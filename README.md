@@ -1,38 +1,72 @@
-# sv
+# typst-flow
 
-Everything you need to build a Svelte project, powered by [`sv`](https://github.com/sveltejs/cli).
+**typst-flow** is a self-hostable service designed to ultimately provide a collaborative Typst writing experience, much like [typst.app](https://typst.app). This platform enables users to collaboratively create, edit, and preview Typst documents in real-time. Name originates from my feeling when I write with Typst, it feels like a flow - I love it.
 
-## Creating a project
+---
 
-If you're seeing this, you've probably already done this step. Congrats!
+## Features (All pretty much WIP)
 
-```bash
-# create a new project in the current directory
-npx sv create
+- **Live Preview**: See your Typst document rendered in real-time as you edit.
+- **Self-Hostable**: Full control over your instance, ensuring privacy and customization.
+- **User Management**: Manage access through user accounts or external authentication.
+- **Collaborative Editing**: Multiple users can edit the same document simultaneously.
+- **Export Options**: Generate and download Typst documents as PDFs or source files.
 
-# create a new project in my-app
-npx sv create my-app
-```
+### Planned
 
-## Developing
+- **Version Control**: Integrated history to track changes.
 
-Once you've created a project and installed dependencies with `npm install` (or `pnpm install` or `yarn`), start a development server:
+---
 
-```bash
-npm run dev
+## Installation
 
-# or start the server and open the app in a new browser tab
-npm run dev -- --open
-```
+### Prerequisites
+- **Server Requirements**:  
+  - Operating System: Linux (recommended), macOS, or Windows  
+  - RAM: Minimum 2 GB  
+  - Disk Space: At least 500 MB for the application, plus storage for documents
+- **Software Requirements**:  
+  - Docker
 
-## Building
+### Steps
+1. Clone the repository:  
+   ```bash
+   git clone https://github.com/LeqitDev/typst-flow.git
+   cd typst-flow
+    ```
 
-To create a production version of your app:
+---
 
-```bash
-npm run build
-```
+## Whats inside
 
-You can preview the production build with `npm run preview`.
+- **Frontend**: Svelte, shadcn-svelte, tailwindcss
+- **Backend**: SvelteKit
+- **Auth**: Lucia
+- **Database**: Postgres (for managing users, sessions, teams, and projects)
+- **S3 Storage**: Minio (for storing Typst documents)
+- **Collaborative Editing**: [Typst Flower](https://github.com/LeqitDev/typst-flower) (Custom Operational Transformation implementation)
+- **Typst**: Through a custom wasm package [Typst Flow Wasm](https://github.com/LeqitDev/typst-flow-wasm)
 
-> To deploy your app, you may need to install an [adapter](https://svelte.dev/docs/kit/adapters) for your target environment.
+---
+
+## Contributing
+
+Contributions are welcome! Here are some ways you can help:
+
+- **Bug Reports**: Report any bugs you encounter through the Issues tab.
+- **Feature Requests**: Suggest new features or improvements.
+- **Code Contributions**: Submit a pull request with your changes.
+
+---
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+## Acknowledgements
+
+- **Typst**: Without the absolutely insane [Typst Project](https://github.com/typst/typst), all of this would not be possible.
+- **Inspirations**: [obsidian-typst](https://github.com/fenjalien/obsidian-typst), [typst-lsp](https://github.com/nvarner/typst-lsp) bzw. [tinymist](https://github.com/Myriad-Dreamin/tinymist), [typst.ts](https://github.com/Myriad-Dreamin/typst.ts)
+- **caleb1248**: That [repo](https://github.com/caleb1248/monaco-vscode-textmate) helped me a lot with the Monaco Editor integration.
