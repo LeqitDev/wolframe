@@ -18,5 +18,8 @@ export default defineConfig({
 			"$rust": path.resolve(__dirname, 'typst-flow-wasm/pkg'),
 		}
 	},
+	define: {
+		global: {}
+	},
 	plugins: [sveltekit()]
 });

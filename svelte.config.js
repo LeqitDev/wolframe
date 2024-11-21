@@ -15,7 +15,7 @@ const config = {
 		alias: {
 			"$rust": "./typst-flow-wasm/pkg"
 		}
-	}
+	},
 };
 
 export default config;

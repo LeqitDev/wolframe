@@ -5,7 +5,8 @@
 	// import { editor as meditor } from 'monaco-editor';
 	import type { PageData } from './$types';
 	import init, * as typst from '$rust/typst_flow_wasm';
-	import { Canvg } from 'canvg';
+	import PageRenderWorker from '$lib/workers/page_renderer?url';
+	import { IndexedDBFileStorage } from '$lib/indexeddb';
 
 	const debounce = (func: Function, wait: number = 300) => {
 		let timeout: any;
@@ -29,8 +30,7 @@
 
 	let divEl: HTMLDivElement;
 
-	let pages = $state(['']);
-	let canvases: {canvg: Canvg, canvas: HTMLCanvasElement}[] = $state([]);
+	let canvases: { canvas: HTMLCanvasElement; normal_width: number; ratio: number }[] = $state([]);
 	const store = getProjectStore();
 	let editor: any = null;
 	let vfs: { name: string; content: string; model: any }[] = $state([]);
@@ -38,6 +38,7 @@
 	let compiler: typst.SuiteCore;
 	let canvasContainer: HTMLDivElement;
 	let previewScale = $state(1);
+	let page_render_worker: undefined | Worker;
 
 	function xml_get_sync(path: string) {
 		const request = new XMLHttpRequest();
@@ -58,18 +59,28 @@
 		for (const [i, svg] of compiler.compile().entries()) {
 			if (canvases.length <= i) {
 				let canvas = document.createElement('canvas');
-				const ctx = canvas.getContext('2d');
 				canvasContainer.appendChild(canvas);
-				let canvg = await Canvg.from(ctx!, svg);
-				canvg.render();
-				
-				canvases.push({canvg, canvas});
+				const offscreen = canvas.transferControlToOffscreen();
+
+				page_render_worker!.postMessage(
+					{
+						type: 'render',
+						svg,
+						canvas: offscreen,
+						pageId: i,
+						recompile
+					} as App.IPageRenderMessage,
+					[offscreen]
+				);
+
+				canvases.push({ canvas, normal_width: canvas.clientWidth, ratio: 0 });
 			} else {
-				if (recompile) {
-					const ctx = canvases[i].canvas.getContext('2d');
-					canvases[i].canvg = await Canvg.from(ctx!, svg);
-				}
-				canvases[i].canvg.render();
+				page_render_worker!.postMessage({
+					type: 'render',
+					svg,
+					pageId: i,
+					recompile
+				} as App.IPageRenderMessage);
 			}
 		}
 	}
@@ -78,24 +89,22 @@
 		ws.send(
 			'EDIT ' +
 				JSON.stringify(
-					accumulatedChanges
-						.flat()
-						.sort((a, b) => a.rangeOffset - b.rangeOffset) as RawOperation[]
+					accumulatedChanges.flat().sort((a, b) => a.rangeOffset - b.rangeOffset) as RawOperation[]
 				)
 		);
 		for (let change of accumulatedChanges.flat()) {
-				try {
-					console.log('Applying change', change, vfs[currentModelId].name);
+			try {
+				console.log('Applying change', change, vfs[currentModelId].name);
 
-					compiler.edit(
-						vfs[currentModelId].name,
-						change.text,
-						change.rangeOffset,
-						change.rangeOffset + change.rangeLength
-					);
-				} catch (e) {
-					console.error(e);
-				}
+				compiler.edit(
+					vfs[currentModelId].name,
+					change.text,
+					change.rangeOffset,
+					change.rangeOffset + change.rangeLength
+				);
+			} catch (e) {
+				console.error(e);
+			}
 		}
 		console.log('Content changed', accumulatedChanges.map((v) => v[0]) as RawOperation[]);
 		accumulatedChanges = [];
@@ -103,37 +112,131 @@
 	});
 	let accumulatedChanges: any[] = [];
 
+	function convertRemToPixels(rem: number) {
+		return rem * parseFloat(getComputedStyle(document.documentElement).fontSize);
+	}
+
+	function zoomPreview() {
+		for (let i = 0; i < canvases.length; i++) {
+			const normal_width = canvases[i].normal_width;
+			const new_width = normal_width * previewScale;
+
+			page_render_worker!.postMessage({
+				type: 'resize',
+				pageId: i,
+				resizeArgs: {
+					width: new_width,
+					height: new_width * canvases[i].ratio
+				}
+			} as App.IPageRenderMessage);
+		}
+
+		canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
+		canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
+
+		if (previewScale < 1 && canvasContainer.style.alignItems !== 'center') {
+			canvasContainer.style.alignItems = 'center';
+		} else {
+			if (previewScale >= 1 && canvasContainer.style.alignItems !== 'start') {
+				canvasContainer.style.alignItems = 'start';
+			}
+		}
+
+		render(false);
+	}
+
 	function onWheel(e: WheelEvent) {
 		if (e.ctrlKey) {
 			e.preventDefault();
-			console.log('scale', previewScale);
-			
-			if (e.deltaY > 0 && previewScale > 0.1) {
+
+			let factor = 0;
+			const MIN_SCALE = 0.6;
+			const MAX_SCALE = 2;
+
+			if (e.deltaY > 0) {
 				// Zoom out
-				canvases.forEach((v) => {
-					const new_width = v.canvas.clientWidth * 0.9;
-					v.canvg.resize(new_width, undefined, true);
-				});
-
-				previewScale -= 0.1;
+				if (previewScale > MIN_SCALE) {
+					factor = -0.1;
+				}
 			} else {
-				if (previewScale < 2) {
-					// Zoom in
-					canvases.forEach((v) => {
-						const new_width = v.canvas.clientWidth * 1.1;
-						v.canvg.resize(new_width, undefined, true);
-					});
-
-					previewScale += 0.1;
+				// Zoom in
+				if (previewScale < MAX_SCALE) {
+					factor = 0.1;
 				}
 			}
-			render(false);
+
+			// Only update if there's a meaningful change
+			if (factor !== 0) {
+				const newScale = previewScale + factor;
+
+				// Ensure the new scale is within bounds
+				if (newScale >= MIN_SCALE && newScale <= MAX_SCALE) {
+					previewScale = newScale;
+
+					zoomPreview();
+				}
+			}
 		}
 	}
 
+	let isDragging = false;
+	let startX = 0;
+	let startY = 0;
+	let scrollLeft = 0;
+	let scrollTop = 0;
+
+	function onMouseDown(e: MouseEvent) {
+		isDragging = true;
+		startX = e.pageX - canvasContainer.offsetLeft;
+		startY = e.pageY - canvasContainer.offsetTop;
+		scrollLeft = canvasContainer.scrollLeft;
+		scrollTop = canvasContainer.scrollTop;
+
+		e.preventDefault();
+	}
+
+	function onMouseUp(e: MouseEvent) {
+		isDragging = false;
+	}
+
+	function onMouesMove(e: MouseEvent) {
+		if (!isDragging) return;
+
+		const x = e.pageX - canvasContainer.offsetLeft;
+		const y = e.pageY - canvasContainer.offsetTop;
+
+		const walkX = (x - startX) * 2;
+		const walkY = (y - startY) * 2;
+
+		canvasContainer.scrollLeft = scrollLeft - walkX;
+		canvasContainer.scrollTop = scrollTop - walkY;
+	}
+
 	$effect(() => {
+		page_render_worker = new Worker(PageRenderWorker, {
+			type: 'module'
+		});
+
+		page_render_worker.onmessage = (e: MessageEvent<App.IPageRenderResponse>) => {
+			const msg = e.data;
+			if (msg.type === 'error') {
+				console.log('Error Page Render Worker', msg.error);
+			} else {
+				const infos = msg.canvasInfos;
+				if (!infos || infos.width === 0) {
+					return;
+				}
+
+				console.log('Page', infos.pageId, 'finished! Width:', infos.width);
+				const canvas = canvases[infos.pageId].canvas;
+
+				canvases[infos!.pageId].normal_width = canvas.clientWidth; // update the canvas width
+				canvases[infos!.pageId].ratio = canvas.clientHeight / canvas.clientWidth; // update the ratio (reversed)
+			}
+		};
+
 		(window as any).xml_get_sync = xml_get_sync;
-		document.addEventListener('wheel', onWheel, { passive: false});
+		document.addEventListener('wheel', onWheel, { passive: false });
 
 		init().then(() => {
 			compiler = new typst.SuiteCore('');
@@ -171,6 +274,8 @@
 							try {
 								compiler.add_file('main.typ', e.data.slice(5));
 								render();
+								canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
+								canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
 							} catch (e) {
 								console.error(e);
 							}
@@ -290,6 +395,36 @@
 						}
 					}
 				]
+			},
+			{
+				name: 'Preview',
+				actions: [
+					{
+						name: 'Zoom In',
+						onclick: () => {
+							if (previewScale < 2) {
+								previewScale += 0.1;
+								zoomPreview();
+							}
+						}
+					},
+					{
+						name: 'Zoom Out',
+						onclick: () => {
+							if (previewScale > 0.6) {
+								previewScale -= 0.1;
+								zoomPreview();
+							}
+						}
+					},
+					{
+						name: 'Reset Zoom',
+						onclick: () => {
+							previewScale = 1;
+							zoomPreview();
+						}
+					}
+				]
 			}
 		]);
 	});
@@ -342,12 +477,16 @@
 	</Resizable.Pane>
 	<Resizable.Handle />
 	<Resizable.Pane collapsedSize={0} collapsible={true} minSize={15}>
-		<div bind:this={canvasContainer} class="h-full w-full overflow-y-auto overflow-x-auto grid gap-20 p-16">
-			<!-- <div>
-				{#each pages as page}
-					<div>{@html page}</div>
-				{/each}
-			</div> -->
+		<div
+			bind:this={canvasContainer}
+			onmousedown={onMouseDown}
+			onmouseup={onMouseUp}
+			onmousemove={onMouesMove}
+			onmouseleave={onMouseUp}
+			role="presentation"
+			class="flex h-full w-full flex-col items-start overflow-x-auto overflow-y-auto"
+		>
+		
 		</div>
 	</Resizable.Pane>
 </Resizable.PaneGroup>

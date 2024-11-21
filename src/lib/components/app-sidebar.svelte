@@ -11,6 +11,7 @@
 	import ChevronRight from 'lucide-svelte/icons/chevron-right';
 	import { createAvatar } from '@dicebear/core';
 	import { initials } from '@dicebear/collection';
+	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 
 	interface FileMetadata {
 		filename: string;
@@ -26,14 +27,14 @@
 	// Menu items.
 	const items = [
 		{
-			title: 'Home',
-			url: '#',
-			icon: House
-		},
-		{
 			title: 'Project Settings',
 			url: '#',
 			icon: Settings
+		},
+		{
+			title: 'Home',
+			url: '#',
+			icon: House
 		}
 	];
 
@@ -68,6 +69,16 @@
 		data = {
 			tree: parsePageData(pdata)
 		};
+	});
+
+	let currentHovered: null | { name: string; isDir: boolean } = $state(null);
+	let open = $state(false);
+	let staticHovered: null | { name: string; isDir: boolean } = $state(null);
+
+	$effect(() => {
+		if (!open) {
+			staticHovered = currentHovered;
+		}
 	});
 
 	function parsePageData(data: { files: FileMetadata[]; project_path: string }) {
@@ -113,24 +124,42 @@
 	<Sidebar.Header>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<div class="flex">
-					<img src={projectAvatar} alt="Avatar" class="size-8 rounded-md" />
-					<span class="group-data-[collapsible=icon]:hidden">{pdata.project.name}</span>
+				<div class="flex items-center group-data-[collapsible=icon]:justify-center">
+					<img
+						src={projectAvatar}
+						alt="Avatar"
+						class="size-9 rounded-md group-data-[collapsible=icon]:size-7"
+					/>
+					<span class="pl-2 text-lg font-bold group-data-[collapsible=icon]:hidden"
+						>{pdata.project.name}</span
+					>
 				</div>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Header>
 	<Sidebar.Content>
-		<Sidebar.Group class="group-data-[collapsible=icon]:hidden">
-			<Sidebar.GroupLabel>Project Files</Sidebar.GroupLabel>
-			<Sidebar.GroupContent>
-				<Sidebar.Menu>
-					{#each data.tree as item, index (index)}
-						{@render Tree({ item })}
-					{/each}
-				</Sidebar.Menu>
-			</Sidebar.GroupContent>
-		</Sidebar.Group>
+		<ContextMenu.Root bind:open>
+			<ContextMenu.Trigger class="h-full">
+				<Sidebar.Group class="group-data-[collapsible=icon]:hidden h-full">
+					<Sidebar.GroupLabel>Project Files</Sidebar.GroupLabel>
+					<Sidebar.GroupContent>
+						<Sidebar.Menu>
+							{#each data.tree as item, index (index)}
+								{@render Tree({ item })}
+							{/each}
+						</Sidebar.Menu>
+					</Sidebar.GroupContent>
+				</Sidebar.Group></ContextMenu.Trigger
+			>
+			<ContextMenu.Content>
+				{@const cur = $state.snapshot(staticHovered)}
+				{#if cur}
+					<ContextMenu.Item>Delete {!cur.isDir ? "File" : "Folder"}</ContextMenu.Item>
+				{/if}
+				<ContextMenu.Item>Add folder</ContextMenu.Item>
+				<ContextMenu.Item>Add file</ContextMenu.Item>
+			</ContextMenu.Content>
+		</ContextMenu.Root>
 	</Sidebar.Content>
 	<Sidebar.Footer>
 		<Sidebar.Menu>
@@ -157,7 +186,11 @@
 	{#if !items.length}
 		<Sidebar.MenuButton
 			isActive={name === 'button.svelte'}
-			class="data-[active=true]:bg-transparent"
+			class="data-[active=true]:bg-transparent" onmouseenter={() => {
+				currentHovered = { name, isDir: false };
+			}} onmouseleave={() => {
+							currentHovered = null;
+						}}
 		>
 			<File />
 			{name}
@@ -170,7 +203,11 @@
 			>
 				<Collapsible.Trigger>
 					{#snippet child({ props })}
-						<Sidebar.MenuButton {...props}>
+						<Sidebar.MenuButton {...props} onmouseenter={() => {
+							currentHovered = { name, isDir: true };
+						}} onmouseleave={() => {
+							currentHovered = null;
+						}}>
 							<ChevronRight className="transition-transform" />
 							<Folder />
 							{name}

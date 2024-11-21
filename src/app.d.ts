@@ -41,6 +41,28 @@ declare global {
 			content: null | string;
 			metadata: FileMetadata;
 		}
+
+		interface IPageRenderMessage {
+			type: 'render' | 'resize';
+			pageId: number;
+			canvas?: OffscreenCanvas;
+			svg?: string;
+			recompile?: boolean;
+			resizeArgs?: {
+				width: number;
+				height?: number;
+				preserveAspectRatio?: boolean | string;
+			}
+		}
+
+		interface IPageRenderResponse {
+			type: 'error' | 'success';
+			canvasInfos?: {
+				pageId: number;
+				width: number;
+			};
+			error?: string;
+		}
 	}
 }
 
