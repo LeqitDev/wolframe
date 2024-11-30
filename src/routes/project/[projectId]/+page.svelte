@@ -8,7 +8,10 @@
 	import PageRenderWorker from '$lib/workers/page_renderer?url';
 	import { IndexedDBFileStorage } from '$lib/indexeddb';
 	import { PageRendererWorkerBridge } from '$lib';
-	
+	import { getLogger } from '$lib/logger.svelte';
+
+	const LOGGER = getLogger();
+	LOGGER.logConsole(true);
 
 	const debounce = (func: Function, wait: number = 300) => {
 		let timeout: any;
@@ -52,8 +55,10 @@
 			request.status === 200 &&
 			(request.response instanceof String || typeof request.response === 'string')
 		) {
+			LOGGER.info(LOGGER.wasmSection, 'XML GET', path, 'OK');
 			return Uint8Array.from(request.response, (c: string) => c.charCodeAt(0));
 		}
+		LOGGER.error(LOGGER.wasmSection, 'XML GET', path, 'FAILED');
 		return Uint8Array.from([]);
 	}
 
@@ -66,12 +71,15 @@
 				const offscreen = canvas.transferControlToOffscreen();
 
 				pageRenderer?.forcedRerender(i, svg, offscreen);
+				LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'rendering');
 
 				canvases.push({ id: 'preview-page-' + i, normal_width: canvas.clientWidth, ratio: 0 });
 			} else {
 				if (recompile) {
+					LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'forcing rerender');
 					pageRenderer?.forcedRerender(i, svg);
 				} else {
+					LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'cached rerender');
 					pageRenderer?.cachedRerender(i, svg);
 				}
 			}
@@ -87,7 +95,7 @@
 		);
 		for (let change of accumulatedChanges.flat()) {
 			try {
-				console.log('Applying change', change, vfs[currentModelId].name);
+				LOGGER.info(LOGGER.mainMonacoSection, 'Applying change', change, vfs[currentModelId].name);
 
 				compiler.edit(
 					vfs[currentModelId].name,
@@ -96,10 +104,10 @@
 					change.rangeOffset + change.rangeLength
 				);
 			} catch (e) {
-				console.error(e);
+				LOGGER.error(LOGGER.mainMonacoSection, 'Error applying change', e);
 			}
 		}
-		console.log('Content changed', accumulatedChanges.map((v) => v[0]) as RawOperation[]);
+		LOGGER.info(LOGGER.mainMonacoSection, 'Content changed', accumulatedChanges.map((v) => v[0]) as RawOperation[]);
 		accumulatedChanges = [];
 		render();
 	});
@@ -199,20 +207,31 @@
 		canvasContainer.scrollTop = scrollTop - walkY;
 	}
 
+	// Logging functions for use inside WASM TODO: implement inside wasm
+	function logWasm(...e: any[]) {
+		LOGGER.info(LOGGER.wasmSection, ...e);
+	}
+
+	function errorWasm(...e: any[]) {
+		LOGGER.error(LOGGER.wasmSection, ...e);
+	}
+
 	$effect(() => {
+		LOGGER.clearLogs();
+
 		pageRenderer = new PageRendererWorkerBridge(new Worker(PageRenderWorker, {
 			type: 'module'
 		}));
 
 		pageRenderer.onMessage((msg) => {
 			if (msg.type === 'error') {
-				console.log('Error Page Render Worker', msg.error);
+				LOGGER.error(LOGGER.workerRendererSection, 'Error Page Render Worker', msg.error);
 			} else {
 				if (msg.width === 0) {
 					return;
 				}
 
-				console.log('Page', msg.pageId, 'finished! Width:', msg.width);
+				LOGGER.info(LOGGER.workerRendererSection, 'Page', msg.pageId, 'finished! Width:', msg.width);
 
 				setTimeout(() => {
 					canvases[msg.pageId].normal_width = msg.width; // update the canvas width
@@ -222,6 +241,8 @@
 		});
 
 		(window as any).xml_get_sync = xml_get_sync;
+		(window as any).logWasm = logWasm;
+		(window as any).errorWasm = errorWasm;
 		document.addEventListener('wheel', onWheel, { passive: false });
 
 		init().then(() => {
@@ -229,7 +250,7 @@
 
 			import('$lib/editor').then(({ EditorSetup, initializeEditor, createModel }) => {
 				initializeEditor(compiler).then((_editor) => {
-					console.log('Editor initialized');
+					LOGGER.info(LOGGER.mainMonacoSection, 'Editor initialized');
 					editor = _editor;
 
 					// Provide models for the vfs
@@ -251,10 +272,10 @@
 					};
 					ws.onerror = (e) => {
 						// TODO: HANDLE ERROR
-						console.log('Websocket Error', e);
+						LOGGER.error(LOGGER.mainWSFlowerSection, 'Websocket Error', e);
 					};
 					ws.onmessage = (e: MessageEvent<string>) => {
-						console.log(e.data);
+						LOGGER.info(LOGGER.mainWSFlowerSection, `Websocket Message: """${e.data}"""`);
 						if (e.data.startsWith('INIT ')) {
 							vfs[0].model.setValue(e.data.slice(5));
 							try {
@@ -280,7 +301,11 @@
 					onContentChanged(e);
 				}); */
 				});
+			}).catch((e) => {
+				LOGGER.error(LOGGER.mainMonacoSection, 'Error initializing editor', e);
 			});
+		}).catch((e) => {
+			LOGGER.error(LOGGER.wasmSection, 'Error initializing WASM', e);
 		});
 
 		return () => {

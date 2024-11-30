@@ -1,5 +1,8 @@
 <script lang="ts">
+	import { initializeLogger } from '$lib/logger.svelte';
 	import '../app.css';
+
+	initializeLogger();
 
 	let { children } = $props();
 </script>
