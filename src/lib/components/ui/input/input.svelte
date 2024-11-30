@@ -9,6 +9,7 @@
 		class: className,
 		...restProps
 	}: WithElementRef<HTMLInputAttributes> = $props();
+
 </script>
 
 <input

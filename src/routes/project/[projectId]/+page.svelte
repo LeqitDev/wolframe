@@ -7,6 +7,8 @@
 	import init, * as typst from '$rust/typst_flow_wasm';
 	import PageRenderWorker from '$lib/workers/page_renderer?url';
 	import { IndexedDBFileStorage } from '$lib/indexeddb';
+	import { PageRendererWorkerBridge } from '$lib';
+	
 
 	const debounce = (func: Function, wait: number = 300) => {
 		let timeout: any;
@@ -30,7 +32,7 @@
 
 	let divEl: HTMLDivElement;
 
-	let canvases: { canvas: HTMLCanvasElement; normal_width: number; ratio: number }[] = $state([]);
+	let canvases: { id: string; normal_width: number; ratio: number }[] = [];
 	const store = getProjectStore();
 	let editor: any = null;
 	let vfs: { name: string; content: string; model: any }[] = $state([]);
@@ -38,7 +40,7 @@
 	let compiler: typst.SuiteCore;
 	let canvasContainer: HTMLDivElement;
 	let previewScale = $state(1);
-	let page_render_worker: undefined | Worker;
+	let pageRenderer: undefined | PageRendererWorkerBridge;
 
 	function xml_get_sync(path: string) {
 		const request = new XMLHttpRequest();
@@ -59,28 +61,19 @@
 		for (const [i, svg] of compiler.compile().entries()) {
 			if (canvases.length <= i) {
 				let canvas = document.createElement('canvas');
+				canvas.id = 'preview-page-' + i;
 				canvasContainer.appendChild(canvas);
 				const offscreen = canvas.transferControlToOffscreen();
 
-				page_render_worker!.postMessage(
-					{
-						type: 'render',
-						svg,
-						canvas: offscreen,
-						pageId: i,
-						recompile
-					} as App.IPageRenderMessage,
-					[offscreen]
-				);
+				pageRenderer?.forcedRerender(i, svg, offscreen);
 
-				canvases.push({ canvas, normal_width: canvas.clientWidth, ratio: 0 });
+				canvases.push({ id: 'preview-page-' + i, normal_width: canvas.clientWidth, ratio: 0 });
 			} else {
-				page_render_worker!.postMessage({
-					type: 'render',
-					svg,
-					pageId: i,
-					recompile
-				} as App.IPageRenderMessage);
+				if (recompile) {
+					pageRenderer?.forcedRerender(i, svg);
+				} else {
+					pageRenderer?.cachedRerender(i, svg);
+				}
 			}
 		}
 	}
@@ -120,15 +113,9 @@
 		for (let i = 0; i < canvases.length; i++) {
 			const normal_width = canvases[i].normal_width;
 			const new_width = normal_width * previewScale;
+			
 
-			page_render_worker!.postMessage({
-				type: 'resize',
-				pageId: i,
-				resizeArgs: {
-					width: new_width,
-					height: new_width * canvases[i].ratio
-				}
-			} as App.IPageRenderMessage);
+			pageRenderer?.resize(i, new_width, new_width * canvases[i].ratio);
 		}
 
 		canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
@@ -213,27 +200,26 @@
 	}
 
 	$effect(() => {
-		page_render_worker = new Worker(PageRenderWorker, {
+		pageRenderer = new PageRendererWorkerBridge(new Worker(PageRenderWorker, {
 			type: 'module'
-		});
+		}));
 
-		page_render_worker.onmessage = (e: MessageEvent<App.IPageRenderResponse>) => {
-			const msg = e.data;
+		pageRenderer.onMessage((msg) => {
 			if (msg.type === 'error') {
 				console.log('Error Page Render Worker', msg.error);
 			} else {
-				const infos = msg.canvasInfos;
-				if (!infos || infos.width === 0) {
+				if (msg.width === 0) {
 					return;
 				}
 
-				console.log('Page', infos.pageId, 'finished! Width:', infos.width);
-				const canvas = canvases[infos.pageId].canvas;
+				console.log('Page', msg.pageId, 'finished! Width:', msg.width);
 
-				canvases[infos!.pageId].normal_width = canvas.clientWidth; // update the canvas width
-				canvases[infos!.pageId].ratio = canvas.clientHeight / canvas.clientWidth; // update the ratio (reversed)
+				setTimeout(() => {
+					canvases[msg.pageId].normal_width = msg.width; // update the canvas width
+					canvases[msg.pageId].ratio = msg.height / msg.width; // update the ratio (reversed)
+				});
 			}
-		};
+		});
 
 		(window as any).xml_get_sync = xml_get_sync;
 		document.addEventListener('wheel', onWheel, { passive: false });

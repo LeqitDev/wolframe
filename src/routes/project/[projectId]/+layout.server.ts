@@ -18,7 +18,7 @@ export const load: LayoutServerLoad = async (event) => {
         throw redirect(302, '/');
     }
 
-    const project_path = getPath(null, event.locals.user.id, slug, null);
+    const project_path = getPath(null, event.locals.user.id, slug, null).split("/").filter((value) => value.length > 0).join("/");
 
     const files = await minio.listFiles(project_path);
 

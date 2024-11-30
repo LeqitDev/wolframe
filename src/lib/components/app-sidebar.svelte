@@ -12,6 +12,28 @@
 	import { createAvatar } from '@dicebear/core';
 	import { initials } from '@dicebear/collection';
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
+	import Separator from './ui/separator/separator.svelte';
+	import { Input } from './ui/input';
+	import { tick } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
+	import { flip } from 'svelte/animate';
+
+	interface FileSystemFolderType {
+		type: 'directory';
+		depth: number;
+		children: FileSystemNode[];
+		open: boolean;
+	}
+
+	interface FileSystemFileType {
+		type: 'file';
+		size: number;
+		mimetype: string;
+		etag: string;
+		lastModified: Date;
+	}
+
+	type FileSystemNodeType = FileSystemFileType | FileSystemFolderType;
 
 	interface FileMetadata {
 		filename: string;
@@ -21,6 +43,16 @@
 		etag: string;
 		path: string;
 	}
+
+	interface BaseFileSystemNode {
+		name: string;
+		path: string;
+		new?: boolean;
+	}
+
+	type FileSystemNode = BaseFileSystemNode & FileSystemNodeType;
+	type FileSystemFolder = BaseFileSystemNode & FileSystemFolderType;
+	type FileSystemFile = BaseFileSystemNode & FileSystemFileType;
 
 	// https://github.com/Microsoft/monaco-editor/issues/366
 
@@ -38,27 +70,71 @@
 		}
 	];
 
-	let data = $state({
-		tree: [
-			['lib', ['components', 'button.svelte', 'card.svelte'], 'utils.ts'],
-			[
-				'routes',
-				['hello', '+page.svelte', '+page.ts'],
-				'+page.svelte',
-				'+page.server.ts',
-				'+layout.svelte'
-			],
-			['static', 'favicon.ico', 'svelte.svg'],
-			'eslint.config.js',
-			'.gitignore',
-			'svelte.config.js',
-			'tailwind.config.js',
-			'package.json',
-			'README.md'
-		]
+	let {
+		pdata,
+		activeFile = $bindable(),
+		previewFile = $bindable(),
+		debug = false,
+		onFileClick = () => {},
+		onNodeMoved = () => {},
+		onNewFile = () => {},
+		onNewDir = () => {},
+		onFileDeleted = () => {},
+		onDirDeleted = () => {},
+		onPreviewFileChange = () => {}
+	}: {
+		pdata: any;
+		activeFile: string;
+		previewFile: string;
+		debug?: boolean;
+		onFileClick?: (file: FileMetadata) => void;
+		onNodeMoved?: (node: FileSystemNode, prev_path: string) => void;
+		onNewFile?: (file: FileMetadata) => void;
+		onNewDir?: (dir: FileSystemFolder) => void;
+		onFileDeleted?: (file: FileMetadata) => void;
+		onDirDeleted?: (dir: FileSystemFolder) => void;
+		onPreviewFileChange?: (file: FileMetadata) => void;
+	} = $props();
+
+	let data: { tree: FileSystemFolder } = $state({
+		tree: parsePageData(pdata)
 	});
 
-	let { pdata }: { pdata: any } = $props();
+	let dragState: {
+		dragged: FileSystemNode | null;
+		targets: SvelteSet<FileSystemFolder>;
+		hoverTimer: number;
+	} = $state({
+		dragged: null,
+		targets: new SvelteSet(),
+		hoverTimer: 0
+	});
+
+	let dragTarget = $derived.by(() => {
+		// highest depth folder in dragState.targets
+		let maxDepth = -1;
+		let target: FileSystemFolder | null = null;
+		let targets = dragState.targets;
+
+		if (dragState.targets.size === 0) return null;
+		for (const folder of targets) {
+			if (folder.depth > maxDepth) {
+				maxDepth = folder.depth;
+				target = folder;
+			}
+		}
+
+		return target;
+	});
+
+	let validDrop = $derived.by(() => {
+		return dragState.dragged && dragTarget && validateDragTarget(dragState.dragged, dragTarget);
+	});
+
+	function validateDragTarget(dragged: FileSystemNode, target: FileSystemFolder): boolean {
+		// Prevent dragging into own children or self
+		return !(dragged.path === target.path && dragged.type === target.type);
+	}
 
 	let projectAvatar = createAvatar(initials, {
 		seed: pdata.project.name,
@@ -66,57 +142,374 @@
 	}).toDataUri();
 
 	$effect(() => {
-		data = {
-			tree: parsePageData(pdata)
-		};
+		if (dragTarget) {
+			forEachTreeNode;
+		}
 	});
 
-	let currentHovered: null | { name: string; isDir: boolean } = $state(null);
-	let open = $state(false);
-	let staticHovered: null | { name: string; isDir: boolean } = $state(null);
+	let currentHovered: null | { item: FileSystemNode; isDir: boolean } = $state(null);
+	let contextMenuVisibility = $state(false);
+	let staticHovered: null | { item: FileSystemNode; isDir: boolean } = $state(null);
 
 	$effect(() => {
-		if (!open) {
+		if (!contextMenuVisibility) {
 			staticHovered = currentHovered;
 		}
 	});
 
+	function fileSystemFileToFileMetadata(file: FileSystemFile): FileMetadata {
+		return {
+			filename: file.name,
+			mimetype: file.mimetype,
+			size: file.size,
+			lastModified: file.lastModified,
+			etag: file.etag,
+			path: file.path
+		};
+	}
+
 	function parsePageData(data: { files: FileMetadata[]; project_path: string }) {
-		const tree: any[] = [];
-		const dirMap = new Map<string, any[]>();
+		const root: FileSystemNode = {
+			name: data.project_path.split('/').pop() || '',
+			type: 'directory',
+			children: [],
+			depth: 0,
+			open: true,
+			path: data.project_path.substring(0, data.project_path.length)
+		};
 
-		// Sort files by path to ensure parent directories are processed first
-		const sortedFiles = [...data.files].sort((a, b) => a.path.localeCompare(b.path));
-
-		for (const file of sortedFiles) {
-			const parts = file.path.replace(data.project_path, '').split('/').filter(Boolean);
-			const fileName = parts[parts.length - 1];
-
-			if (parts.length === 1) {
-				// Root level file
-				tree.push(fileName);
-				continue;
+		const filesByDirectory: Map<string, FileMetadata[]> = new Map();
+		data.files.forEach((file) => {
+			const dirPath = file.path.replace(file.filename, '').trim();
+			if (!filesByDirectory.has(dirPath)) {
+				filesByDirectory.set(dirPath, []);
 			}
+			filesByDirectory.get(dirPath)?.push(file);
+		});
 
-			let currentLevel = tree;
-			for (let i = 0; i < parts.length - 1; i++) {
-				const dirName = parts[i];
+		console.log(filesByDirectory);
 
-				// Find or create directory array in current level
-				let dirArray = currentLevel.find((item) => Array.isArray(item) && item[0] === dirName);
+		const buildDirectoryTree = (basePath: string, parentNode: FileSystemNode) => {
+			if (parentNode.type === 'file') return;
 
-				if (!dirArray) {
-					dirArray = [dirName];
-					currentLevel.push(dirArray);
+			const directFiles = data.files.filter(
+				(f) =>
+					f.path.startsWith(basePath) &&
+					f.path.split('/').filter((p) => p).length ===
+						basePath.split('/').filter((p) => p).length + 1
+			);
+
+			directFiles.forEach((file) => {
+				const fileNode: FileSystemNode = {
+					name: file.filename,
+					type: 'file',
+					size: file.size,
+					mimetype: file.mimetype,
+					lastModified: file.lastModified,
+					etag: file.etag,
+					path: file.path
+				};
+				parentNode.children.push(fileNode);
+			});
+
+			// Find subdirectories
+			const subdirs = new Set(
+				data.files
+					.filter(
+						(f) =>
+							f.path.startsWith(basePath) &&
+							f.path !== basePath &&
+							f.path.split('/').filter((p) => p).length >
+								basePath.split('/').filter((p) => p).length + 1
+					)
+					.map(
+						(f) => f.path.split('/').filter((p) => p)[basePath.split('/').filter((p) => p).length]
+					)
+			);
+
+			subdirs.forEach((subdir) => {
+				const fullSubdirPath = `${basePath}/${subdir}`;
+				const dirNode: FileSystemNode = {
+					name: subdir,
+					type: 'directory',
+					depth: parentNode.depth + 1,
+					children: [],
+					path: fullSubdirPath,
+					open: false
+				};
+				parentNode.children.push(dirNode);
+				buildDirectoryTree(fullSubdirPath, dirNode);
+			});
+
+			parentNode.children.sort((a, b) => {
+				const isADir = a.type === 'directory';
+				const isBDir = b.type === 'directory';
+
+				if (isADir && !isBDir) return -1;
+				if (!isADir && isBDir) return 1;
+
+				return a.name.localeCompare(b.name);
+			});
+		};
+
+		buildDirectoryTree(data.project_path, root);
+
+		return root;
+	}
+
+	// Function to recursively find and remove the item
+	function findAndRemoveItem(tree: FileSystemNode, delitem: FileSystemNode): FileSystemNode | null {
+		let removedItem: FileSystemNode | null = null;
+		
+
+		if (tree.type === 'directory') {
+			for (let i = 0; i < tree.children.length; i++) {
+				const item = tree.children[i];
+				
+
+				// If it's a file and matches the path and type, remove it
+				if (item.path === delitem.path && item.type === delitem.type) {
+					return tree.children.splice(i, 1)[0];
 				}
 
-				currentLevel = dirArray;
+				// If it's a directory, recursively search only if the path is a prefix
+				if (item.type === 'directory' && delitem.path.startsWith(item.path)) {
+					const removedItem = findAndRemoveItem(item, delitem);
+					/* if (item.children.length === 0) { If we want to remove empty dirs
+						tree.children.splice(i, 1);
+					} */
+					if (removedItem) return removedItem;
+				}
 			}
-
-			currentLevel.push(fileName);
 		}
 
+		return removedItem;
+	}
+
+	// Function to insert item into the correct folder
+	function insertItemInFolder(tree: FileSystemNode, folder: FileSystemNode, item: FileSystemNode) {
+		if (item.path === folder.path) {
+			console.error('Cannot insert item into itself');
+			return;
+		}
+
+		const parts = item.path.replace(tree.path, '').split('/').filter(Boolean);
+		let current = tree;
+
+		if (current.type === 'directory') {
+			for (const part of parts.slice(0, -1)) {
+				const dir: FileSystemNode | undefined = current.children.find(
+					(child) => child.name === part
+				);
+
+				if (!dir || dir.type !== 'directory') {
+					console.error('Directory not found');
+					return;
+				}
+
+				current = dir;
+			}
+
+			current.children.push(item);
+
+			// Sort the children
+			current.children.sort((a, b) => {
+				const isADir = a.type === 'directory';
+				const isBDir = b.type === 'directory';
+
+				if (isADir && !isBDir) return -1;
+				if (!isADir && isBDir) return 1;
+
+				return a.name.localeCompare(b.name);
+			});
+		}
+	}
+
+	function moveItemInTree(
+		tree: FileSystemNode,
+		curFolder: FileSystemNode,
+		curDragged: FileSystemNode
+	) {
+		// Remove the item from its current location
+		const removedItem = findAndRemoveItem(tree, curDragged);
+
+		if (!removedItem) {
+			console.error('Item not found in the tree');
+			return tree;
+		}
+
+		// Update the path of the dragged item
+		const newPath = `${curFolder.path}/${curDragged.name}`;
+		const prevPath = removedItem.path;
+		
+		if (previewFile === prevPath) {
+			previewFile = newPath;
+		}
+
+		if (activeFile === prevPath) {
+			activeFile = newPath;
+		}
+
+		removedItem.path = newPath;
+
+		onNodeMoved(removedItem, prevPath);
+
+		// Insert the item into the new location
+		insertItemInFolder(tree, curFolder, removedItem);
+
 		return tree;
+	}
+
+	function addFile() {
+		let hovered = $state.snapshot(staticHovered);
+
+		if (hovered && hovered.isDir) {
+			const newFile = {
+				name: '',
+				type: 'file',
+				new: true,
+				mimetype: 'plain/text',
+				size: 0,
+				lastModified: new Date(),
+				etag: '',
+				path: hovered.item.path + '/...'
+			} as FileSystemNode;
+
+			insertItemInFolder(data.tree, hovered.item as FileSystemNode, newFile);
+			setTimeout(() => {
+				let newFileFocus = document.getElementById('newFileFocus');
+
+				if (newFileFocus) {
+					newFileFocus.focus();
+				}
+			}, 10);
+		}
+	}
+
+	function finalizeNewFile(e: FocusEvent | KeyboardEvent, item: FileSystemNode) {
+		if (e.type === 'keypress' && (e as KeyboardEvent).key !== 'Enter') return;
+		if (item.name === '') {
+			findAndRemoveItem(data.tree, item);
+		} else {
+			item.path = item.path.substring(0, item.path.length - 3) + item.name;
+			// TODO: New file callback
+			onNewFile(fileSystemFileToFileMetadata(item as FileSystemFile));
+			item.new = false;
+		}
+	}
+
+	function addDir() {
+		let hovered = $state.snapshot(staticHovered);
+
+		if (hovered && hovered.isDir) {
+			hovered.item = hovered.item as FileSystemNode;
+			console.log(hovered.item.path);
+
+			if (hovered.item.type === 'file') {
+				console.error('Cannot create a directory inside a file');
+				return;
+			}
+
+			const newDir = {
+				name: '',
+				type: 'directory',
+				new: true,
+				children: [],
+				open: false,
+				depth: hovered.item.depth + 1,
+				path: hovered.item.path + '/...'
+			} as FileSystemFolder;
+			insertItemInFolder(data.tree, hovered.item, newDir);
+
+			setTimeout(() => {
+				let newDirFocus = document.getElementById('newDirFocus');
+
+				if (newDirFocus) {
+					newDirFocus.focus();
+				}
+			}, 100);
+		}
+	}
+
+	function finalizeNewDir(e: FocusEvent | KeyboardEvent, item: FileSystemNode) {
+		if (e.type === 'keypress' && (e as KeyboardEvent).key !== 'Enter') return;
+		if (item.name === '') {
+			findAndRemoveItem(data.tree, item);
+		} else {
+			item.path = item.path.substring(0, item.path.length - 3) + item.name;
+			onNewDir(item as FileSystemFolder);
+			item.new = false;
+		}
+	}
+
+	function forEachTreeNode(tree: FileSystemNode, callback: (node: FileSystemNode) => boolean) {
+		let terminate = false;
+		if (tree.type === 'directory') {
+			tree.children.forEach((child) => {
+				terminate = callback(child);
+				if (!terminate) forEachTreeNode(child, callback);
+			});
+			if (terminate) return;
+		}
+	}
+
+	function drop(e: DragEvent) {
+		e.preventDefault();
+		console.log('Drop', $state.snapshot(dragState), $state.snapshot(dragTarget));
+		if ($state.snapshot(validDrop)) {
+			console.log('OK');
+
+			if (dragState.dragged!.path === dragTarget!.path + '/' + dragState.dragged!.name) {
+				dragState.targets.clear();
+				return;
+			}
+
+			for (const target of dragState.targets) {
+				if (!target.open) {
+					target.open = true;
+				}
+			}
+
+			// Move file (inside tree)
+			moveItemInTree(data.tree, dragTarget!, dragState.dragged!);
+
+			// TODO: Move file callback
+
+			dragState.dragged = null;
+			dragState.targets.clear();
+		}
+	}
+
+	function dragEnd(e: DragEvent) {
+		dragState.dragged = null;
+		dragState.targets.clear();
+	}
+
+	function dragStart(e: DragEvent, item: FileSystemNode) {
+		dragState.dragged = item;
+		e.dataTransfer?.setData('text/plain', item.path);
+	}
+
+	function dragOverFolder(e: DragEvent, folder: FileSystemFolder) {
+		e.preventDefault();
+		if (dragState.dragged) {
+			dragState.targets.add(folder);
+		}
+	}
+
+	function deleteNode() {
+		let hovered = $state.snapshot(staticHovered);
+
+		if (hovered) {
+			const item = hovered.item;
+			const removedItem = findAndRemoveItem(data.tree, item);
+
+			if (item.type === 'file') {
+				onFileDeleted(fileSystemFileToFileMetadata(removedItem as FileSystemFile));
+			} else {
+				onDirDeleted(removedItem as FileSystemFolder);
+			}
+		}
 	}
 </script>
 
@@ -138,26 +531,71 @@
 		</Sidebar.Menu>
 	</Sidebar.Header>
 	<Sidebar.Content>
-		<ContextMenu.Root bind:open>
+		<ContextMenu.Root
+			bind:open={contextMenuVisibility}
+			onOpenChange={() => (staticHovered = currentHovered)}
+		>
 			<ContextMenu.Trigger class="h-full">
-				<Sidebar.Group class="group-data-[collapsible=icon]:hidden h-full">
+				<Sidebar.Group class="h-full group-data-[collapsible=icon]:hidden">
 					<Sidebar.GroupLabel>Project Files</Sidebar.GroupLabel>
-					<Sidebar.GroupContent>
-						<Sidebar.Menu>
-							{#each data.tree as item, index (index)}
-								{@render Tree({ item })}
-							{/each}
+					<Sidebar.GroupContent class="h-full">
+						<Sidebar.Menu
+							onmouseover={() => {
+								currentHovered = {
+									item: data.tree,
+									isDir: true
+								};
+							}}
+							onmouseleave={() => {
+								currentHovered = null;
+							}}
+							ondragover={(e) => dragOverFolder(e, data.tree)}
+							ondrop={drop}
+							ondragend={dragEnd}
+							class={`h-full gap-0 ${dragTarget?.path === pdata.project_path ? 'bg-sidebar-accent' : ''}`}
+						>
+							{#if data.tree.children}
+								{#each data.tree.children as child, index (index)}
+									{@render Tree({ item: child })}
+								{/each}
+							{/if}
 						</Sidebar.Menu>
 					</Sidebar.GroupContent>
-				</Sidebar.Group></ContextMenu.Trigger
-			>
-			<ContextMenu.Content>
+				</Sidebar.Group>
+			</ContextMenu.Trigger>
+			<ContextMenu.Content class="w-screen max-w-60 bg-sidebar shadow-xl">
 				{@const cur = $state.snapshot(staticHovered)}
 				{#if cur}
-					<ContextMenu.Item>Delete {!cur.isDir ? "File" : "Folder"}</ContextMenu.Item>
+					{#if cur.isDir}
+						<ContextMenu.Item onclick={addFile}>New file...</ContextMenu.Item>
+						<ContextMenu.Item onclick={addDir}>New folder...</ContextMenu.Item>
+						{#if !cur.isDir || cur.item.path !== data.tree.path}
+							<ContextMenu.Separator />
+						{/if}
+					{/if}
+					{#if cur.item.path !== data.tree.path}
+						<ContextMenu.Item onclick={deleteNode}>Delete {!cur.isDir ? 'File' : 'Folder'}</ContextMenu.Item>
+					{/if}
+					{#if !cur.isDir}
+						<ContextMenu.CheckboxItem checked={cur.item.path === previewFile} onCheckedChange={(checked) => {
+							if (checked) {
+								onPreviewFileChange(fileSystemFileToFileMetadata(cur.item as FileSystemFile));
+								previewFile = cur.item.path;
+							}
+						}}>
+							Preview This File
+							<ContextMenu.Shortcut>⌘⇧P</ContextMenu.Shortcut>
+						</ContextMenu.CheckboxItem>
+					{/if}
 				{/if}
-				<ContextMenu.Item>Add folder</ContextMenu.Item>
-				<ContextMenu.Item>Add file</ContextMenu.Item>
+				{#if debug}
+					<ContextMenu.Separator />
+					<ContextMenu.Item
+						onclick={() => {
+							console.log($state.snapshot(data.tree));
+						}}>Log tree</ContextMenu.Item
+					>
+				{/if}
 			</ContextMenu.Content>
 		</ContextMenu.Root>
 	</Sidebar.Content>
@@ -180,45 +618,110 @@
 	<Sidebar.Rail />
 </Sidebar.Root>
 
+{#snippet previewing()}
+<div class="bg-red w-20 h-8">
+	<p>Currently previewing this file.</p>
+</div>
+{/snippet}
+
 <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
-{#snippet Tree({ item }: { item: string | any[] })}
-	{@const [name, ...items] = Array.isArray(item) ? item : [item]}
-	{#if !items.length}
-		<Sidebar.MenuButton
-			isActive={name === 'button.svelte'}
-			class="data-[active=true]:bg-transparent" onmouseenter={() => {
-				currentHovered = { name, isDir: false };
-			}} onmouseleave={() => {
-							currentHovered = null;
-						}}
-		>
-			<File />
-			{name}
+{#snippet Tree({ item }: { item: FileSystemNode })}
+	{#if item.type === 'file'}
+		{#if item.new}
+			<Sidebar.MenuButton
+				isActive={item.path === activeFile}
+				class="from-emerald-500/20 to-cyan-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:font-semibold"
+			>
+				<File />
+				<Input
+					bind:value={item.name}
+					class="h-7 w-full rounded-none px-1 py-0.5 focus-visible:outline-0 focus-visible:ring-offset-1"
+					id="newFileFocus"
+					onblur={(e) => finalizeNewFile(e, item)}
+					onkeypress={(e) => finalizeNewFile(e, item)}
+				/>
+			</Sidebar.MenuButton>
+		{:else}
+			<Sidebar.MenuButton
+				isActive={item.path === activeFile}
+				class="relative select-none from-emerald-500/20 to-cyan-500/20 data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold"
+				style="-webkit-user-drag: element;"
+				onmouseenter={() => {
+					currentHovered = { item, isDir: false };
+				}}
+				onmouseleave={() => {
+					currentHovered = null;
+				}}
+				draggable="true"
+				ondragstart={(e) => dragStart(e, item)}
+				onclick={() => onFileClick(fileSystemFileToFileMetadata(item as FileSystemFile))}
+				tooltipContent={item.path === previewFile ? previewing : undefined}
+			>
+				{#if item.path === previewFile}
+					<div class="absolute left-0 top-0 h-full w-1 bg-emerald-400"></div>
+				{/if}
+				<File />
+				{item.name}
+				<span class="h-full w-full"></span>
+			</Sidebar.MenuButton>
+		{/if}
+	{:else if item.new}
+		<Sidebar.MenuButton>
+			<Folder />
+			<Input
+				bind:value={item.name}
+				class="h-7 w-full rounded-none px-1 py-0.5 focus-visible:outline-0 focus-visible:ring-offset-1"
+				id="newDirFocus"
+				onblur={(e) => finalizeNewDir(e, item)}
+				onkeypress={(e) => finalizeNewDir(e, item)}
+			/>
 		</Sidebar.MenuButton>
 	{:else}
-		<Sidebar.MenuItem>
+		<Sidebar.MenuItem class={dragTarget?.path == item.path ? 'bg-sidebar-accent' : ''}>
 			<Collapsible.Root
 				class="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
-				open={name === 'lib' || name === 'components'}
+				open={item.name === 'lib' || item.name === 'components' || item.open}
+				onOpenChange={(open) => {
+					item.open = open;
+				}}
+				ondragenter={(e) => {
+					dragState.hoverTimer = Date.now();
+				}}
+				ondragover={(e) => {
+					if (!item.open && Date.now() - dragState.hoverTimer > 500 && dragState.dragged !== item) {
+						dragState.hoverTimer = Date.now();
+						item.open = true;
+					}
+					dragOverFolder(e, item);
+				}}
+				ondragleave={() => {
+					dragState.targets.delete(item);
+				}}
 			>
-				<Collapsible.Trigger>
+				<Collapsible.Trigger draggable="true" ondragstart={(e) => dragStart(e, item)}>
 					{#snippet child({ props })}
-						<Sidebar.MenuButton {...props} onmouseenter={() => {
-							currentHovered = { name, isDir: true };
-						}} onmouseleave={() => {
-							currentHovered = null;
-						}}>
+						<Sidebar.MenuButton
+							{...props}
+							onmouseenter={() => {
+								currentHovered = { item, isDir: true };
+							}}
+							onmouseleave={() => {
+								currentHovered = null;
+							}}
+						>
 							<ChevronRight className="transition-transform" />
 							<Folder />
-							{name}
+							{item.name}
 						</Sidebar.MenuButton>
 					{/snippet}
 				</Collapsible.Trigger>
 				<Collapsible.Content>
-					<Sidebar.MenuSub>
-						{#each items as subItem, index (index)}
-							{@render Tree({ item: subItem })}
-						{/each}
+					<Sidebar.MenuSub class="mr-0 gap-0 pr-0">
+						{#if item.children}
+							{#each item.children as child, index (index)}
+								{@render Tree({ item: child })}
+							{/each}
+						{/if}
 					</Sidebar.MenuSub>
 				</Collapsible.Content>
 			</Collapsible.Root>

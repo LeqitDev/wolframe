@@ -42,26 +42,33 @@ declare global {
 			metadata: FileMetadata;
 		}
 
-		interface IPageRenderMessage {
-			type: 'render' | 'resize';
-			pageId: number;
-			canvas?: OffscreenCanvas;
-			svg?: string;
-			recompile?: boolean;
-			resizeArgs?: {
-				width: number;
-				height?: number;
-				preserveAspectRatio?: boolean | string;
-			}
-		}
+		export namespace PageRenderer {
 
-		interface IPageRenderResponse {
-			type: 'error' | 'success';
-			canvasInfos?: {
+			type Request = {pageId: number;} & ({
+				type: 'render';
+				svg: string;
+				recompile: false;
+			} | {
+				type: 'render';
+				canvas?: OffscreenCanvas;
+				svg: string;
+				recompile: true;
+			} | {
+				type: 'resize';
+				width: number;
+				height: number;
+				preserveAspectRatio?: boolean | string;
+			});
+
+			type Response = {
+				type: 'error';
+				error: string;
+			} | {
+				type: 'success';
 				pageId: number;
 				width: number;
+				height: number;
 			};
-			error?: string;
 		}
 	}
 }

@@ -1,56 +1,78 @@
 import { DOMParser } from 'xmldom';
 import { Canvg, presets, type IOptions } from 'canvg';
 
-const pages: Canvg[] = [];
+const pages: {canvg: Canvg; canvas: OffscreenCanvas}[] = [];
 
 const preset = presets.offscreen({ DOMParser: DOMParser });
 
-self.onmessage = async (event: MessageEvent<App.IPageRenderMessage>) => {
+self.onmessage = async (event: MessageEvent<App.PageRenderer.Request>) => {
 	const msg = event.data;
 	
 	switch (msg.type) {
 		case 'render':
 			{
+				const page = pages.at(msg.pageId);
+
 				if (!msg.svg) {
-					send_response('error', 'Invalid message! Missing svg!');
-					return;
-				} else if (!msg.canvas && !pages[msg.pageId]) {
-					send_response('error', 'Invalid message! Missing canvas!');
+					send_error('Invalid message! Missing svg!');
 					return;
 				}
 
                 if (msg.recompile) {
-                    delete pages[msg.pageId];
-                }
-				
-                if (!pages[msg.pageId]) {
-					const ctx = msg.canvas!.getContext("2d");
+					if (!msg.canvas && !page) {
+						send_error('Invalid message! No canvas provided!');
+						return;
+					}
+
+					const ctx = (msg.canvas ?? page!.canvas).getContext("2d");
 
 					if (!ctx) {
-						send_response('error', 'Invalid message! Missing context!');
+						send_error('Invalid message! Missing context!');
 						return;
 					}
 					
-					
-                    const canvg = await Canvg.from(ctx, msg.svg, preset as unknown as IOptions);
-                    pages[msg.pageId] = canvg;
-                    await canvg.render();
-					send_response('success', undefined, {pageId: msg.pageId, width: msg.canvas!.width});
+					try {
+						const canvg = await Canvg.from(ctx, msg.svg, preset as unknown as IOptions);
+						if (page) {
+							page.canvg = canvg;
+						} else {
+							pages[msg.pageId] = {canvg, canvas: msg.canvas!};
+						}
+
+						if (page) {
+							canvg.resize(page.canvas.width, page.canvas.height);
+						}
+
+						await canvg.render();
+					} catch (e) {
+						send_error(e as string);
+						return;
+					}
+
+					send_success(msg.pageId, pages[msg.pageId].canvas.width, pages[msg.pageId].canvas.height);
                 } else {
-                    await pages[msg.pageId].render();
-					send_response('success', undefined, {pageId: msg.pageId, width: 0});
-                }
+					if (!page) {
+						send_error('Invalid message! No cached page found!');
+						return;
+					}
+
+					try {
+						await page.canvg.render();
+					} catch (e) {
+						send_error(e as string);
+						return;
+					}
+					send_success(msg.pageId, 0, 0);
+				}
 			}
 			break;
 		case 'resize':
 			{
-                if (!msg.resizeArgs) {
-					send_response('error', 'Invalid message! Missing resize arguments!');
-					return;
-				}
-                const canvg = pages[msg.pageId];
-                if (canvg) {
-                    canvg.resize(msg.resizeArgs.width, msg.resizeArgs.height, msg.resizeArgs.preserveAspectRatio);
+                const page = pages[msg.pageId];
+                if (page) {
+					console.log('resize', msg.width, msg.height, msg.preserveAspectRatio);
+					
+                    page.canvg.resize(msg.width, msg.height, msg.preserveAspectRatio);
                 }
             }
 			break;
@@ -58,7 +80,10 @@ self.onmessage = async (event: MessageEvent<App.IPageRenderMessage>) => {
 	
 };
 
+function send_success(pageId: number, width: number, height: number) {
+	self.postMessage({ type: 'success', pageId, width, height} as App.PageRenderer.Response);
+}
 
-function send_response(type: 'error' | 'success', error?: string, canvasInfos?: { pageId: number, width: number }) {
-	self.postMessage({ type, canvasInfos, error } as App.IPageRenderResponse);
+function send_error(error: string) {
+	self.postMessage({ type: 'error', error } as App.PageRenderer.Response);
 }
