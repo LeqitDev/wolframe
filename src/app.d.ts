@@ -43,32 +43,30 @@ declare global {
 		}
 
 		export namespace PageRenderer {
+			type RenderRequestType = {type: 'render', svg: string; cached: boolean;};
+			type ResizeRequestType = {type: 'resize', zoom: number;};
+			type DeleteRequestType = {type: 'delete'};
+			type UpdateRequestType = {type: 'update', maxWidth: number;};
 
-			type Request = {pageId: number;} & ({
-				type: 'render';
-				svg: string;
-				recompile: false;
-			} | {
-				type: 'render';
-				canvas?: OffscreenCanvas;
-				svg: string;
-				recompile: true;
-			} | {
-				type: 'resize';
-				width: number;
-				height: number;
-				preserveAspectRatio?: boolean | string;
-			});
+			type RenderRequest = {pageId: number;} & RenderRequestType;
+			type ResizeRequest = {pageId: number;} & ResizeRequestType;
+			type DeleteRequest = {pageId: number;} & DeleteRequestType;
+			type UpdateRequest = {pageId: number;} & UpdateRequestType;
 
-			type Response = {
-				type: 'error';
-				error: string;
-			} | {
-				type: 'success';
-				pageId: number;
-				width: number;
-				height: number;
-			};
+			type Request = 
+				| RenderRequest
+				| ResizeRequest
+				| DeleteRequest
+				| UpdateRequest;
+
+			type ErrorResponse = {type: 'error'; error: string;};
+			type SuccessRenderResponse = {type: 'render-success'; pageId: number; png: string; dimensions: {width: number; height: number;}};
+			type SuccessResponse = {type: 'success'; pageId: number;};
+
+			type Response = 
+				| ErrorResponse
+				| SuccessResponse
+				| SuccessRenderResponse;
 		}
 	}
 }

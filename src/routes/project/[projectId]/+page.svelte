@@ -9,6 +9,7 @@
 	import { IndexedDBFileStorage } from '$lib/indexeddb';
 	import { PageRendererWorkerBridge } from '$lib';
 	import { getLogger } from '$lib/logger.svelte';
+	import { scale } from 'svelte/transition';
 
 	const LOGGER = getLogger();
 	LOGGER.logConsole(true);
@@ -35,7 +36,7 @@
 
 	let divEl: HTMLDivElement;
 
-	let canvases: { id: string; normal_width: number; ratio: number }[] = [];
+	let pagePngs: {src: string; dimensions: {width: number; height: number;}}[] = $state([]);
 	const store = getProjectStore();
 	let editor: any = null;
 	let vfs: { name: string; content: string; model: any }[] = $state([]);
@@ -63,26 +64,25 @@
 	}
 
 	async function render(recompile: boolean = true) {
-		for (const [i, svg] of compiler.compile().entries()) {
-			if (canvases.length <= i) {
-				let canvas = document.createElement('canvas');
-				canvas.id = 'preview-page-' + i;
-				canvasContainer.appendChild(canvas);
-				const offscreen = canvas.transferControlToOffscreen();
-
-				pageRenderer?.forcedRerender(i, svg, offscreen);
-				LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'rendering');
-
-				canvases.push({ id: 'preview-page-' + i, normal_width: canvas.clientWidth, ratio: 0 });
-			} else {
-				if (recompile) {
-					LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'forcing rerender');
-					pageRenderer?.forcedRerender(i, svg);
+		try {
+			const compiled = compiler.compile();
+			
+			for (const [i, svg] of compiled.entries()) {
+				if (pagePngs.length <= i) {
+					pageRenderer?.rerender(i, svg);
+					LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'rendering');
 				} else {
-					LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'cached rerender');
-					pageRenderer?.cachedRerender(i, svg);
+					if (recompile) {
+						LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'forcing rerender');
+						pageRenderer?.rerender(i, svg);
+					} else {
+						LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'cached rerender');
+						pageRenderer?.rerender(i, svg, true);
+					}
 				}
 			}
+		} catch (e) {
+			LOGGER.error(LOGGER.mainWSFlowerSection, 'Error compiling', e);
 		}
 	}
 
@@ -118,13 +118,7 @@
 	}
 
 	function zoomPreview() {
-		for (let i = 0; i < canvases.length; i++) {
-			const normal_width = canvases[i].normal_width;
-			const new_width = normal_width * previewScale;
-			
-
-			pageRenderer?.resize(i, new_width, new_width * canvases[i].ratio);
-		}
+		// pageRenderer?.resize(-1, previewScale);
 
 		canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
 		canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
@@ -137,7 +131,7 @@
 			}
 		}
 
-		render(false);
+		// render(false);
 	}
 
 	function onWheel(e: WheelEvent) {
@@ -222,21 +216,20 @@
 		pageRenderer = new PageRendererWorkerBridge(new Worker(PageRenderWorker, {
 			type: 'module'
 		}));
+		setTimeout(() => {
+			pageRenderer!.update(-1, canvasContainer.clientWidth);
+		}, 1000);
 
 		pageRenderer.onMessage((msg) => {
 			if (msg.type === 'error') {
 				LOGGER.error(LOGGER.workerRendererSection, 'Error Page Render Worker', msg.error);
-			} else {
-				if (msg.width === 0) {
-					return;
+			} else if (msg.type === 'render-success') {
+				pagePngs[msg.pageId] = {
+					src: msg.png,
+					dimensions: msg.dimensions
 				}
 
-				LOGGER.info(LOGGER.workerRendererSection, 'Page', msg.pageId, 'finished! Width:', msg.width);
-
-				setTimeout(() => {
-					canvases[msg.pageId].normal_width = msg.width; // update the canvas width
-					canvases[msg.pageId].ratio = msg.height / msg.width; // update the ratio (reversed)
-				});
+				LOGGER.info(LOGGER.workerRendererSection, 'Page', msg.pageId, 'finished!');
 			}
 		});
 
@@ -497,7 +490,14 @@
 			role="presentation"
 			class="flex h-full w-full flex-col items-start overflow-x-auto overflow-y-auto"
 		>
-		
+			{#each pagePngs as png, i}
+				<img
+					src={png.src}
+					alt={`Page ${i}`}
+					class="rounded-lg shadow-lg"
+					style={`width: ${png.dimensions.width * previewScale}px; height: ${png.dimensions.height * previewScale}px;`}
+				/>
+			{/each}
 		</div>
 	</Resizable.Pane>
 </Resizable.PaneGroup>

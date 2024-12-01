@@ -11,11 +11,7 @@ class WorkerBridge {
         this.worker = worker;
     }
 
-    postMessageRawTransfer<T>(message: T, transfer: Transferable[]) {
-        this.worker.postMessage(message, transfer);
-    }
-
-    postMessageRaw<T>(message: T, options?: StructuredSerializeOptions) {
+    postMessage<T>(message: T, options?: StructuredSerializeOptions) {
         this.worker.postMessage(message, options);
     }
 
@@ -31,20 +27,20 @@ export class PageRendererWorkerBridge extends WorkerBridge {
         super(worker);
     }
 
-    public cachedRerender(pageId: number, svg: string) {
-        super.postMessageRaw<App.PageRenderer.Request>({ pageId, type: 'render', svg, recompile: false });
+    public update(pageId: number, maxWidth: number) {
+        super.postMessage<App.PageRenderer.Request>({ pageId, type: 'update', maxWidth });
     }
 
-    public forcedRerender(pageId: number, svg: string, canvas?: OffscreenCanvas) {
-        if (canvas) {
-            super.postMessageRawTransfer<App.PageRenderer.Request>({ pageId, type: 'render', svg, canvas, recompile: true }, [canvas]);
-        } else {
-            super.postMessageRaw<App.PageRenderer.Request>({ pageId, type: 'render', svg, recompile: true });
-        }
+    public rerender(pageId: number, svg: string, cachedSvg: boolean = false) {
+        super.postMessage<App.PageRenderer.Request>({ pageId, type: 'render', svg, cached: cachedSvg });
     }
 
-    public resize(pageId: number, width: number, height: number, preserveAspectRatio?: boolean | string) {
-        super.postMessageRaw<App.PageRenderer.Request>({ pageId, type: 'resize', width, height, preserveAspectRatio });
+    public resize(pageId: number, zoom: number) {
+        super.postMessage<App.PageRenderer.Request>({ pageId, type: 'resize', zoom });
+    }
+
+    public delete(pageId: number) {
+        super.postMessage<App.PageRenderer.Request>({ pageId, type: 'delete' });
     }
 
     public onMessage(callback: (message: App.PageRenderer.Response) => void): void {
