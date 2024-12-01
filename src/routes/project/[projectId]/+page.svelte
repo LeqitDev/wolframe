@@ -9,7 +9,9 @@
 	import { IndexedDBFileStorage } from '$lib/indexeddb';
 	import { PageRendererWorkerBridge } from '$lib';
 	import { getLogger } from '$lib/logger.svelte';
+	import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
 	import { scale } from 'svelte/transition';
+	// import { MarkerSeverity, Range } from 'monaco-editor';
 
 	const LOGGER = getLogger();
 	LOGGER.logConsole(true);
@@ -39,12 +41,13 @@
 	let pagePngs: {src: string; dimensions: {width: number; height: number;}}[] = $state([]);
 	const store = getProjectStore();
 	let editor: any = null;
-	let vfs: { name: string; content: string; model: any }[] = $state([]);
+	let vfs: { name: string; content: string; model: Monaco.editor.ITextModel }[] = $state([]);
 	let currentModelId = 0;
 	let compiler: typst.SuiteCore;
 	let canvasContainer: HTMLDivElement;
 	let previewScale = $state(1);
 	let pageRenderer: undefined | PageRendererWorkerBridge;
+	let monaco: typeof Monaco;
 
 	function xml_get_sync(path: string) {
 		const request = new XMLHttpRequest();
@@ -66,7 +69,7 @@
 	async function render(recompile: boolean = true) {
 		try {
 			const compiled = compiler.compile();
-			
+
 			for (const [i, svg] of compiled.entries()) {
 				if (pagePngs.length <= i) {
 					pageRenderer?.rerender(i, svg);
@@ -81,8 +84,64 @@
 					}
 				}
 			}
-		} catch (e) {
-			LOGGER.error(LOGGER.mainWSFlowerSection, 'Error compiling', e);
+
+			// Remove any extra pages
+			if (pagePngs.length > compiled.length) {
+				pagePngs = pagePngs.slice(0, compiled.length);
+			}
+
+			monaco.editor.setModelMarkers(vfs[currentModelId].model, 'compiler', []);
+		} catch (e: any) {
+			const errs = e as typst.CompileError[];
+			let errStr = '';
+
+			for (let err of errs) {
+				errStr += err.get_root().get_file_path() + ' at range ' + err.get_root().get_range() + ': ' + err.get_message() + '\n';
+			}
+
+			const convertedErrs = [];
+			const markers = [];
+
+			const model = vfs[currentModelId].model;
+			console.log(model);
+			
+
+			for (let err of errs) {
+				let struct = {
+					file: err.get_root().get_file_path(),
+					range: err.get_root().get_range(),
+					message: err.get_message(),
+					severity: err.get_severity(),
+					hints: err.get_hints(),
+					trace: err.get_trace().map((v) => {
+						return {
+							file: v.get_file_path(),
+							range: v.get_range(),
+						};
+					})
+				}
+
+				convertedErrs.push(struct);
+
+				const start_position = model.getPositionAt(struct.range[0]);
+				const end_position = model.getPositionAt(struct.range[1]);
+			
+				const modelRange = monaco.Range.fromPositions(start_position, end_position);
+
+				let marker = {
+					severity: struct.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
+					message: struct.message,
+					startLineNumber: modelRange.startLineNumber,
+					startColumn: modelRange.startColumn,
+					endLineNumber: modelRange.endLineNumber,
+					endColumn: modelRange.endColumn
+				};
+
+				markers.push(marker);
+			}
+
+			LOGGER.error(LOGGER.mainWSFlowerSection, 'Error compiling', errStr, '\nFull: ', convertedErrs);
+			monaco.editor.setModelMarkers(model, 'compiler', markers);
 		}
 	}
 
@@ -216,9 +275,17 @@
 		pageRenderer = new PageRendererWorkerBridge(new Worker(PageRenderWorker, {
 			type: 'module'
 		}));
-		setTimeout(() => {
-			pageRenderer!.update(-1, canvasContainer.clientWidth);
-		}, 1000);
+
+		const resizeObserver = new ResizeObserver((entries) => {
+			for (let entry of entries) {
+				const style = getComputedStyle(canvasContainer);
+
+				const width = parseFloat(style.width) - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+				pageRenderer!.update(-1, width);
+			}
+		});
+
+		resizeObserver.observe(canvasContainer);
 
 		pageRenderer.onMessage((msg) => {
 			if (msg.type === 'error') {
@@ -241,14 +308,15 @@
 		init().then(() => {
 			compiler = new typst.SuiteCore('');
 
-			import('$lib/editor').then(({ EditorSetup, initializeEditor, createModel }) => {
-				initializeEditor(compiler).then((_editor) => {
+			import('$lib/editor').then((iMonaco) => {
+				monaco = iMonaco.default;
+				iMonaco.initializeEditor(compiler).then((_editor) => {
 					LOGGER.info(LOGGER.mainMonacoSection, 'Editor initialized');
 					editor = _editor;
 
 					// Provide models for the vfs
 					for (let file of data.initial_vfs) {
-						let model = createModel(file.content);
+						let model = iMonaco.createModel(file.content);
 						vfs.push({
 							name: file.filename,
 							content: file.content,
@@ -494,7 +562,7 @@
 				<img
 					src={png.src}
 					alt={`Page ${i}`}
-					class="rounded-lg shadow-lg"
+					class="rounded-sm shadow-2xl shadow-slate-500 max-w-none"
 					style={`width: ${png.dimensions.width * previewScale}px; height: ${png.dimensions.height * previewScale}px;`}
 				/>
 			{/each}

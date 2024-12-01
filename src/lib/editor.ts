@@ -462,7 +462,7 @@ async function initializeEditor(suite_core: typst.SuiteCore) {
 	}
 }
 
-export { EditorSetup, initializeEditor };
+export { initializeEditor };
 
 export const createModel = (
 	content: string,
@@ -470,3 +470,5 @@ export const createModel = (
 ): monaco.editor.ITextModel => {
 	return monaco.editor.createModel(content, language);
 };
+
+export default monaco;
