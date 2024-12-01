@@ -10,7 +10,8 @@
 	import { PageRendererWorkerBridge } from '$lib';
 	import { getLogger } from '$lib/logger.svelte';
 	import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
-	import { scale } from 'svelte/transition';
+	import { fade, scale } from 'svelte/transition';
+	import { LoaderCircle } from 'lucide-svelte';
 	// import { MarkerSeverity, Range } from 'monaco-editor';
 
 	const LOGGER = getLogger();
@@ -48,6 +49,8 @@
 	let previewScale = $state(1);
 	let pageRenderer: undefined | PageRendererWorkerBridge;
 	let monaco: typeof Monaco;
+	let loading = $state(true);
+	let loadMessage = $state('Initializing the project');
 
 	function xml_get_sync(path: string) {
 		const request = new XMLHttpRequest();
@@ -67,6 +70,9 @@
 	}
 
 	async function render(recompile: boolean = true) {
+		if (loading) {
+			loading = false;
+		}
 		try {
 			const compiled = compiler.compile();
 
@@ -177,7 +183,11 @@
 	}
 
 	function zoomPreview() {
-		// pageRenderer?.resize(-1, previewScale);
+		
+		if (previewScale > 1.2) {
+			LOGGER.info(LOGGER.workerRendererSection, 'Zooming to', previewScale);
+			pageRenderer?.resize(-1, previewScale);
+		}
 
 		canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
 		canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
@@ -271,6 +281,7 @@
 
 	$effect(() => {
 		LOGGER.clearLogs();
+		loadMessage = 'Loading WASM Flow';
 
 		pageRenderer = new PageRendererWorkerBridge(new Worker(PageRenderWorker, {
 			type: 'module'
@@ -308,6 +319,8 @@
 		init().then(() => {
 			compiler = new typst.SuiteCore('');
 
+			loadMessage = 'Loading Monaco Editor';
+
 			import('$lib/editor').then((iMonaco) => {
 				monaco = iMonaco.default;
 				iMonaco.initializeEditor(compiler).then((_editor) => {
@@ -327,9 +340,12 @@
 					// Set the first model
 					editor.setModel(vfs[0].model);
 
+					loadMessage = 'Connecting to Typst Flower Service';
+
 					ws = new WebSocket('ws://localhost:3030/users');
 					ws.onopen = () => {
 						ws.send('INIT ' + data.project?.id);
+						loadMessage = 'Painting the canvas like picasso';
 					};
 					ws.onerror = (e) => {
 						// TODO: HANDLE ERROR
@@ -528,6 +544,15 @@
 
 	let { data }: { data: PageData } = $props();
 </script>
+
+{#if loading}
+	<div class="absolute top-0 left-0 w-screen h-screen flex items-center justify-center bg-background z-50" transition:fade>
+		<div class="flex flex-col justify-center items-center">
+			<LoaderCircle class="animate-spin" />
+			<p class="text-center">{loadMessage}...</p>
+		</div>
+	</div>
+{/if}
 
 <form
 	method="POST"

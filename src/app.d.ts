@@ -1,4 +1,7 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
+
+import type { CompletionWrapper } from '$rust/typst_flow_wasm';
+
 // for information about these interfaces
 declare global {
 	namespace App {
@@ -67,6 +70,21 @@ declare global {
 				| ErrorResponse
 				| SuccessResponse
 				| SuccessRenderResponse;
+		}
+
+		export namespace Compiler {
+			type CompileRequest = {type: 'compile'}
+			type EditRequest = {type: 'edit', file: string, content: string, offsetStart: number, offsetEnd: number};
+			type CompletionRequest = {type: 'completion', file: string, offset: number};
+			type InitRequest = {type: 'init', root: string};
+
+			type Request = CompileRequest | EditRequest | CompletionRequest | InitRequest;
+
+			type ErrorResponse = {type: 'error'; error: string;};
+			type CompileResponse = {type: 'compile'; svgs: string[]};
+			type CompletionResponse = {type: 'completion'; completions: CompletionWrapper[]};
+
+			type Response = ErrorResponse | CompileResponse | CompletionResponse;
 		}
 	}
 }

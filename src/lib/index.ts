@@ -47,3 +47,29 @@ export class PageRendererWorkerBridge extends WorkerBridge {
         super.onMessageRaw<App.PageRenderer.Response>(callback);
     }
 }
+
+export class ProjectMenuWorkerBridge extends WorkerBridge {
+    constructor(worker: Worker) {
+        super(worker);
+    }
+
+    public init(root: '') {
+        super.postMessage<App.Compiler.InitRequest>({ type: 'init', root });
+    }
+
+    public compile() {
+        super.postMessage<App.Compiler.CompileRequest>({ type: 'compile' });
+    }
+
+    public completions(file: string, offset: number) {
+        super.postMessage<App.Compiler.CompletionRequest>({ type: 'completion', file, offset });
+    }
+
+    public edit(file: string, content: string, offsetStart: number, offsetEnd: number) {
+        super.postMessage<App.Compiler.EditRequest>({ type: 'edit', file, content, offsetStart, offsetEnd });
+    }
+
+    public onMessage(callback: (message: App.Compiler.Response) => void): void {
+        super.onMessageRaw<App.Compiler.Response>(callback);
+    }
+}
