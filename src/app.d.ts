@@ -1,6 +1,8 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 
-import type { CompletionWrapper } from '$rust/typst_flow_wasm';
+import type { Sections } from '$lib/logger.svelte';
+import type { CoreCompletionItem } from '$lib/monaco';
+import type { CompileError, CompletionWrapper } from '$rust/typst_flow_wasm';
 
 // for information about these interfaces
 declare global {
@@ -77,14 +79,31 @@ declare global {
 			type EditRequest = {type: 'edit', file: string, content: string, offsetStart: number, offsetEnd: number};
 			type CompletionRequest = {type: 'completion', file: string, offset: number};
 			type InitRequest = {type: 'init', root: string};
+			type AddFileRequest = {type: 'add-file', file: string, content: string};
 
-			type Request = CompileRequest | EditRequest | CompletionRequest | InitRequest;
+			type Request = CompileRequest | EditRequest | CompletionRequest | InitRequest | AddFileRequest;
 
-			type ErrorResponse = {type: 'error'; error: string;};
+			interface CompileErrorSpan {
+				file: string;
+				range: Uint32Array;
+			}
+			interface CompileErrorType {
+				span: CompileErrorSpan;
+				message: string;
+				severity: string;
+				hints: string[];
+				trace: CompileErrorSpan[];
+			}
+
+			type DefaultErrorResponse = {sub: 'default'; error: string;};
+			type CompileErrorResponse = {sub: 'compile'; errors: CompileErrorType[];};
+			type ErrorResponse = {type: 'error';} & (DefaultErrorResponse | CompileErrorResponse);
+
 			type CompileResponse = {type: 'compile'; svgs: string[]};
-			type CompletionResponse = {type: 'completion'; completions: CompletionWrapper[]};
+			type CompletionResponse = {type: 'completion'; completions: CoreCompletionItem[]};
+			type LoggerResponse = {type: 'logger'; severity: 'error' | 'warn' | 'info'; section: Sections; message: any[]; }
 
-			type Response = ErrorResponse | CompileResponse | CompletionResponse;
+			type Response = ErrorResponse | CompileResponse | CompletionResponse | LoggerResponse;
 		}
 	}
 }

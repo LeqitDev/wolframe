@@ -6,12 +6,14 @@
 	import type { PageData } from './$types';
 	import init, * as typst from '$rust/typst_flow_wasm';
 	import PageRenderWorker from '$lib/workers/page_renderer?url';
+	import CompilerWorker from '$lib/workers/compiler?worker';
 	import { IndexedDBFileStorage } from '$lib/indexeddb';
-	import { PageRendererWorkerBridge } from '$lib';
-	import { getLogger } from '$lib/logger.svelte';
+	import { CompilerWorkerBridge, PageRendererWorkerBridge } from '$lib';
+	import { getLogger, MainMonacoSection, MainWSFlowerSection, WASMSection, WorkerRendererSection } from '$lib/logger.svelte';
 	import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
 	import { fade, scale } from 'svelte/transition';
 	import { LoaderCircle } from 'lucide-svelte';
+	import { TypstCompletionProvider, type CoreCompletionItem, CoreCompletionKinds, convertToMonacoSnippet } from '$lib/monaco';
 	// import { MarkerSeverity, Range } from 'monaco-editor';
 
 	const LOGGER = getLogger();
@@ -44,7 +46,7 @@
 	let editor: any = null;
 	let vfs: { name: string; content: string; model: Monaco.editor.ITextModel }[] = $state([]);
 	let currentModelId = 0;
-	let compiler: typst.SuiteCore;
+	let compiler: undefined | CompilerWorkerBridge;
 	let canvasContainer: HTMLDivElement;
 	let previewScale = $state(1);
 	let pageRenderer: undefined | PageRendererWorkerBridge;
@@ -52,103 +54,13 @@
 	let loading = $state(true);
 	let loadMessage = $state('Initializing the project');
 
-	function xml_get_sync(path: string) {
-		const request = new XMLHttpRequest();
-		request.overrideMimeType('text/plain; charset=x-user-defined');
-		request.open('GET', path, false);
-		request.send(null);
-
-		if (
-			request.status === 200 &&
-			(request.response instanceof String || typeof request.response === 'string')
-		) {
-			LOGGER.info(LOGGER.wasmSection, 'XML GET', path, 'OK');
-			return Uint8Array.from(request.response, (c: string) => c.charCodeAt(0));
-		}
-		LOGGER.error(LOGGER.wasmSection, 'XML GET', path, 'FAILED');
-		return Uint8Array.from([]);
-	}
+	
 
 	async function render(recompile: boolean = true) {
 		if (loading) {
 			loading = false;
 		}
-		try {
-			const compiled = compiler.compile();
-
-			for (const [i, svg] of compiled.entries()) {
-				if (pagePngs.length <= i) {
-					pageRenderer?.rerender(i, svg);
-					LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'rendering');
-				} else {
-					if (recompile) {
-						LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'forcing rerender');
-						pageRenderer?.rerender(i, svg);
-					} else {
-						LOGGER.info(LOGGER.workerRendererSection, 'Page', i, 'cached rerender');
-						pageRenderer?.rerender(i, svg, true);
-					}
-				}
-			}
-
-			// Remove any extra pages
-			if (pagePngs.length > compiled.length) {
-				pagePngs = pagePngs.slice(0, compiled.length);
-			}
-
-			monaco.editor.setModelMarkers(vfs[currentModelId].model, 'compiler', []);
-		} catch (e: any) {
-			const errs = e as typst.CompileError[];
-			let errStr = '';
-
-			for (let err of errs) {
-				errStr += err.get_root().get_file_path() + ' at range ' + err.get_root().get_range() + ': ' + err.get_message() + '\n';
-			}
-
-			const convertedErrs = [];
-			const markers = [];
-
-			const model = vfs[currentModelId].model;
-			console.log(model);
-			
-
-			for (let err of errs) {
-				let struct = {
-					file: err.get_root().get_file_path(),
-					range: err.get_root().get_range(),
-					message: err.get_message(),
-					severity: err.get_severity(),
-					hints: err.get_hints(),
-					trace: err.get_trace().map((v) => {
-						return {
-							file: v.get_file_path(),
-							range: v.get_range(),
-						};
-					})
-				}
-
-				convertedErrs.push(struct);
-
-				const start_position = model.getPositionAt(struct.range[0]);
-				const end_position = model.getPositionAt(struct.range[1]);
-			
-				const modelRange = monaco.Range.fromPositions(start_position, end_position);
-
-				let marker = {
-					severity: struct.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
-					message: struct.message,
-					startLineNumber: modelRange.startLineNumber,
-					startColumn: modelRange.startColumn,
-					endLineNumber: modelRange.endLineNumber,
-					endColumn: modelRange.endColumn
-				};
-
-				markers.push(marker);
-			}
-
-			LOGGER.error(LOGGER.mainWSFlowerSection, 'Error compiling', errStr, '\nFull: ', convertedErrs);
-			monaco.editor.setModelMarkers(model, 'compiler', markers);
-		}
+		compiler?.compile();
 	}
 
 	const update_bouncer = debounce(() => {
@@ -160,19 +72,19 @@
 		);
 		for (let change of accumulatedChanges.flat()) {
 			try {
-				LOGGER.info(LOGGER.mainMonacoSection, 'Applying change', change, vfs[currentModelId].name);
+				LOGGER.info(MainMonacoSection, 'Applying change', change, vfs[currentModelId].name);
 
-				compiler.edit(
+				compiler?.edit(
 					vfs[currentModelId].name,
 					change.text,
 					change.rangeOffset,
 					change.rangeOffset + change.rangeLength
 				);
 			} catch (e) {
-				LOGGER.error(LOGGER.mainMonacoSection, 'Error applying change', e);
+				LOGGER.error(MainMonacoSection, 'Error applying change', e);
 			}
 		}
-		LOGGER.info(LOGGER.mainMonacoSection, 'Content changed', accumulatedChanges.map((v) => v[0]) as RawOperation[]);
+		LOGGER.info(MainMonacoSection, 'Content changed', accumulatedChanges.map((v) => v[0]) as RawOperation[]);
 		accumulatedChanges = [];
 		render();
 	});
@@ -185,7 +97,7 @@
 	function zoomPreview() {
 		
 		if (previewScale > 1.2) {
-			LOGGER.info(LOGGER.workerRendererSection, 'Zooming to', previewScale);
+			LOGGER.info(WorkerRendererSection, 'Zooming to', previewScale);
 			pageRenderer?.resize(-1, previewScale);
 		}
 
@@ -270,18 +182,123 @@
 		canvasContainer.scrollTop = scrollTop - walkY;
 	}
 
-	// Logging functions for use inside WASM TODO: implement inside wasm
-	function logWasm(...e: any[]) {
-		LOGGER.info(LOGGER.wasmSection, ...e);
+	function handleCompileErrorResponse(response: App.Compiler.CompileErrorResponse) {
+		const errs = response.errors;
+
+			const convertedErrs = [];
+			const markers = [];
+
+			const model = vfs[currentModelId].model;
+			console.log(model);
+			
+
+			for (let err of errs) {
+				convertedErrs.push(err);
+
+				const start_position = model.getPositionAt(err.span.range[0]);
+				const end_position = model.getPositionAt(err.span.range[1]);
+			
+				const modelRange = monaco.Range.fromPositions(start_position, end_position);
+
+				let marker = {
+					severity: err.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
+					message: err.message,
+					startLineNumber: modelRange.startLineNumber,
+					startColumn: modelRange.startColumn,
+					endLineNumber: modelRange.endLineNumber,
+					endColumn: modelRange.endColumn
+				};
+
+				markers.push(marker);
+			}
+
+			monaco.editor.setModelMarkers(model, 'compiler', markers);
 	}
 
-	function errorWasm(...e: any[]) {
-		LOGGER.error(LOGGER.wasmSection, ...e);
+	function handleCompileResponse(response: App.Compiler.CompileResponse) {
+		const compiled = response.svgs;
+
+		for (const [i, svg] of compiled.entries()) {
+			if (pagePngs.length <= i) {
+				pageRenderer?.rerender(i, svg);
+				LOGGER.info(WorkerRendererSection, 'Page', i, 'rendering');
+			} else {
+				LOGGER.info(WorkerRendererSection, 'Page', i, 'forcing rerender');
+				pageRenderer?.rerender(i, svg);
+			}
+		}
+
+		// Remove any extra pages
+		if (pagePngs.length > compiled.length) {
+			pagePngs = pagePngs.slice(0, compiled.length);
+		}
+
+		monaco.editor.setModelMarkers(vfs[currentModelId].model, 'compiler', []);
 	}
+
+	function handleCompilerErrorResponse(response: App.Compiler.ErrorResponse) {
+		switch (response.sub) {
+			case 'default':
+				LOGGER.error(WASMSection, 'Error', response.error);
+				break;
+			case 'compile':
+				handleCompileErrorResponse(response);
+				break;
+		}
+	}
+
+	function handleCompilerLoggerResponse(response: App.Compiler.LoggerResponse) {
+		switch (response.severity) {
+			case 'info':
+				LOGGER.info(WASMSection, ...response.message);
+				break;
+			case 'warn':
+				LOGGER.warn(WASMSection, ...response.message);
+				break;
+			case 'error':
+				LOGGER.error(WASMSection, ...response.message);
+				break;
+		}
+	}
+
+	function handleCompilerCompletionResponse(response: App.Compiler.CompletionResponse, completionProvider: TypstCompletionProvider) {
+		
+		completionProvider.setCompletions(response.completions);
+	}
+
+	function handleCompilerResponse(response: App.Compiler.Response, completionProvider: TypstCompletionProvider) {
+		switch (response.type) {
+			case 'error':
+				handleCompilerErrorResponse(response);
+				break;
+			case 'completion':
+				handleCompilerCompletionResponse(response, completionProvider);
+				break;
+			case 'compile':
+				handleCompileResponse(response);
+				break;
+			case 'logger':
+				handleCompilerLoggerResponse(response);
+				break;
+		}
+	}
+
 
 	$effect(() => {
 		LOGGER.clearLogs();
+		const completionProvider = new TypstCompletionProvider(
+			(file, offset) => {
+				compiler?.completions(file, offset);
+			}
+		);
 		loadMessage = 'Loading WASM Flow';
+
+		compiler = new CompilerWorkerBridge(new CompilerWorker());
+
+		compiler.init('');
+
+		compiler.onMessage((res) => handleCompilerResponse(res, completionProvider));
+
 
 		pageRenderer = new PageRendererWorkerBridge(new Worker(PageRenderWorker, {
 			type: 'module'
@@ -300,31 +317,25 @@
 
 		pageRenderer.onMessage((msg) => {
 			if (msg.type === 'error') {
-				LOGGER.error(LOGGER.workerRendererSection, 'Error Page Render Worker', msg.error);
+				LOGGER.error(WorkerRendererSection, 'Error Page Render Worker', msg.error);
 			} else if (msg.type === 'render-success') {
 				pagePngs[msg.pageId] = {
 					src: msg.png,
 					dimensions: msg.dimensions
 				}
 
-				LOGGER.info(LOGGER.workerRendererSection, 'Page', msg.pageId, 'finished!');
+				LOGGER.info(WorkerRendererSection, 'Page', msg.pageId, 'finished!');
 			}
 		});
 
-		(window as any).xml_get_sync = xml_get_sync;
-		(window as any).logWasm = logWasm;
-		(window as any).errorWasm = errorWasm;
 		document.addEventListener('wheel', onWheel, { passive: false });
 
-		init().then(() => {
-			compiler = new typst.SuiteCore('');
+		loadMessage = 'Loading Monaco Editor';
 
-			loadMessage = 'Loading Monaco Editor';
-
-			import('$lib/editor').then((iMonaco) => {
+		import('$lib/editor').then((iMonaco) => {
 				monaco = iMonaco.default;
-				iMonaco.initializeEditor(compiler).then((_editor) => {
-					LOGGER.info(LOGGER.mainMonacoSection, 'Editor initialized');
+				iMonaco.initializeEditor(completionProvider).then((_editor) => {
+					LOGGER.info(MainMonacoSection, 'Editor initialized');
 					editor = _editor;
 
 					// Provide models for the vfs
@@ -349,14 +360,14 @@
 					};
 					ws.onerror = (e) => {
 						// TODO: HANDLE ERROR
-						LOGGER.error(LOGGER.mainWSFlowerSection, 'Websocket Error', e);
+						LOGGER.error(MainWSFlowerSection, 'Websocket Error', e);
 					};
 					ws.onmessage = (e: MessageEvent<string>) => {
-						LOGGER.info(LOGGER.mainWSFlowerSection, `Websocket Message: """${e.data}"""`);
+						LOGGER.info(MainWSFlowerSection, `Websocket Message: """${e.data}"""`);
 						if (e.data.startsWith('INIT ')) {
 							vfs[0].model.setValue(e.data.slice(5));
 							try {
-								compiler.add_file('main.typ', e.data.slice(5));
+								compiler?.add_file('main.typ', e.data.slice(5));
 								render();
 								canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
 								canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
@@ -379,11 +390,8 @@
 				}); */
 				});
 			}).catch((e) => {
-				LOGGER.error(LOGGER.mainMonacoSection, 'Error initializing editor', e);
+				LOGGER.error(MainMonacoSection, 'Error initializing editor', e);
 			});
-		}).catch((e) => {
-			LOGGER.error(LOGGER.wasmSection, 'Error initializing WASM', e);
-		});
 
 		return () => {
 			// Cleanup

@@ -1,6 +1,6 @@
 import { getContext, setContext } from "svelte";
 
-type Sections =
+export type Sections =
     | { section: 'worker'; subsection: 'renderer' }
     | { section: 'main'; subsection: 'sidebar' | 'monaco' | 'ws-flower' | 'preview' }
     | { section: 'wasm'; subsection: 'wasm' };
@@ -13,15 +13,15 @@ interface LogRaw {
 
 type Log = LogRaw & Sections;
 
+export const WASMSection = { section: 'wasm', subsection: 'wasm' } as Sections;
+export const WorkerRendererSection = { section: 'worker', subsection: 'renderer' } as Sections;
+export const MainSidebarSection = { section: 'main', subsection: 'sidebar' } as Sections;
+export const MainMonacoSection = { section: 'main', subsection: 'monaco' } as Sections;
+export const MainWSFlowerSection = { section: 'main', subsection: 'ws-flower' } as Sections;
+
 export class Logger {
     private _logs: Log[] = $state([]);
     private _logConsole = $state(false);
-    
-    wasmSection = { section: 'wasm', subsection: 'wasm' } as Sections;
-    workerRendererSection = { section: 'worker', subsection: 'renderer' } as Sections;
-    mainSidebarSection = { section: 'main', subsection: 'sidebar' } as Sections;
-    mainMonacoSection = { section: 'main', subsection: 'monaco' } as Sections;
-    mainWSFlowerSection = { section: 'main', subsection: 'ws-flower' } as Sections;
 
     public get logs() {
         return this._logs;

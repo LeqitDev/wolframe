@@ -48,12 +48,12 @@ export class PageRendererWorkerBridge extends WorkerBridge {
     }
 }
 
-export class ProjectMenuWorkerBridge extends WorkerBridge {
+export class CompilerWorkerBridge extends WorkerBridge {
     constructor(worker: Worker) {
         super(worker);
     }
 
-    public init(root: '') {
+    public init(root: string) {
         super.postMessage<App.Compiler.InitRequest>({ type: 'init', root });
     }
 
@@ -67,6 +67,10 @@ export class ProjectMenuWorkerBridge extends WorkerBridge {
 
     public edit(file: string, content: string, offsetStart: number, offsetEnd: number) {
         super.postMessage<App.Compiler.EditRequest>({ type: 'edit', file, content, offsetStart, offsetEnd });
+    }
+
+    public add_file(file: string, content: string) {
+        super.postMessage<App.Compiler.AddFileRequest>({ type: 'add-file', file, content });
     }
 
     public onMessage(callback: (message: App.Compiler.Response) => void): void {

@@ -347,7 +347,7 @@ class EditorSetup {
 
 	public static async setupEditor(
 		container: HTMLElement,
-		suite_core: typst.SuiteCore,
+		completionHandler: monaco.languages.CompletionItemProvider,
 		options: monaco.editor.IStandaloneEditorConstructionOptions = {}
 	): Promise<monaco.editor.IStandaloneCodeEditor> {
 		try {
@@ -398,7 +398,7 @@ class EditorSetup {
 			monaco.languages.setTokensProvider('typst', tokensProvider); */
 
 			// Load the completion items
-			this.loadCompletionItems(suite_core);
+			monaco.languages.registerCompletionItemProvider('typst', completionHandler);
 
 			monaco.editor.defineTheme('typst-theme', this.parseVscodeTheme());
 			monaco.editor.defineTheme('typst-dark-theme', convertTheme(darkPlusTheme));
@@ -431,7 +431,7 @@ class EditorSetup {
 }
 
 // Example usage: https://github.com/ekzhang/rustpad/
-async function initializeEditor(suite_core: typst.SuiteCore) {
+async function initializeEditor(completionProvider: monaco.languages.CompletionItemProvider) {
 	try {
 		self.MonacoEnvironment = {
 			getWorkerUrl: function (_moduleId, _label) {
@@ -444,7 +444,7 @@ async function initializeEditor(suite_core: typst.SuiteCore) {
 			throw new Error('Editor container not found');
 		}
 
-		const editor = await EditorSetup.setupEditor(container, suite_core, {
+		const editor = await EditorSetup.setupEditor(container, completionProvider, {
 			value: '// Your initial Typst content here\n\n#let typst = "hihi"',
 			minimap: { enabled: false },
 			fontSize: 14,
