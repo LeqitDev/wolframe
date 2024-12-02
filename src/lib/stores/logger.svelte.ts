@@ -7,7 +7,7 @@ export type Sections =
 
 interface LogRaw {
     type: 'info' | 'warn' | 'error';
-    message: any[];
+    message: unknown[];
     timestamp: number;
 }
 
@@ -57,15 +57,15 @@ export class Logger {
         this._logs.push(log);
     }
 
-    public info(section: Sections, ...message: any[]) {
+    public info(section: Sections, ...message: unknown[]) {
         this.log({ type: 'info', message, timestamp: Date.now() }, section);
     }
 
-    public warn(section: Sections, ...message: any[]) {
+    public warn(section: Sections, ...message: unknown[]) {
         this.log({ type: 'warn', message, timestamp: Date.now() }, section);
     }
 
-    public error(section: Sections, ...message: any[]) {
+    public error(section: Sections, ...message: unknown[]) {
         this.log({ type: 'error', message, timestamp: Date.now() }, section);
     }
 

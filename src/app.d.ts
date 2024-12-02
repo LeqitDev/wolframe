@@ -1,8 +1,6 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 
-import type { Sections } from '$lib/logger.svelte';
-import type { CoreCompletionItem } from '$lib/monaco';
-import type { CompileError, CompletionWrapper } from '$rust/typst_flow_wasm';
+import type { Sections } from '$lib/stores/logger.svelte';
 
 // for information about these interfaces
 declare global {
@@ -95,13 +93,23 @@ declare global {
 				trace: CompileErrorSpan[];
 			}
 
+			interface CompletionItemType {
+				label: string;
+				kind: {
+					kind: string;
+					detail?: string
+				};
+				apply?: string;
+				detail?: string;
+			}
+
 			type DefaultErrorResponse = {sub: 'default'; error: string;};
 			type CompileErrorResponse = {sub: 'compile'; errors: CompileErrorType[];};
 			type ErrorResponse = {type: 'error';} & (DefaultErrorResponse | CompileErrorResponse);
 
 			type CompileResponse = {type: 'compile'; svgs: string[]};
-			type CompletionResponse = {type: 'completion'; completions: CoreCompletionItem[]};
-			type LoggerResponse = {type: 'logger'; severity: 'error' | 'warn' | 'info'; section: Sections; message: any[]; }
+			type CompletionResponse = {type: 'completion'; completions: CompletionItemType[]};
+			type LoggerResponse = {type: 'logger'; severity: 'error' | 'warn' | 'info'; section: Sections; message: unknown[]; }
 
 			type Response = ErrorResponse | CompileResponse | CompletionResponse | LoggerResponse;
 		}

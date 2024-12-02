@@ -1,33 +1,24 @@
 <script lang="ts">
-	import { Button } from '$lib/components/ui/button';
 	import * as Resizable from '$lib/components/ui/resizable/index.js';
-	import { getProjectStore } from '$lib/stores/project.svelte';
+	import { getLayoutStore } from '$lib/stores/layoutStore.svelte';
 	// import { editor as meditor } from 'monaco-editor';
 	import type { PageData } from './$types';
-	import init, * as typst from '$rust/typst_flow_wasm';
 	import PageRenderWorker from '$lib/workers/page_renderer?url';
 	import CompilerWorker from '$lib/workers/compiler?worker';
-	import { IndexedDBFileStorage } from '$lib/indexeddb';
-	import { CompilerWorkerBridge, PageRendererWorkerBridge } from '$lib';
-	import { getLogger, MainMonacoSection, MainWSFlowerSection, WASMSection, WorkerRendererSection } from '$lib/logger.svelte';
+	import { CompilerWorkerBridge, PageRendererWorkerBridge } from '$lib/workerBridges';
+	import {
+		getLogger,
+		MainMonacoSection,
+		MainWSFlowerSection,
+		WASMSection,
+		WorkerRendererSection
+	} from '$lib/stores/logger.svelte';
 	import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
 	import { fade, scale } from 'svelte/transition';
 	import { LoaderCircle } from 'lucide-svelte';
-	import { TypstCompletionProvider, type CoreCompletionItem, CoreCompletionKinds, convertToMonacoSnippet } from '$lib/monaco';
-	// import { MarkerSeverity, Range } from 'monaco-editor';
+	import { TypstCompletionProvider } from '$lib/monaco';
+	import { convertRemToPixels, debounce, PreviewDragger } from '$lib/utils';
 
-	const LOGGER = getLogger();
-	LOGGER.logConsole(true);
-
-	const debounce = (func: Function, wait: number = 300) => {
-		let timeout: any;
-		return (...args: any) => {
-			clearTimeout(timeout);
-			timeout = setTimeout(() => {
-				func.apply(this, ...args);
-			}, wait);
-		};
-	};
 
 	interface RawOperation {
 		range: {
@@ -39,24 +30,33 @@
 		text: string;
 	}
 
-	let divEl: HTMLDivElement;
-
-	let pagePngs: {src: string; dimensions: {width: number; height: number;}}[] = $state([]);
-	const store = getProjectStore();
-	let editor: any = null;
-	let vfs: { name: string; content: string; model: Monaco.editor.ITextModel }[] = $state([]);
-	let currentModelId = 0;
-	let compiler: undefined | CompilerWorkerBridge;
-	let canvasContainer: HTMLDivElement;
-	let previewScale = $state(1);
-	let pageRenderer: undefined | PageRendererWorkerBridge;
-	let monaco: typeof Monaco;
+	// Sveltekit
+	const layoutStore = getLayoutStore(); // For Menu and things
+	const LOGGER = getLogger();
+	LOGGER.logConsole(true);
 	let loading = $state(true);
 	let loadMessage = $state('Initializing the project');
 
-	
+	// *Workers*
+	// Compiler
+	let compiler: CompilerWorkerBridge;
 
-	async function render(recompile: boolean = true) {
+	// Preview Renderer
+	let pageRenderer: PageRendererWorkerBridge;
+	let previewScale = $state(1); // Zoom level
+	let canvasContainer: HTMLDivElement;
+	let pagePngs: { src: string; dimensions: { width: number; height: number } }[] = $state([]);
+	let previewDragger: PreviewDragger;
+
+	// Editor stuff
+	let monaco: typeof Monaco;
+	let editorAnchor: HTMLDivElement;
+	let editor: Monaco.editor.IStandaloneCodeEditor;
+	let vfs: { name: string; content: string; model: Monaco.editor.ITextModel }[] = $state([]);
+	let currentModelId = 0;
+	let collectedEditorUpdates: any[] = []; // Editor text changes
+
+	async function render() {
 		if (loading) {
 			loading = false;
 		}
@@ -67,10 +67,10 @@
 		ws.send(
 			'EDIT ' +
 				JSON.stringify(
-					accumulatedChanges.flat().sort((a, b) => a.rangeOffset - b.rangeOffset) as RawOperation[]
+					collectedEditorUpdates.flat().sort((a, b) => a.rangeOffset - b.rangeOffset) as RawOperation[]
 				)
 		);
-		for (let change of accumulatedChanges.flat()) {
+		for (let change of collectedEditorUpdates.flat()) {
 			try {
 				LOGGER.info(MainMonacoSection, 'Applying change', change, vfs[currentModelId].name);
 
@@ -84,18 +84,16 @@
 				LOGGER.error(MainMonacoSection, 'Error applying change', e);
 			}
 		}
-		LOGGER.info(MainMonacoSection, 'Content changed', accumulatedChanges.map((v) => v[0]) as RawOperation[]);
-		accumulatedChanges = [];
+		LOGGER.info(
+			MainMonacoSection,
+			'Content changed',
+			collectedEditorUpdates.map((v) => v[0]) as RawOperation[]
+		);
+		collectedEditorUpdates = [];
 		render();
 	});
-	let accumulatedChanges: any[] = [];
-
-	function convertRemToPixels(rem: number) {
-		return rem * parseFloat(getComputedStyle(document.documentElement).fontSize);
-	}
 
 	function zoomPreview() {
-		
 		if (previewScale > 1.2) {
 			LOGGER.info(WorkerRendererSection, 'Zooming to', previewScale);
 			pageRenderer?.resize(-1, previewScale);
@@ -111,8 +109,6 @@
 				canvasContainer.style.alignItems = 'start';
 			}
 		}
-
-		// render(false);
 	}
 
 	function onWheel(e: WheelEvent) {
@@ -149,70 +145,39 @@
 		}
 	}
 
-	let isDragging = false;
-	let startX = 0;
-	let startY = 0;
-	let scrollLeft = 0;
-	let scrollTop = 0;
-
-	function onMouseDown(e: MouseEvent) {
-		isDragging = true;
-		startX = e.pageX - canvasContainer.offsetLeft;
-		startY = e.pageY - canvasContainer.offsetTop;
-		scrollLeft = canvasContainer.scrollLeft;
-		scrollTop = canvasContainer.scrollTop;
-
-		e.preventDefault();
-	}
-
-	function onMouseUp(e: MouseEvent) {
-		isDragging = false;
-	}
-
-	function onMouesMove(e: MouseEvent) {
-		if (!isDragging) return;
-
-		const x = e.pageX - canvasContainer.offsetLeft;
-		const y = e.pageY - canvasContainer.offsetTop;
-
-		const walkX = (x - startX) * 2;
-		const walkY = (y - startY) * 2;
-
-		canvasContainer.scrollLeft = scrollLeft - walkX;
-		canvasContainer.scrollTop = scrollTop - walkY;
-	}
+	
 
 	function handleCompileErrorResponse(response: App.Compiler.CompileErrorResponse) {
 		const errs = response.errors;
 
-			const convertedErrs = [];
-			const markers = [];
+		const convertedErrs = [];
+		const markers = [];
 
-			const model = vfs[currentModelId].model;
-			console.log(model);
-			
+		const model = vfs[currentModelId].model;
+		console.log(model);
 
-			for (let err of errs) {
-				convertedErrs.push(err);
+		for (let err of errs) {
+			convertedErrs.push(err);
 
-				const start_position = model.getPositionAt(err.span.range[0]);
-				const end_position = model.getPositionAt(err.span.range[1]);
-			
-				const modelRange = monaco.Range.fromPositions(start_position, end_position);
+			const start_position = model.getPositionAt(err.span.range[0]);
+			const end_position = model.getPositionAt(err.span.range[1]);
 
-				let marker = {
-					severity: err.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
-					message: err.message,
-					startLineNumber: modelRange.startLineNumber,
-					startColumn: modelRange.startColumn,
-					endLineNumber: modelRange.endLineNumber,
-					endColumn: modelRange.endColumn
-				};
+			const modelRange = monaco.Range.fromPositions(start_position, end_position);
 
-				markers.push(marker);
-			}
+			let marker = {
+				severity:
+					err.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
+				message: err.message,
+				startLineNumber: modelRange.startLineNumber,
+				startColumn: modelRange.startColumn,
+				endLineNumber: modelRange.endLineNumber,
+				endColumn: modelRange.endColumn
+			};
 
-			monaco.editor.setModelMarkers(model, 'compiler', markers);
+			markers.push(marker);
+		}
+
+		monaco.editor.setModelMarkers(model, 'compiler', markers);
 	}
 
 	function handleCompileResponse(response: App.Compiler.CompileResponse) {
@@ -261,12 +226,17 @@
 		}
 	}
 
-	function handleCompilerCompletionResponse(response: App.Compiler.CompletionResponse, completionProvider: TypstCompletionProvider) {
-		
+	function handleCompilerCompletionResponse(
+		response: App.Compiler.CompletionResponse,
+		completionProvider: TypstCompletionProvider
+	) {
 		completionProvider.setCompletions(response.completions);
 	}
 
-	function handleCompilerResponse(response: App.Compiler.Response, completionProvider: TypstCompletionProvider) {
+	function handleCompilerResponse(
+		response: App.Compiler.Response,
+		completionProvider: TypstCompletionProvider
+	) {
 		switch (response.type) {
 			case 'error':
 				handleCompilerErrorResponse(response);
@@ -283,14 +253,11 @@
 		}
 	}
 
-
 	$effect(() => {
 		LOGGER.clearLogs();
-		const completionProvider = new TypstCompletionProvider(
-			(file, offset) => {
-				compiler?.completions(file, offset);
-			}
-		);
+		const completionProvider = new TypstCompletionProvider((file, offset) => {
+			compiler?.completions(file, offset);
+		});
 		loadMessage = 'Loading WASM Flow';
 
 		compiler = new CompilerWorkerBridge(new CompilerWorker());
@@ -299,16 +266,18 @@
 
 		compiler.onMessage((res) => handleCompilerResponse(res, completionProvider));
 
-
-		pageRenderer = new PageRendererWorkerBridge(new Worker(PageRenderWorker, {
-			type: 'module'
-		}));
+		pageRenderer = new PageRendererWorkerBridge(
+			new Worker(PageRenderWorker, {
+				type: 'module'
+			})
+		);
 
 		const resizeObserver = new ResizeObserver((entries) => {
 			for (let entry of entries) {
 				const style = getComputedStyle(canvasContainer);
 
-				const width = parseFloat(style.width) - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+				const width =
+					parseFloat(style.width) - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
 				pageRenderer!.update(-1, width);
 			}
 		});
@@ -322,17 +291,20 @@
 				pagePngs[msg.pageId] = {
 					src: msg.png,
 					dimensions: msg.dimensions
-				}
+				};
 
 				LOGGER.info(WorkerRendererSection, 'Page', msg.pageId, 'finished!');
 			}
 		});
 
+		previewDragger = new PreviewDragger(canvasContainer);
+
 		document.addEventListener('wheel', onWheel, { passive: false });
 
 		loadMessage = 'Loading Monaco Editor';
 
-		import('$lib/editor').then((iMonaco) => {
+		import('$lib/monaco/editor')
+			.then((iMonaco) => {
 				monaco = iMonaco.default;
 				iMonaco.initializeEditor(completionProvider).then((_editor) => {
 					LOGGER.info(MainMonacoSection, 'Editor initialized');
@@ -389,15 +361,20 @@
 					onContentChanged(e);
 				}); */
 				});
-			}).catch((e) => {
+			})
+			.catch((e) => {
 				LOGGER.error(MainMonacoSection, 'Error initializing editor', e);
 			});
 
 		return () => {
 			// Cleanup
+			vfs.forEach((v) => {
+				v.model.dispose();
+			});
 			editor?.dispose();
 			ws.close();
 			document.removeEventListener('wheel', onWheel);
+			previewDragger?.dispose();
 		};
 	});
 
@@ -410,7 +387,7 @@
 				text: v.text
 			};
 		});
-		accumulatedChanges.push(changes);
+		collectedEditorUpdates.push(changes);
 	}
 
 	// ONLY TEST
@@ -418,7 +395,7 @@
 
 	// Set the menu
 	$effect(() => {
-		store.setMenu([
+		layoutStore.setMenu([
 			{
 				name: 'Window',
 				actions: [
@@ -554,8 +531,11 @@
 </script>
 
 {#if loading}
-	<div class="absolute top-0 left-0 w-screen h-screen flex items-center justify-center bg-background z-50" transition:fade>
-		<div class="flex flex-col justify-center items-center">
+	<div
+		class="absolute left-0 top-0 z-50 flex h-screen w-screen items-center justify-center bg-background"
+		transition:fade
+	>
+		<div class="flex flex-col items-center justify-center">
 			<LoaderCircle class="animate-spin" />
 			<p class="text-center">{loadMessage}...</p>
 		</div>
@@ -578,16 +558,12 @@
 		bind:this={panes.editor.obj}
 		class=""
 	>
-		<div bind:this={divEl} id="editor" class="h-full w-full"></div>
+		<div bind:this={editorAnchor} id="editor" class="h-full w-full"></div>
 	</Resizable.Pane>
 	<Resizable.Handle />
 	<Resizable.Pane collapsedSize={0} collapsible={true} minSize={15}>
 		<div
 			bind:this={canvasContainer}
-			onmousedown={onMouseDown}
-			onmouseup={onMouseUp}
-			onmousemove={onMouesMove}
-			onmouseleave={onMouseUp}
 			role="presentation"
 			class="flex h-full w-full flex-col items-start overflow-x-auto overflow-y-auto"
 		>
@@ -595,7 +571,7 @@
 				<img
 					src={png.src}
 					alt={`Page ${i}`}
-					class="rounded-sm shadow-2xl shadow-slate-500 max-w-none"
+					class="max-w-none rounded-sm shadow-2xl shadow-slate-500"
 					style={`width: ${png.dimensions.width * previewScale}px; height: ${png.dimensions.height * previewScale}px;`}
 				/>
 			{/each}

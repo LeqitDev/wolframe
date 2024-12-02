@@ -12,123 +12,14 @@ import typstGrammar from '$lib/assets/typst.tmLanguage.json?url';
 import typstTheme from '$lib/assets/typstTokio.json';
 import darkPlusTheme from '$lib/textmate/themes/dark-plus.json';
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?url';
-import { convertTheme, TokensProviderCache } from './textmate';
-import * as typst from '../../typst-flow-wasm/pkg/typst_flow_wasm';
+import { convertTheme, TokensProviderCache } from '../textmate';
+import * as typst from '$rust/typst_flow_wasm';
 
 // Types for oniguruma
 interface OnigLib {
 	createOnigScanner(patterns: string[]): OnigScanner;
 	createOnigString(str: string): OnigString;
 }
-
-class SimpleLanguageInfoProvider implements monaco.languages.TokensProvider {
-	private grammar: vscodeTextmate.IGrammar;
-	private ruleStack: vscodeTextmate.StateStack | null;
-
-	constructor(grammar: vscodeTextmate.IGrammar) {
-		this.grammar = grammar;
-		this.ruleStack = null;
-	}
-
-	getInitialState(): monaco.languages.IState {
-		return new (class implements monaco.languages.IState {
-			clone(): monaco.languages.IState {
-				return this;
-			}
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			equals(_other: monaco.languages.IState): boolean {
-				return true;
-			}
-		})();
-	}
-
-	tokenize(line: string, state: monaco.languages.IState): monaco.languages.ILineTokens {
-		const lineTokens = this.grammar.tokenizeLine(line, this.ruleStack);
-		console.log('lineTokens:', lineTokens); // DEBUGGING
-		this.ruleStack = lineTokens.ruleStack;
-
-		return {
-			tokens: lineTokens.tokens.map((token) => ({
-				startIndex: token.startIndex,
-				scopes: token.scopes[token.scopes.length - 1],
-				endIndex: token.endIndex
-			})),
-			endState: state
-		};
-	}
-}
-
-type MyCompletionItem = monaco.languages.CompletionItem & {
-	insertTextRules?: monaco.languages.CompletionItemInsertTextRule;
-};
-
-const typstCompletions = {
-	keywords: [
-		{ label: 'let', insertText: 'let ' },
-		'set',
-		{label: 'show', insertText: 'show '},
-		{label: 'if', insertText: 'if (${1:condition}) {${2}}', insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet},
-		{label: 'else', insertText: 'else {${1}}', insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet},
-		'for',
-		'in',
-		'while',
-		'break',
-		'continue',
-		'return',
-		{
-			label: 'import',
-			insertText: 'import "${1:@preview}"${2:: }',
-			insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet
-		},
-		{label: 'include', insertText: 'include "${1:}"', insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet},
-		'as',
-		'and',
-		'or',
-		'not'
-	] as (string | MyCompletionItem)[],
-	functions: [
-		'text',
-		'paragraph',
-		'heading',
-		'list',
-		'enumerate',
-		'figure',
-		'table',
-		'image',
-		'align',
-		'center',
-		'left',
-		'right',
-		'justified',
-		'bold',
-		'italic',
-		'underline'
-	] as (string | MyCompletionItem)[],
-	elements: ['page', 'columns', 'grid', 'stack', 'box', 'line', 'rect', 'circle', 'path'] as (string | MyCompletionItem)[]
-};
-
-const createCompletionItems = (
-	items: (string | MyCompletionItem)[],
-	kind: monaco.languages.CompletionItemKind,
-	range: monaco.IRange
-) => {
-	return items.map((item) => {
-		if (typeof item === 'string') {
-			return {
-				label: item,
-				kind: kind,
-				insertText: item,
-				range: range
-			};
-		} else {
-			return {
-				...item,
-				kind: kind,
-				range: range
-			};
-		}
-	});
-};
 
 /* 
 	Syntax,
@@ -434,7 +325,7 @@ class EditorSetup {
 async function initializeEditor(completionProvider: monaco.languages.CompletionItemProvider) {
 	try {
 		self.MonacoEnvironment = {
-			getWorkerUrl: function (_moduleId, _label) {
+			getWorkerUrl: function () {
 				return editorWorker;
 			}
 		};

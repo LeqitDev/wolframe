@@ -3,12 +3,11 @@
 	import AppSidebar from '$lib/components/app-sidebar.svelte';
 	import * as Menubar from '$lib/components/ui/menubar/index.js';
 	import type { PageData } from './$types';
-	import { createProjectStore, getProjectStore } from '$lib/stores/project.svelte';
+	import { createLayoutStore } from '$lib/stores/layoutStore.svelte';
 
 	let { children, data }: { children: any; data: PageData } = $props();
 
-	createProjectStore();
-	const store = getProjectStore();
+	const store = createLayoutStore();
 </script>
 
 {#snippet menu({ data }: { data: App.IProjectMenu })}

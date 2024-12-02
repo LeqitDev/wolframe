@@ -1,6 +1,11 @@
-import { WASMSection, type Sections } from '$lib/logger.svelte';
+import { WASMSection, type Sections } from '$lib/stores/logger.svelte';
 import init, * as typst from '$rust/typst_flow_wasm';
-import { type CoreCompletionItem, CoreCompletionKinds, convertToMonacoSnippet } from '$lib/monaco';
+
+type compilerGlobalThis = typeof globalThis & {
+    xml_get_sync?: (path: string) => Uint8Array;
+    logWasm?: (...e: unknown[]) => void;
+    errorWasm?: (...e: unknown[]) => void;
+};
 
 let initialized = false;
 let compiler: typst.SuiteCore;
@@ -23,7 +28,7 @@ function xml_get_sync(path: string) {
     return Uint8Array.from([]);
 }
 
-function compile(request: App.Compiler.CompileRequest) {
+function compile() {
     try {
         const svgs = compiler.compile();
         sendCompileResponse(svgs);
@@ -62,13 +67,12 @@ function completion(request: App.Compiler.CompletionRequest) {
         return {
             label: completion.label(),
             kind: {
-                kind: CoreCompletionKinds[completion.kind().kind],
+                kind: completion.kind().kind.toString(),
                 detail: completion.kind().detail
             },
-            insertText: completion.apply(),
+            apply: completion.apply(),
             detail: completion.detail(),
-            parsed: convertToMonacoSnippet(completion.apply())
-        } as CoreCompletionItem;
+        } as App.Compiler.CompletionItemType;
     });
 
     sendCompletionResponse(items);
@@ -79,11 +83,11 @@ function add_file(request: App.Compiler.AddFileRequest) {
 }
 
 // Logging functions for use inside WASM TODO: implement inside wasm
-function logWasm(...e: any[]) {
+function logWasm(...e: unknown[]) {
     sendLoggerResponse('info', WASMSection, ...e);
 }
 
-function errorWasm(...e: any[]) {
+function errorWasm(...e: unknown[]) {
     sendLoggerResponse('error', WASMSection, ...e);
 }
 
@@ -92,9 +96,9 @@ self.onmessage = async (event: MessageEvent<App.Compiler.Request>) => {
 
     if (request.type === 'init') {
         if (!initialized) {
-            (globalThis as any).xml_get_sync = xml_get_sync;
-            (globalThis as any).logWasm = logWasm;
-            (globalThis as any).errorWasm = errorWasm;
+            (globalThis as compilerGlobalThis).xml_get_sync = xml_get_sync;
+            (globalThis as compilerGlobalThis).logWasm = logWasm;
+            (globalThis as compilerGlobalThis).errorWasm = errorWasm;
             // Instantiate a promise to wait for the WASM module to be loaded
             promise = new Promise((resolve) => {
                 // loop until the WASM module is loaded
@@ -121,7 +125,7 @@ self.onmessage = async (event: MessageEvent<App.Compiler.Request>) => {
 
         switch (request.type) {
             case 'compile':
-                compile(request);
+                compile();
                 break;
             case 'edit':
                 edit(request);
@@ -150,10 +154,10 @@ function sendCompileResponse(svgs: string[]) {
     self.postMessage({ type: 'compile', svgs } as App.Compiler.CompileResponse);
 }
 
-function sendCompletionResponse(completions: CoreCompletionItem[]) {
+function sendCompletionResponse(completions: App.Compiler.CompletionItemType[]) {
     self.postMessage({ type: 'completion', completions } as App.Compiler.CompletionResponse);
 }
 
-function sendLoggerResponse(severity: 'error' | 'warn' | 'info', section: Sections, ...message: any[]) {
+function sendLoggerResponse(severity: 'error' | 'warn' | 'info', section: Sections, ...message: unknown[]) {
     self.postMessage({ type: 'logger', severity, section, message } as App.Compiler.LoggerResponse);
 }

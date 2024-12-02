@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { initializeLogger } from '$lib/logger.svelte';
+	import { initializeLogger } from '$lib/stores/logger.svelte';
 	import '../app.css';
 
 	initializeLogger();
