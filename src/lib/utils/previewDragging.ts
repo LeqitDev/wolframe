@@ -5,10 +5,12 @@ let isDragging = false;
 	let scrollTop = 0;
 
 export class PreviewDragger {
-    private canvasContainer: HTMLElement;
+    private canvasContainer: HTMLDivElement;
 
-    constructor(canvasContainer: HTMLElement) {
+    constructor(canvasContainer: HTMLDivElement) {
         this.canvasContainer = canvasContainer;
+        console.log('PreviewDragger created', this.canvasContainer);
+        
         this.canvasContainer.addEventListener('mousedown', this.onMouseDown);
         this.canvasContainer.addEventListener('mouseup', this.onMouseUp);
         this.canvasContainer.addEventListener('mousemove', this.onMouesMove);
@@ -16,6 +18,8 @@ export class PreviewDragger {
     }
 
     dispose() {
+        console.log('PreviewDragger disposed', this.canvasContainer);
+        
         this.canvasContainer.removeEventListener('mousedown', this.onMouseDown);
         this.canvasContainer.removeEventListener('mouseup', this.onMouseUp);
         this.canvasContainer.removeEventListener('mousemove', this.onMouesMove);
@@ -23,6 +27,9 @@ export class PreviewDragger {
     }
 
 	onMouseDown(e: MouseEvent) {
+        if (!this.canvasContainer) {
+            this.canvasContainer = document.getElementById('canvas-container') as HTMLDivElement;
+        }
 		isDragging = true;
 		startX = e.pageX - this.canvasContainer.offsetLeft;
 		startY = e.pageY - this.canvasContainer.offsetTop;

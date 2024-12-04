@@ -8,6 +8,7 @@
 	import { CompilerWorkerBridge, PageRendererWorkerBridge } from '$lib/workerBridges';
 	import {
 		getLogger,
+		Logger,
 		MainMonacoSection,
 		MainWSFlowerSection,
 		WASMSection,
@@ -18,7 +19,21 @@
 	import { LoaderCircle } from 'lucide-svelte';
 	import { TypstCompletionProvider } from '$lib/monaco';
 	import { convertRemToPixels, debounce, PreviewDragger } from '$lib/utils';
+	import { SvelteMap } from 'svelte/reactivity';
+	import { untrack } from 'svelte';
+	import * as Menubar from '$lib/components/ui/menubar/index.js';
+	import { ServerCrash } from 'lucide-svelte';
+	import { Server } from 'lucide-svelte';
+	import { Button, buttonVariants } from '$lib/components/ui/button';
+	import * as Tooltip from '$lib/components/ui/tooltip';
 
+	interface FlowerState {
+		connected: boolean;
+		status: 'connected' | 'reconnecting' | 'failed';
+		reconnectingAttempts: number;
+		maxReconnectAttempts: number;
+		curTimeout: Timer | null;
+	}
 
 	interface RawOperation {
 		range: {
@@ -30,10 +45,81 @@
 		text: string;
 	}
 
+	interface VFSFile {
+		content: string;
+		model: Monaco.editor.ITextModel;
+		open?: boolean;
+	}
+
+	interface Page {
+		// canvas: HTMLCanvasElement;
+		svg?: string;
+		dimensions: { width: number; height: number };
+	}
+
+	class ProjectAppState {
+		vfs: SvelteMap<string, VFSFile> = new SvelteMap();
+		monaco?: typeof Monaco;
+		pages: Page[] = $state([]);
+		logger: Logger;
+		typstCompletionProvider?: TypstCompletionProvider;
+		currentModel: string = '';
+
+		constructor() {
+			this.logger = getLogger();
+			this.logger.logConsole(true);
+		}
+
+		getFirstModel() {
+			return this.vfs.values().next().value?.model;
+		}
+
+		getCurrentFile() {
+			return this.vfs.get(this.currentModel);
+		}
+
+		getCurrentName() {
+			return this.currentModel;
+		}
+
+		getPageCount() {
+			return this.pages.length;
+		}
+
+		slicePages(last_index: number) {
+			this.pages = this.pages.slice(0, last_index);
+		}
+
+		setPage(index: number, page: Page) {
+			this.pages[index] = page;
+		}
+
+		setPageDimensions(index: number, dimensions: { width: number; height: number }) {
+			this.pages[index].dimensions = dimensions;
+		}
+
+		getPage(index: number) {
+			return this.pages[index];
+		}
+
+		updatePageSvg(index: number, svg: string) {
+			this.pages[index].svg = svg;
+		}
+
+		get openFiles() {
+			// return [{ name: string, file: VFSFile }]
+			return Array.from(this.vfs.entries()).filter(([n, f]) => f.open).map(([name, file]) => {
+				return { name, model: file.model };
+			});
+		}
+	}
+
+	const projectState = new ProjectAppState();
+
 	// Sveltekit
 	const layoutStore = getLayoutStore(); // For Menu and things
-	const LOGGER = getLogger();
-	LOGGER.logConsole(true);
+	// const LOGGER = getLogger();
+	// projectState.logger.logConsole(true);
 	let loading = $state(true);
 	let loadMessage = $state('Initializing the project');
 
@@ -45,16 +131,23 @@
 	let pageRenderer: PageRendererWorkerBridge;
 	let previewScale = $state(1); // Zoom level
 	let canvasContainer: HTMLDivElement;
-	let pagePngs: { src: string; dimensions: { width: number; height: number } }[] = $state([]);
+	// let pagePngs: { src: string; dimensions: { width: number; height: number } }[] = $state([]);
 	let previewDragger: PreviewDragger;
 
 	// Editor stuff
-	let monaco: typeof Monaco;
+	// let monaco: typeof Monaco;
 	let editorAnchor: HTMLDivElement;
 	let editor: Monaco.editor.IStandaloneCodeEditor;
-	let vfs: { name: string; content: string; model: Monaco.editor.ITextModel }[] = $state([]);
+	// let vfs: { name: string; content: string; model: projectState.monaco.editor.ITextModel }[] = $state([]);
 	let currentModelId = 0;
 	let collectedEditorUpdates: any[] = []; // Editor text changes
+	let flowerState: FlowerState = $state({
+		connected: false,
+		status: 'connected',
+		reconnectingAttempts: 0,
+		maxReconnectAttempts: 10,
+		curTimeout: null
+	});
 
 	async function render() {
 		if (loading) {
@@ -64,27 +157,34 @@
 	}
 
 	const update_bouncer = debounce(() => {
-		ws.send(
+		flowerServer.send(
 			'EDIT ' +
 				JSON.stringify(
-					collectedEditorUpdates.flat().sort((a, b) => a.rangeOffset - b.rangeOffset) as RawOperation[]
+					collectedEditorUpdates
+						.flat()
+						.sort((a, b) => a.rangeOffset - b.rangeOffset) as RawOperation[]
 				)
 		);
 		for (let change of collectedEditorUpdates.flat()) {
 			try {
-				LOGGER.info(MainMonacoSection, 'Applying change', change, vfs[currentModelId].name);
+				projectState.logger.info(
+					MainMonacoSection,
+					'Applying change',
+					change,
+					projectState.getCurrentName()
+				);
 
 				compiler?.edit(
-					vfs[currentModelId].name,
+					projectState.currentModel,
 					change.text,
 					change.rangeOffset,
 					change.rangeOffset + change.rangeLength
 				);
 			} catch (e) {
-				LOGGER.error(MainMonacoSection, 'Error applying change', e);
+				projectState.logger.error(MainMonacoSection, 'Error applying change', e);
 			}
 		}
-		LOGGER.info(
+		projectState.logger.info(
 			MainMonacoSection,
 			'Content changed',
 			collectedEditorUpdates.map((v) => v[0]) as RawOperation[]
@@ -94,10 +194,10 @@
 	});
 
 	function zoomPreview() {
-		if (previewScale > 1.2) {
-			LOGGER.info(WorkerRendererSection, 'Zooming to', previewScale);
+		/* if (previewScale > 1.2) {
+			projectState.logger.info(WorkerRendererSection, 'Zooming to', previewScale);
 			pageRenderer?.resize(-1, previewScale);
-		}
+		} */
 
 		canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
 		canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
@@ -109,6 +209,11 @@
 				canvasContainer.style.alignItems = 'start';
 			}
 		}
+
+		pageRenderer?.resize(-1, previewScale);
+		/* for (let i = 0; i < projectState.getPageCount(); i++) {
+			pageRenderer?.rerender(i);
+		} */
 	}
 
 	function onWheel(e: WheelEvent) {
@@ -145,15 +250,13 @@
 		}
 	}
 
-	
-
 	function handleCompileErrorResponse(response: App.Compiler.CompileErrorResponse) {
 		const errs = response.errors;
 
 		const convertedErrs = [];
 		const markers = [];
 
-		const model = vfs[currentModelId].model;
+		const model = projectState.getCurrentFile()!.model;
 		console.log(model);
 
 		for (let err of errs) {
@@ -162,11 +265,13 @@
 			const start_position = model.getPositionAt(err.span.range[0]);
 			const end_position = model.getPositionAt(err.span.range[1]);
 
-			const modelRange = monaco.Range.fromPositions(start_position, end_position);
+			const modelRange = projectState.monaco!.Range.fromPositions(start_position, end_position);
 
 			let marker = {
 				severity:
-					err.severity === 'error' ? monaco.MarkerSeverity.Error : monaco.MarkerSeverity.Warning,
+					err.severity === 'error'
+						? projectState.monaco!.MarkerSeverity.Error
+						: projectState.monaco!.MarkerSeverity.Warning,
 				message: err.message,
 				startLineNumber: modelRange.startLineNumber,
 				startColumn: modelRange.startColumn,
@@ -177,34 +282,46 @@
 			markers.push(marker);
 		}
 
-		monaco.editor.setModelMarkers(model, 'compiler', markers);
+		projectState.monaco?.editor.setModelMarkers(model, 'compiler', markers);
 	}
 
 	function handleCompileResponse(response: App.Compiler.CompileResponse) {
 		const compiled = response.svgs;
 
 		for (const [i, svg] of compiled.entries()) {
-			if (pagePngs.length <= i) {
-				pageRenderer?.rerender(i, svg);
-				LOGGER.info(WorkerRendererSection, 'Page', i, 'rendering');
+			if (projectState.getPageCount() <= i) {
+				const canvas = document.createElement('canvas');
+				canvasContainer.appendChild(canvas);
+				const offscreen = canvas.transferControlToOffscreen();
+
+				projectState.pages.push({
+					// canvas: msg.canvas,
+					svg,
+					dimensions: { width: 0, height: 0 }
+				});
+
+				pageRenderer?.initPage(i, offscreen, svg);
+				projectState.logger.info(WorkerRendererSection, 'Page', i, 'rendering');
 			} else {
-				LOGGER.info(WorkerRendererSection, 'Page', i, 'forcing rerender');
+				projectState.updatePageSvg(i, svg);
+				projectState.logger.info(WorkerRendererSection, 'Page', i, 'forcing rerender');
 				pageRenderer?.rerender(i, svg);
 			}
 		}
 
 		// Remove any extra pages
-		if (pagePngs.length > compiled.length) {
-			pagePngs = pagePngs.slice(0, compiled.length);
+		if (projectState.getPageCount() > compiled.length) {
+			projectState.slicePages(compiled.length);
 		}
 
-		monaco.editor.setModelMarkers(vfs[currentModelId].model, 'compiler', []);
+		const model = projectState.getCurrentFile()?.model;
+		if (model) projectState.monaco?.editor.setModelMarkers(model, 'compiler', []);
 	}
 
 	function handleCompilerErrorResponse(response: App.Compiler.ErrorResponse) {
 		switch (response.sub) {
 			case 'default':
-				LOGGER.error(WASMSection, 'Error', response.error);
+				projectState.logger.error(WASMSection, 'Error', response.error);
 				break;
 			case 'compile':
 				handleCompileErrorResponse(response);
@@ -215,13 +332,13 @@
 	function handleCompilerLoggerResponse(response: App.Compiler.LoggerResponse) {
 		switch (response.severity) {
 			case 'info':
-				LOGGER.info(WASMSection, ...response.message);
+				projectState.logger.info(WASMSection, ...response.message);
 				break;
 			case 'warn':
-				LOGGER.warn(WASMSection, ...response.message);
+				projectState.logger.warn(WASMSection, ...response.message);
 				break;
 			case 'error':
-				LOGGER.error(WASMSection, ...response.message);
+				projectState.logger.error(WASMSection, ...response.message);
 				break;
 		}
 	}
@@ -253,8 +370,64 @@
 		}
 	}
 
+	function flowerConnectHandler() {
+		flowerServer = new WebSocket('ws://localhost:3030/users');
+
+		flowerServer.onopen = () => {
+			flowerServer.send('INIT ' + data.project?.id);
+			loadMessage = 'Painting the canvas like picasso';
+			flowerState.connected = true;
+			flowerState.status = 'connected';
+		};
+
+		flowerServer.onerror = (e) => {
+			projectState.logger.error(MainWSFlowerSection, 'Websocket Error', e);
+			flowerServer.close();
+		};
+
+		flowerServer.onclose = (e) => {
+			flowerState.connected = false;
+			flowerReconnectHandler();
+		};
+
+		flowerServer.onmessage = (e: MessageEvent<string>) => {
+			projectState.logger.info(MainWSFlowerSection, `Websocket Message:`, e);
+			if (e.data.startsWith('INIT ')) {
+				projectState.vfs.get('main.typ')?.model.setValue(e.data.slice(5));
+				try {
+					compiler?.add_file('main.typ', e.data.slice(5));
+					render();
+					canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
+					canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
+				} catch (e) {
+					console.error(e);
+				}
+
+				setTimeout(() => {
+					// add delay to prevent an echo
+					projectState.vfs.get('main.typ')?.model.onDidChangeContent((e: any) => {
+						onContentChanged(e);
+					});
+				}, 50);
+			}
+		};
+	}
+
+	function flowerReconnectHandler() {
+		flowerState.reconnectingAttempts++;
+		if (flowerState.reconnectingAttempts < flowerState.maxReconnectAttempts) {
+			flowerState.status = 'reconnecting';
+			flowerState.curTimeout = setTimeout(() => {
+				flowerConnectHandler();
+			}, 2000 * flowerState.reconnectingAttempts);
+		} else {
+			flowerState.status = 'failed';
+		}
+	}
+
 	$effect(() => {
-		LOGGER.clearLogs();
+		layoutStore.setMenubarSnippet(menubar);
+		projectState.logger.clearLogs();
 		const completionProvider = new TypstCompletionProvider((file, offset) => {
 			compiler?.completions(file, offset);
 		});
@@ -283,19 +456,29 @@
 		});
 
 		resizeObserver.observe(canvasContainer);
+		setTimeout(() => {
+			resizeObserver.unobserve(canvasContainer);
+		}, 3000);
 
 		pageRenderer.onMessage((msg) => {
 			if (msg.type === 'error') {
-				LOGGER.error(WorkerRendererSection, 'Error Page Render Worker', msg.error);
+				projectState.logger.error(WorkerRendererSection, 'Error Page Render Worker', msg.error);
 			} else if (msg.type === 'render-success') {
-				pagePngs[msg.pageId] = {
-					src: msg.png,
-					dimensions: msg.dimensions
-				};
+				projectState.setPageDimensions(msg.pageId, msg.dimensions);
 
-				LOGGER.info(WorkerRendererSection, 'Page', msg.pageId, 'finished!');
+				/* const svg = document.getElementById(`preview-page-${msg.pageId}`);
+				if (svg) {
+					svg.style.width = `${msg.dimensions.width * previewScale}px`;
+					svg.style.height = `${msg.dimensions.height * previewScale}px`;
+				} */
+
+				// projectState.setPageDimensions(msg.pageId, msg.dimensions);
+
+				projectState.logger.info(WorkerRendererSection, 'Page', msg.pageId, 'finished!');
 			}
 		});
+
+		console.log('Container', canvasContainer);
 
 		previewDragger = new PreviewDragger(canvasContainer);
 
@@ -305,56 +488,29 @@
 
 		import('$lib/monaco/editor')
 			.then((iMonaco) => {
-				monaco = iMonaco.default;
+				projectState.monaco = iMonaco.default;
 				iMonaco.initializeEditor(completionProvider).then((_editor) => {
-					LOGGER.info(MainMonacoSection, 'Editor initialized');
+					projectState.logger.info(MainMonacoSection, 'Editor initialized');
 					editor = _editor;
 
 					// Provide models for the vfs
 					for (let file of data.initial_vfs) {
 						let model = iMonaco.createModel(file.content);
-						vfs.push({
-							name: file.filename,
+						if (projectState.currentModel === '') {
+							projectState.currentModel = file.filename;
+						}
+						projectState.vfs.set(file.filename, {
 							content: file.content,
 							model
 						});
 					}
 
 					// Set the first model
-					editor.setModel(vfs[0].model);
+					editor.setModel(projectState.getFirstModel()!);
 
 					loadMessage = 'Connecting to Typst Flower Service';
 
-					ws = new WebSocket('ws://localhost:3030/users');
-					ws.onopen = () => {
-						ws.send('INIT ' + data.project?.id);
-						loadMessage = 'Painting the canvas like picasso';
-					};
-					ws.onerror = (e) => {
-						// TODO: HANDLE ERROR
-						LOGGER.error(MainWSFlowerSection, 'Websocket Error', e);
-					};
-					ws.onmessage = (e: MessageEvent<string>) => {
-						LOGGER.info(MainWSFlowerSection, `Websocket Message: """${e.data}"""`);
-						if (e.data.startsWith('INIT ')) {
-							vfs[0].model.setValue(e.data.slice(5));
-							try {
-								compiler?.add_file('main.typ', e.data.slice(5));
-								render();
-								canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
-								canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
-							} catch (e) {
-								console.error(e);
-							}
-
-							setTimeout(() => {
-								// add delay to prevent an echo
-								vfs[0].model.onDidChangeContent((e: any) => {
-									onContentChanged(e);
-								});
-							}, 50);
-						}
-					};
+					flowerConnectHandler();
 
 					// Add the listeners
 					/* editor.onDidChangeModelContent((e) => {
@@ -363,16 +519,16 @@
 				});
 			})
 			.catch((e) => {
-				LOGGER.error(MainMonacoSection, 'Error initializing editor', e);
+				projectState.logger.error(MainMonacoSection, 'Error initializing editor', e);
 			});
 
 		return () => {
 			// Cleanup
-			vfs.forEach((v) => {
+			projectState.vfs.forEach((v) => {
 				v.model.dispose();
 			});
 			editor?.dispose();
-			ws.close();
+			flowerServer.close();
 			document.removeEventListener('wheel', onWheel);
 			previewDragger?.dispose();
 		};
@@ -390,117 +546,7 @@
 		collectedEditorUpdates.push(changes);
 	}
 
-	// ONLY TEST
-	let ws: WebSocket;
-
-	// Set the menu
-	$effect(() => {
-		layoutStore.setMenu([
-			{
-				name: 'Window',
-				actions: [
-					{
-						name: `${panes.editor.obj?.isCollapsed() ? 'Show' : 'Hide'} Editor`,
-						onclick: () => {
-							if (panes.editor.obj?.isCollapsed()) {
-								panes.editor.obj?.expand();
-							} else {
-								panes.editor.obj?.collapse();
-							}
-						}
-					},
-					{
-						name: `${panes.preview.obj?.isCollapsed() ? 'Show' : 'Hide'} Preview`,
-						onclick: () => {
-							if (panes.preview.obj?.isCollapsed()) {
-								panes.preview.obj?.expand();
-							} else {
-								panes.preview.obj?.collapse();
-							}
-						}
-					}
-				]
-			},
-			{
-				name: 'Project',
-				actions: [
-					{
-						name: 'Delete Project',
-						onclick: () => {
-							// console.log('Delete project');
-							delete_form.submit();
-						}
-					}
-				]
-			},
-			{
-				name: 'Websocket',
-				actions: [
-					{
-						name: 'Connect',
-						onclick: () => {
-							console.log('Connect');
-						}
-					},
-					{
-						name: 'Disconnect',
-						onclick: () => {
-							console.log('Disconnect');
-							ws.close();
-						}
-					},
-					{
-						name: 'Send',
-						onclick: () => {
-							console.log('Send');
-							ws.send(
-								'EDIT ' +
-									JSON.stringify({
-										text: 'hello',
-										range: {
-											startLineNumber: 1,
-											startColumn: 1,
-											endLineNumber: 1,
-											endColumn: 5
-										}
-									})
-							);
-						}
-					}
-				]
-			},
-			{
-				name: 'Preview',
-				actions: [
-					{
-						name: 'Zoom In',
-						onclick: () => {
-							if (previewScale < 2) {
-								previewScale += 0.1;
-								zoomPreview();
-							}
-						}
-					},
-					{
-						name: 'Zoom Out',
-						onclick: () => {
-							if (previewScale > 0.6) {
-								previewScale -= 0.1;
-								zoomPreview();
-							}
-						}
-					},
-					{
-						name: 'Reset Zoom',
-						onclick: () => {
-							previewScale = 1;
-							zoomPreview();
-						}
-					}
-				]
-			}
-		]);
-	});
+	let flowerServer: WebSocket;
 
 	// Set the collapsible panes handles
 	let panes: {
@@ -530,6 +576,158 @@
 	let { data }: { data: PageData } = $props();
 </script>
 
+{#snippet menubar()}
+	<Menubar.Root>
+		<Menubar.Menu>
+			<Menubar.Trigger>Window</Menubar.Trigger>
+			<Menubar.Content>
+				<Menubar.Item
+					onclick={() => {
+						if (panes.editor.obj?.isCollapsed()) {
+							panes.editor.obj?.expand();
+						} else {
+							panes.editor.obj?.collapse();
+						}
+					}}
+				>
+					{panes.editor.obj?.isCollapsed() ? 'Show' : 'Hide'} Editor
+				</Menubar.Item>
+				<Menubar.Item
+					onclick={() => {
+						if (panes.preview.obj?.isCollapsed()) {
+							panes.preview.obj?.expand();
+						} else {
+							panes.preview.obj?.collapse();
+						}
+					}}
+				>
+					{panes.preview.obj?.isCollapsed() ? 'Show' : 'Hide'} Preview
+				</Menubar.Item>
+			</Menubar.Content>
+		</Menubar.Menu>
+		<Menubar.Menu>
+			<Menubar.Trigger>Project</Menubar.Trigger>
+			<Menubar.Content>
+				<Menubar.Item
+					onclick={() => {
+						delete_form.submit();
+					}}
+				>
+					Delete Project
+				</Menubar.Item>
+			</Menubar.Content>
+		</Menubar.Menu>
+		<Menubar.Menu>
+			<Menubar.Trigger>Websocket</Menubar.Trigger>
+			<Menubar.Content>
+				<Menubar.Item
+					onclick={() => {
+						console.log('Connect');
+					}}
+				>
+					Connect
+				</Menubar.Item>
+				<Menubar.Item
+					onclick={() => {
+						console.log('Disconnect');
+						flowerServer.close();
+					}}
+				>
+					Disconnect
+				</Menubar.Item>
+				<Menubar.Item
+					onclick={() => {
+						console.log('Send');
+						flowerServer.send(
+							'EDIT ' +
+								JSON.stringify({
+									text: 'hello',
+									range: {
+										startLineNumber: 1,
+										startColumn: 1,
+										endLineNumber: 1,
+										endColumn: 5
+									}
+								})
+						);
+					}}
+				>
+					Send
+				</Menubar.Item>
+			</Menubar.Content>
+		</Menubar.Menu>
+		<Menubar.Menu>
+			<Menubar.Trigger>Preview</Menubar.Trigger>
+			<Menubar.Content>
+				<Menubar.Item
+					onclick={() => {
+						if (previewScale < 2) {
+							previewScale += 0.1;
+							zoomPreview();
+						}
+					}}
+				>
+					Zoom In
+				</Menubar.Item>
+				<Menubar.Item
+					onclick={() => {
+						if (previewScale > 0.6) {
+							previewScale -= 0.1;
+							zoomPreview();
+						}
+					}}
+				>
+					Zoom Out
+				</Menubar.Item>
+				<Menubar.Item
+					onclick={() => {
+						previewScale = 1;
+						zoomPreview();
+					}}
+				>
+					Reset Zoom
+				</Menubar.Item>
+			</Menubar.Content>
+		</Menubar.Menu>
+	</Menubar.Root>
+	<Tooltip.Provider>
+		<Tooltip.Root>
+			<Tooltip.Trigger class={buttonVariants({ variant: 'outline', size: 'icon' })} onclick={() => {
+				if (flowerState.status === 'failed') {
+					flowerConnectHandler();
+				}
+			}}>
+				{#if flowerState.connected}
+					<div class="relative">
+						<Server />
+						<span class="absolute bottom-0 right-0 h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
+					</div>
+				{:else}
+					<div class="relative">
+						<ServerCrash />
+						<span
+							class={`absolute bottom-0 right-0 p-1 ${flowerState.status === 'reconnecting' ? 'bg-orange-500' : 'bg-destructive'} h-1.5 w-1.5 rounded-full`}
+						>
+						</span>
+					</div>
+				{/if}
+				</Tooltip.Trigger
+			>
+			<Tooltip.Content>
+				{#if flowerState.connected}
+					<p>Connected to Typst Flower Service</p>
+				{:else if flowerState.status === 'reconnecting'}
+					<p>Reconnecting to Typst Flower Service...</p>
+					<p>Attempt {flowerState.reconnectingAttempts}</p>
+				{:else}
+					<p>Failed to connect to Typst Flower Service</p>
+					<p>Click to retry</p>
+				{/if}
+			</Tooltip.Content>
+		</Tooltip.Root>
+	</Tooltip.Provider>
+{/snippet}
+
 {#if loading}
 	<div
 		class="absolute left-0 top-0 z-50 flex h-screen w-screen items-center justify-center bg-background"
@@ -538,6 +736,11 @@
 		<div class="flex flex-col items-center justify-center">
 			<LoaderCircle class="animate-spin" />
 			<p class="text-center">{loadMessage}...</p>
+			{#if flowerState.status === 'reconnecting'}
+				<p>Attempt {flowerState.reconnectingAttempts}</p>
+			{:else if flowerState.status === 'failed'}
+				<p>Failed to connect to Typst Flower Service</p>
+			{/if}
 		</div>
 	</div>
 {/if}
@@ -558,23 +761,36 @@
 		bind:this={panes.editor.obj}
 		class=""
 	>
+	<div class="flex gap-2">
+		{#each projectState.openFiles as file}
+			<Button
+				variant="outline"
+				size="sm"
+				onclick={() => {
+					projectState.currentModel = file.name;
+					editor.setModel(file.model);
+				}}
+			>
+				{file.name}
+			</Button>
+		{/each}
+	</div>
 		<div bind:this={editorAnchor} id="editor" class="h-full w-full"></div>
 	</Resizable.Pane>
 	<Resizable.Handle />
 	<Resizable.Pane collapsedSize={0} collapsible={true} minSize={15}>
 		<div
+			id="canvas-container"
 			bind:this={canvasContainer}
 			role="presentation"
 			class="flex h-full w-full flex-col items-start overflow-x-auto overflow-y-auto"
-		>
-			{#each pagePngs as png, i}
-				<img
-					src={png.src}
-					alt={`Page ${i}`}
-					class="max-w-none rounded-sm shadow-2xl shadow-slate-500"
-					style={`width: ${png.dimensions.width * previewScale}px; height: ${png.dimensions.height * previewScale}px;`}
-				/>
-			{/each}
-		</div>
+		></div>
 	</Resizable.Pane>
 </Resizable.PaneGroup>
+
+<style>
+	:global(.typst-doc) {
+		width: 100% !important;
+		height: 100% !important;
+	}
+</style>

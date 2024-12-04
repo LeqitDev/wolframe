@@ -9,8 +9,12 @@ export class PageRendererWorkerBridge extends WorkerBridge<App.PageRenderer.Requ
         super.postMessage({ pageId, type: 'update', maxWidth });
     }
 
-    public rerender(pageId: number, svg: string, cachedSvg: boolean = false) {
-        super.postMessage({ pageId, type: 'render', svg, cached: cachedSvg });
+    public initPage(pageId: number, canvas: OffscreenCanvas, svg: string) {
+        super.postMessageWithTransfer({ pageId, type: 'init-page', canvas, svg }, [canvas]);
+    }
+
+    public rerender(pageId: number, svg?: string) {
+        super.postMessage({ pageId, type: 'render', svg });
     }
 
     public resize(pageId: number, zoom: number) {

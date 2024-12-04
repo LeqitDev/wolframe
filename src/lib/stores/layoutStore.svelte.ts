@@ -1,8 +1,9 @@
-import { setContext, getContext } from 'svelte';
+import { setContext, getContext, type Snippet } from 'svelte';
 
 
 export class LayoutStore {
 	private _menu: App.IProjectMenu[] = $state([]);
+	private _menubarSnippet: Snippet | null = $state(null);
 	private _cache: App.IProjectCache = $state({});
 
 	constructor() {}
@@ -11,8 +12,16 @@ export class LayoutStore {
 		return this._menu;
 	}
 
+	get menubarSnippet() {
+		return this._menubarSnippet;
+	}
+
 	setMenu(menu: App.IProjectMenu[]) {
 		this._menu = menu;
+	}
+
+	setMenubarSnippet(snippet: Snippet | null) {
+		this._menubarSnippet = snippet;
 	}
 
 	tryAddingToCache(key: string, content: string, metadata: App.FileMetadata) {

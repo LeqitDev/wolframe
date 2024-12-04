@@ -46,24 +46,27 @@ declare global {
 		}
 
 		export namespace PageRenderer {
-			type RenderRequestType = {type: 'render', svg: string; cached: boolean;};
-			type ResizeRequestType = {type: 'resize', zoom: number;};
+			type InitPageRequestType = {type: 'init-page'; canvas: OffscreenCanvas; svg: string;};
+			type RenderRequestType = {type: 'render'; svg?: string;};
+			type ResizeRequestType = {type: 'resize'; zoom: number;};
 			type DeleteRequestType = {type: 'delete'};
-			type UpdateRequestType = {type: 'update', maxWidth: number;};
+			type UpdateRequestType = {type: 'update'; maxWidth: number;};
 
+			type InitPageRequest = {pageId: number;} & InitPageRequestType;
 			type RenderRequest = {pageId: number;} & RenderRequestType;
 			type ResizeRequest = {pageId: number;} & ResizeRequestType;
 			type DeleteRequest = {pageId: number;} & DeleteRequestType;
 			type UpdateRequest = {pageId: number;} & UpdateRequestType;
 
 			type Request = 
+				| InitPageRequest
 				| RenderRequest
 				| ResizeRequest
 				| DeleteRequest
 				| UpdateRequest;
 
 			type ErrorResponse = {type: 'error'; error: string;};
-			type SuccessRenderResponse = {type: 'render-success'; pageId: number; png: string; dimensions: {width: number; height: number;}};
+			type SuccessRenderResponse = {type: 'render-success'; pageId: number; dimensions: {width: number; height: number;}};
 			type SuccessResponse = {type: 'success'; pageId: number;};
 
 			type Response = 

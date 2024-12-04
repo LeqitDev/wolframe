@@ -1,13 +1,10 @@
-import { DOMParser } from 'xmldom';
-import { Canvg, presets, type IOptions } from 'canvg';
+import { TypstToCanvas } from '$lib/ttc';
 
 const pages: {
-	canvg: Canvg;
-	canvas: OffscreenCanvas;
-	dimension: { width: number; height: number };
+	canvg: TypstToCanvas;
+	updated: boolean;
+	svg?: string;
 }[] = [];
-
-const preset = presets.offscreen({ DOMParser: DOMParser });
 
 let zoom = 1;
 
@@ -19,52 +16,16 @@ async function update(req: App.PageRenderer.UpdateRequest) {
 	maxWidth = req.maxWidth;
 
 	for (const page of pages) {
-		page.dimension = { width: page.canvas.width * (maxWidth/page.canvas.width), height: page.canvas.height * (maxWidth/page.canvas.width) };
-		page.canvg.resize(page.dimension.width * zoom, page.dimension.height * zoom);
+		page.canvg.setNewMaxWidth(maxWidth);
 
-		await page.canvg.render();
+		// page.canvg.render();
 
-		const blob = await page.canvas.convertToBlob({ type: 'image/png' });
-		const url = URL.createObjectURL(blob);
-
-		send_render_success(pages.indexOf(page), url, page.dimension);
+		send_render_success(pages.indexOf(page), page.canvg.dimension);
 	}
 }
 
-async function cachedRender(req: App.PageRenderer.RenderRequest) {
-	const page = pages.at(req.pageId);
-
-	if (!req.svg) {
-		send_error('Invalid message! Missing svg!');
-		return;
-	}
-	if (!page) {
-		send_error('Invalid message! No cached page found!');
-		return;
-	}
-
-	try {
-		await page.canvg.render();
-
-		const blob = await page.canvas.convertToBlob({ type: 'image/png' });
-		const url = URL.createObjectURL(blob);
-
-		send_render_success(req.pageId, url, page.dimension);
-	} catch (e) {
-		send_error(e as string);
-		return;
-	}
-}
-
-async function forceRender(req: App.PageRenderer.RenderRequest) {
-	const page = pages.at(req.pageId);
-
-	if (!req.svg) {
-		send_error('Invalid message! Missing svg!');
-		return;
-	}
-
-	const canvas = page?.canvas ?? new OffscreenCanvas(300, 150);
+async function initPage(req: App.PageRenderer.InitPageRequest) {
+	const canvas = req.canvas;
 
 	const ctx = canvas.getContext('2d');
 
@@ -73,33 +34,36 @@ async function forceRender(req: App.PageRenderer.RenderRequest) {
 		return;
 	}
 
+	const canvg = new TypstToCanvas(canvas, maxWidth);
+
+	canvg.renderSVG(req.svg);
+
+	const page = {
+		canvg,
+		updated: false,
+	};
+
+	pages.push(page);
+
+	send_render_success(pages.indexOf(page), page.canvg.dimension);
+}
+
+async function render(req: App.PageRenderer.RenderRequest) {
+	const page = pages.at(req.pageId);
+
+	if (!page) {
+		send_error('Invalid message! No cached page found!');
+		return;
+	}
+
 	try {
-		const canvg = await Canvg.from(ctx, req.svg, preset as unknown as IOptions);
-		if (page) {
-			page.canvg = canvg; // Update the cached page
-			canvg.resize(page.dimension.width * zoom, page.dimension.height * zoom);
+		if (req.svg) {
+			page.canvg.renderSVG(req.svg);
+		} else {
+			page.canvg.render();
 		}
 
-		await canvg.render();
-
-		if (!page) {
-			pages[req.pageId] = {
-				canvg,
-				canvas,
-				dimension: { width: canvas.width * (maxWidth/canvas.width), height: canvas.height * (maxWidth/canvas.width) }
-			};
-
-			const page = pages[req.pageId];
-
-			canvg.resize(page.dimension.width * zoom, page.dimension.height * zoom);
-
-			await canvg.render();
-		}
-
-		const blob = await canvas.convertToBlob({ type: 'image/png' });
-		const url = URL.createObjectURL(blob);
-		
-		send_render_success(req.pageId, url, pages[req.pageId].dimension);
+		send_render_success(req.pageId, page.canvg.dimension);
 	} catch (e) {
 		send_error(e as string);
 		return;
@@ -110,12 +74,14 @@ function resize(req: App.PageRenderer.ResizeRequest) {
 	if (req.pageId === -1) {
 		zoom = req.zoom;
 		for (const page of pages) {
-			page.canvg.resize(page.dimension.width * zoom, page.dimension.height * zoom);
+			// page.canvas.width = page.dimension.width * zoom;
+			// page.canvas.height = page.dimension.height * zoom;
+			page.canvg.scale(zoom);
 		}
 	} else {
 		const page = pages[req.pageId];
 		if (page) {
-			page.canvg.resize(page.dimension.width * req.zoom, page.dimension.height * req.zoom);
+			page.canvg.scale(zoom);
 		}
 	}
 	send_success(req.pageId);
@@ -139,12 +105,11 @@ self.onmessage = async (event: MessageEvent<App.PageRenderer.Request>) => {
 		case 'update':
 			update(msg);
 			break;
+		case 'init-page':
+			initPage(msg);
+			break;
 		case 'render':
-			if (msg.cached) {
-				await cachedRender(msg);
-			} else {
-				await forceRender(msg);
-			}
+			await render(msg);
 			break;
 		case 'resize':
 			resize(msg);
@@ -155,19 +120,23 @@ self.onmessage = async (event: MessageEvent<App.PageRenderer.Request>) => {
 	}
 };
 
-function send_render_success(pageId: number, png: string, dimensions: { width: number; height: number }) {
-	self.postMessage({
+function send_render_success(pageId: number, dimensions: { width: number; height: number }) {
+	post({
 		type: 'render-success',
 		pageId,
-		png,
 		dimensions
-	} as App.PageRenderer.SuccessRenderResponse);
+	});
 }
 
 function send_success(pageId: number) {
-	self.postMessage({ type: 'success', pageId } as App.PageRenderer.SuccessResponse);
+	post({ type: 'success', pageId });
 }
 
 function send_error(error: string) {
-	self.postMessage({ type: 'error', error } as App.PageRenderer.Response);
+	post({ type: 'error', error });
+}
+
+
+function post(message: App.PageRenderer.Response) {
+	self.postMessage(message);
 }

@@ -56,7 +56,9 @@
 		"@oslojs/crypto": "^1.0.1",
 		"@oslojs/encoding": "^1.1.0",
 		"@types/bun": "^1.1.14",
+		"@types/jsdom": "^21.1.7",
 		"@wasmer/sdk": "^0.9.0",
+		"@xmldom/xmldom": "^0.9.5",
 		"canvg": "^4.0.2",
 		"deepmerge": "^4.3.1",
 		"drizzle-orm": "^0.33.0",
@@ -67,7 +69,6 @@
 		"svelte-dnd-action": "^0.9.52",
 		"svelte-splitpanes": "^8.0.9",
 		"vscode-oniguruma": "^2.0.1",
-		"vscode-textmate": "^9.1.0",
-		"xmldom": "^0.6.0"
+		"vscode-textmate": "^9.1.0"
 	}
 }

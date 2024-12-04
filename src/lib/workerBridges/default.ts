@@ -11,6 +11,10 @@ export abstract class WorkerBridge<Req, Res> {
         this.worker.postMessage(message, options);
     }
 
+    protected postMessageWithTransfer(message: Req, transfer: Transferable[]) {
+        this.worker.postMessage(message, transfer);
+    }
+
     protected onMessageRaw(callback: (message: Res) => void) {
         this.worker.onmessage = (event) => {
             this.messageHandler?.onMessage(event.data);

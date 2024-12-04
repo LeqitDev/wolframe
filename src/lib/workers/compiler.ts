@@ -30,7 +30,7 @@ function xml_get_sync(path: string) {
 
 function compile() {
     try {
-        const svgs = compiler.compile();
+        const svgs = compiler.compile(false);
         sendCompileResponse(svgs);
     } catch (e) {
         const err = e as typst.CompileError[];
