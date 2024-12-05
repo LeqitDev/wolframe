@@ -85,3 +85,15 @@ export const files = pgTable('files', {
 		unq: unique().on(tabel.projectId, tabel.path)
 	}
 });
+
+export const directories = pgTable('directories', {
+	id: uuid('id').primaryKey().defaultRandom().unique(),
+	projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+	path: text('path').notNull(),
+	name: text('name').notNull(),
+	createdAt: timestamp('created_at').notNull()
+}, (tabel) => {
+	return {
+		unq: unique().on(tabel.projectId, tabel.path)
+	}
+});

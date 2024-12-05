@@ -21,19 +21,21 @@
 ## Installation
 
 ### Prerequisites
-- **Server Requirements**:  
-  - Operating System: Linux (recommended), macOS, or Windows  
-  - RAM: Minimum 2 GB  
+
+- **Server Requirements**:
+  - Operating System: Linux (recommended), macOS, or Windows
+  - RAM: Minimum 2 GB
   - Disk Space: At least 500 MB for the application, plus storage for documents
-- **Software Requirements**:  
+- **Software Requirements**:
   - Docker
 
 ### Steps
-1. Clone the repository:  
+
+1. Clone the repository:
    ```bash
    git clone https://github.com/LeqitDev/typst-flow.git
    cd typst-flow
-    ```
+   ```
 
 ---
 
@@ -68,5 +70,6 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 ## Acknowledgements
 
 - **Typst**: Without the absolutely insane [Typst Project](https://github.com/typst/typst), all of this would not be possible.
-- **Inspirations**: [obsidian-typst](https://github.com/fenjalien/obsidian-typst), [typst-lsp](https://github.com/nvarner/typst-lsp) bzw. [tinymist](https://github.com/Myriad-Dreamin/tinymist), [typst.ts](https://github.com/Myriad-Dreamin/typst.ts)
+- **Rustpad**: The [Rustpad Project](https://github.com/ekzhang/rustpad) was a huge inspiration for the collaborative editing feature.
+- **Inspirations**: [obsidian-typst](https://github.com/fenjalien/obsidian-typst), [typst-lsp](https://github.com/nvarner/typst-lsp) and [tinymist](https://github.com/Myriad-Dreamin/tinymist), [typst.ts](https://github.com/Myriad-Dreamin/typst.ts)
 - **caleb1248**: That [repo](https://github.com/caleb1248/monaco-vscode-textmate) helped me a lot with the Monaco Editor integration.
