@@ -11,7 +11,7 @@
 </script>
 
 <Sidebar.Provider open={false}>
-	<AppSidebar pdata={data} debug previewFile={data.files.find((value) => value.filename === "main.typ")?.path ?? data.files[0].path} activeFile={data.files.find((value) => value.filename === "main.typ")?.path ?? data.files[0].path} />
+	<AppSidebar {...store.sidebarActions} pdata={data} debug bind:previewFile={store.sidebarPreview} bind:activeFile={store.sidebarActive} />
 	<main class="flex h-screen w-screen flex-col overflow-hidden">
 		<div class="flex gap-2 p-2">
 			{#if store.menubarSnippet}

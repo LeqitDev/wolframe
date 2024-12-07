@@ -19,4 +19,29 @@ export const actions: Actions = {
 
         throw redirect(302, "/");
     },
+
+    newFile: async (event) => {
+        if (!event.locals.user) {
+            throw redirect(302, "/");
+        }
+
+        const slug = event.params.projectId;
+
+        const data = await event.request.formData();
+        if (!data.has("path") || !data.has("name") || !data.has("content")) {
+            throw new Error("Invalid request");
+        }
+
+        await db.insert(table.files).values({
+            projectId: slug!,
+            path: data.get("path") as string,
+            name: data.get("name") as string,
+            createdAt: new Date(),
+            size: 0,
+        });
+
+        minio.uploadFile(data.get("path") as string, data.get("content") as string);
+
+        return "ok";
+    }
 };

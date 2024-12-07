@@ -18,42 +18,6 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { flip } from 'svelte/animate';
 
-	interface FileSystemFolderType {
-		type: 'directory';
-		depth: number;
-		children: FileSystemNode[];
-		open: boolean;
-	}
-
-	interface FileSystemFileType {
-		type: 'file';
-		size: number;
-		mimetype: string;
-		etag: string;
-		lastModified: Date;
-	}
-
-	type FileSystemNodeType = FileSystemFileType | FileSystemFolderType;
-
-	interface FileMetadata {
-		filename: string;
-		mimetype: string;
-		size: number;
-		lastModified: Date;
-		etag: string;
-		path: string;
-	}
-
-	interface BaseFileSystemNode {
-		name: string;
-		path: string;
-		new?: boolean;
-	}
-
-	type FileSystemNode = BaseFileSystemNode & FileSystemNodeType;
-	type FileSystemFolder = BaseFileSystemNode & FileSystemFolderType;
-	type FileSystemFile = BaseFileSystemNode & FileSystemFileType;
-
 	// https://github.com/Microsoft/monaco-editor/issues/366
 
 	// Menu items.
@@ -65,7 +29,7 @@
 		},
 		{
 			title: 'Home',
-			url: '#',
+			url: '/',
 			icon: House
 		}
 	];
@@ -87,22 +51,22 @@
 		activeFile: string;
 		previewFile: string;
 		debug?: boolean;
-		onFileClick?: (file: FileMetadata) => void;
-		onNodeMoved?: (node: FileSystemNode, prev_path: string) => void;
-		onNewFile?: (file: FileMetadata) => void;
-		onNewDir?: (dir: FileSystemFolder) => void;
-		onFileDeleted?: (file: FileMetadata) => void;
-		onDirDeleted?: (dir: FileSystemFolder) => void;
-		onPreviewFileChange?: (file: FileMetadata) => void;
+		onFileClick?: (file: App.Sidebar.FileMetadata) => void;
+		onNodeMoved?: (node: App.Sidebar.FileSystemNode, prev_path: string) => void;
+		onNewFile?: (file: App.Sidebar.FileMetadata) => void;
+		onNewDir?: (dir: App.Sidebar.FileSystemFolder) => void;
+		onFileDeleted?: (file: App.Sidebar.FileMetadata) => void;
+		onDirDeleted?: (dir: App.Sidebar.FileSystemFolder) => void;
+		onPreviewFileChange?: (file: App.Sidebar.FileMetadata) => void;
 	} = $props();
 
-	let data: { tree: FileSystemFolder } = $state({
+	let data: { tree: App.Sidebar.FileSystemFolder } = $state({
 		tree: parsePageData(pdata)
 	});
 
 	let dragState: {
-		dragged: FileSystemNode | null;
-		targets: SvelteSet<FileSystemFolder>;
+		dragged: App.Sidebar.FileSystemNode | null;
+		targets: SvelteSet<App.Sidebar.FileSystemFolder>;
 		hoverTimer: number;
 	} = $state({
 		dragged: null,
@@ -113,7 +77,7 @@
 	let dragTarget = $derived.by(() => {
 		// highest depth folder in dragState.targets
 		let maxDepth = -1;
-		let target: FileSystemFolder | null = null;
+		let target: App.Sidebar.FileSystemFolder | null = null;
 		let targets = dragState.targets;
 
 		if (dragState.targets.size === 0) return null;
@@ -131,7 +95,7 @@
 		return dragState.dragged && dragTarget && validateDragTarget(dragState.dragged, dragTarget);
 	});
 
-	function validateDragTarget(dragged: FileSystemNode, target: FileSystemFolder): boolean {
+	function validateDragTarget(dragged: App.Sidebar.FileSystemNode, target: App.Sidebar.FileSystemFolder): boolean {
 		// Prevent dragging into own children or self
 		return !(dragged.path === target.path && dragged.type === target.type);
 	}
@@ -147,9 +111,9 @@
 		}
 	});
 
-	let currentHovered: null | { item: FileSystemNode; isDir: boolean } = $state(null);
+	let currentHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null);
 	let contextMenuVisibility = $state(false);
-	let staticHovered: null | { item: FileSystemNode; isDir: boolean } = $state(null);
+	let staticHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null);
 
 	$effect(() => {
 		if (!contextMenuVisibility) {
@@ -157,7 +121,7 @@
 		}
 	});
 
-	function fileSystemFileToFileMetadata(file: FileSystemFile): FileMetadata {
+	function fileSystemFileToFileMetadata(file: App.Sidebar.FileSystemFile): App.Sidebar.FileMetadata {
 		return {
 			filename: file.name,
 			mimetype: file.mimetype,
@@ -168,8 +132,8 @@
 		};
 	}
 
-	function parsePageData(data: { files: FileMetadata[]; project_path: string }) {
-		const root: FileSystemNode = {
+	function parsePageData(data: { files: App.Sidebar.FileMetadata[]; project_path: string }) {
+		const root: App.Sidebar.FileSystemNode = {
 			name: data.project_path.split('/').pop() || '',
 			type: 'directory',
 			children: [],
@@ -178,7 +142,7 @@
 			path: data.project_path.substring(0, data.project_path.length)
 		};
 
-		const filesByDirectory: Map<string, FileMetadata[]> = new Map();
+		const filesByDirectory: Map<string, App.Sidebar.FileMetadata[]> = new Map();
 		data.files.forEach((file) => {
 			const dirPath = file.path.replace(file.filename, '').trim();
 			if (!filesByDirectory.has(dirPath)) {
@@ -189,7 +153,7 @@
 
 		console.log(filesByDirectory);
 
-		const buildDirectoryTree = (basePath: string, parentNode: FileSystemNode) => {
+		const buildDirectoryTree = (basePath: string, parentNode: App.Sidebar.FileSystemNode) => {
 			if (parentNode.type === 'file') return;
 
 			const directFiles = data.files.filter(
@@ -200,7 +164,7 @@
 			);
 
 			directFiles.forEach((file) => {
-				const fileNode: FileSystemNode = {
+				const fileNode: App.Sidebar.FileSystemNode = {
 					name: file.filename,
 					type: 'file',
 					size: file.size,
@@ -229,7 +193,7 @@
 
 			subdirs.forEach((subdir) => {
 				const fullSubdirPath = `${basePath}/${subdir}`;
-				const dirNode: FileSystemNode = {
+				const dirNode: App.Sidebar.FileSystemNode = {
 					name: subdir,
 					type: 'directory',
 					depth: parentNode.depth + 1,
@@ -258,8 +222,8 @@
 	}
 
 	// Function to recursively find and remove the item
-	function findAndRemoveItem(tree: FileSystemNode, delitem: FileSystemNode): FileSystemNode | null {
-		let removedItem: FileSystemNode | null = null;
+	function findAndRemoveItem(tree: App.Sidebar.FileSystemNode, delitem: App.Sidebar.FileSystemNode): App.Sidebar.FileSystemNode | null {
+		let removedItem: App.Sidebar.FileSystemNode | null = null;
 		
 
 		if (tree.type === 'directory') {
@@ -287,7 +251,7 @@
 	}
 
 	// Function to insert item into the correct folder
-	function insertItemInFolder(tree: FileSystemNode, folder: FileSystemNode, item: FileSystemNode) {
+	function insertItemInFolder(tree: App.Sidebar.FileSystemNode, folder: App.Sidebar.FileSystemNode, item: App.Sidebar.FileSystemNode) {
 		if (item.path === folder.path) {
 			console.error('Cannot insert item into itself');
 			return;
@@ -298,7 +262,7 @@
 
 		if (current.type === 'directory') {
 			for (const part of parts.slice(0, -1)) {
-				const dir: FileSystemNode | undefined = current.children.find(
+				const dir: App.Sidebar.FileSystemNode | undefined = current.children.find(
 					(child) => child.name === part
 				);
 
@@ -326,9 +290,9 @@
 	}
 
 	function moveItemInTree(
-		tree: FileSystemNode,
-		curFolder: FileSystemNode,
-		curDragged: FileSystemNode
+		tree: App.Sidebar.FileSystemNode,
+		curFolder: App.Sidebar.FileSystemNode,
+		curDragged: App.Sidebar.FileSystemNode
 	) {
 		// Remove the item from its current location
 		const removedItem = findAndRemoveItem(tree, curDragged);
@@ -373,9 +337,9 @@
 				lastModified: new Date(),
 				etag: '',
 				path: hovered.item.path + '/...'
-			} as FileSystemNode;
+			} as App.Sidebar.FileSystemNode;
 
-			insertItemInFolder(data.tree, hovered.item as FileSystemNode, newFile);
+			insertItemInFolder(data.tree, hovered.item as App.Sidebar.FileSystemNode, newFile);
 			setTimeout(() => {
 				let newFileFocus = document.getElementById('newFileFocus');
 
@@ -386,14 +350,14 @@
 		}
 	}
 
-	function finalizeNewFile(e: FocusEvent | KeyboardEvent, item: FileSystemNode) {
+	function finalizeNewFile(e: FocusEvent | KeyboardEvent, item: App.Sidebar.FileSystemNode) {
 		if (e.type === 'keypress' && (e as KeyboardEvent).key !== 'Enter') return;
 		if (item.name === '') {
 			findAndRemoveItem(data.tree, item);
 		} else {
 			item.path = item.path.substring(0, item.path.length - 3) + item.name;
 			// TODO: New file callback
-			onNewFile(fileSystemFileToFileMetadata(item as FileSystemFile));
+			onNewFile(fileSystemFileToFileMetadata(item as App.Sidebar.FileSystemFile));
 			item.new = false;
 		}
 	}
@@ -402,7 +366,7 @@
 		let hovered = $state.snapshot(staticHovered);
 
 		if (hovered && hovered.isDir) {
-			hovered.item = hovered.item as FileSystemNode;
+			hovered.item = hovered.item as App.Sidebar.FileSystemNode;
 			console.log(hovered.item.path);
 
 			if (hovered.item.type === 'file') {
@@ -418,7 +382,7 @@
 				open: false,
 				depth: hovered.item.depth + 1,
 				path: hovered.item.path + '/...'
-			} as FileSystemFolder;
+			} as App.Sidebar.FileSystemFolder;
 			insertItemInFolder(data.tree, hovered.item, newDir);
 
 			setTimeout(() => {
@@ -431,18 +395,18 @@
 		}
 	}
 
-	function finalizeNewDir(e: FocusEvent | KeyboardEvent, item: FileSystemNode) {
+	function finalizeNewDir(e: FocusEvent | KeyboardEvent, item: App.Sidebar.FileSystemNode) {
 		if (e.type === 'keypress' && (e as KeyboardEvent).key !== 'Enter') return;
 		if (item.name === '') {
 			findAndRemoveItem(data.tree, item);
 		} else {
 			item.path = item.path.substring(0, item.path.length - 3) + item.name;
-			onNewDir(item as FileSystemFolder);
+			onNewDir(item as App.Sidebar.FileSystemFolder);
 			item.new = false;
 		}
 	}
 
-	function forEachTreeNode(tree: FileSystemNode, callback: (node: FileSystemNode) => boolean) {
+	function forEachTreeNode(tree: App.Sidebar.FileSystemNode, callback: (node: App.Sidebar.FileSystemNode) => boolean) {
 		let terminate = false;
 		if (tree.type === 'directory') {
 			tree.children.forEach((child) => {
@@ -485,12 +449,12 @@
 		dragState.targets.clear();
 	}
 
-	function dragStart(e: DragEvent, item: FileSystemNode) {
+	function dragStart(e: DragEvent, item: App.Sidebar.FileSystemNode) {
 		dragState.dragged = item;
 		e.dataTransfer?.setData('text/plain', item.path);
 	}
 
-	function dragOverFolder(e: DragEvent, folder: FileSystemFolder) {
+	function dragOverFolder(e: DragEvent, folder: App.Sidebar.FileSystemFolder) {
 		e.preventDefault();
 		if (dragState.dragged) {
 			dragState.targets.add(folder);
@@ -505,9 +469,9 @@
 			const removedItem = findAndRemoveItem(data.tree, item);
 
 			if (item.type === 'file') {
-				onFileDeleted(fileSystemFileToFileMetadata(removedItem as FileSystemFile));
+				onFileDeleted(fileSystemFileToFileMetadata(removedItem as App.Sidebar.FileSystemFile));
 			} else {
-				onDirDeleted(removedItem as FileSystemFolder);
+				onDirDeleted(removedItem as App.Sidebar.FileSystemFolder);
 			}
 		}
 	}
@@ -579,7 +543,7 @@
 					{#if !cur.isDir}
 						<ContextMenu.CheckboxItem checked={cur.item.path === previewFile} onCheckedChange={(checked) => {
 							if (checked) {
-								onPreviewFileChange(fileSystemFileToFileMetadata(cur.item as FileSystemFile));
+								onPreviewFileChange(fileSystemFileToFileMetadata(cur.item as App.Sidebar.FileSystemFile));
 								previewFile = cur.item.path;
 							}
 						}}>
@@ -625,7 +589,7 @@
 {/snippet}
 
 <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
-{#snippet Tree({ item }: { item: FileSystemNode })}
+{#snippet Tree({ item }: { item: App.Sidebar.FileSystemNode })}
 	{#if item.type === 'file'}
 		{#if item.new}
 			<Sidebar.MenuButton
@@ -654,7 +618,7 @@
 				}}
 				draggable="true"
 				ondragstart={(e) => dragStart(e, item)}
-				onclick={() => onFileClick(fileSystemFileToFileMetadata(item as FileSystemFile))}
+				onclick={() => onFileClick(fileSystemFileToFileMetadata(item as App.Sidebar.FileSystemFile))}
 				tooltipContent={item.path === previewFile ? previewing : undefined}
 			>
 				{#if item.path === previewFile}

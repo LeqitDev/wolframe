@@ -26,14 +26,9 @@
 	import { Server } from 'lucide-svelte';
 	import { Button, buttonVariants } from '$lib/components/ui/button';
 	import * as Tooltip from '$lib/components/ui/tooltip';
-
-	interface FlowerState {
-		connected: boolean;
-		status: 'connected' | 'reconnecting' | 'failed';
-		reconnectingAttempts: number;
-		maxReconnectAttempts: number;
-		curTimeout: Timer | null;
-	}
+	import { FlowerServer } from '$lib/flower';
+	import { initializePAS } from '$lib/stores/project.svelte';
+	import type monaco from '$lib/monaco/editor';
 
 	interface RawOperation {
 		range: {
@@ -45,83 +40,16 @@
 		text: string;
 	}
 
-	interface VFSFile {
-		content: string;
-		model: Monaco.editor.ITextModel;
-		open?: boolean;
-	}
+	let delete_form: HTMLFormElement;
 
-	interface Page {
-		// canvas: HTMLCanvasElement;
-		svg?: string;
-		dimensions: { width: number; height: number };
-	}
+	let ctrl_down = $state(false);
 
-	class ProjectAppState {
-		vfs: SvelteMap<string, VFSFile> = new SvelteMap();
-		monaco?: typeof Monaco;
-		pages: Page[] = $state([]);
-		logger: Logger;
-		typstCompletionProvider?: TypstCompletionProvider;
-		currentModel: string = '';
-
-		constructor() {
-			this.logger = getLogger();
-			this.logger.logConsole(true);
-		}
-
-		getFirstModel() {
-			return this.vfs.values().next().value?.model;
-		}
-
-		getCurrentFile() {
-			return this.vfs.get(this.currentModel);
-		}
-
-		getCurrentName() {
-			return this.currentModel;
-		}
-
-		getPageCount() {
-			return this.pages.length;
-		}
-
-		slicePages(last_index: number) {
-			this.pages = this.pages.slice(0, last_index);
-		}
-
-		setPage(index: number, page: Page) {
-			this.pages[index] = page;
-		}
-
-		setPageDimensions(index: number, dimensions: { width: number; height: number }) {
-			this.pages[index].dimensions = dimensions;
-		}
-
-		getPage(index: number) {
-			return this.pages[index];
-		}
-
-		updatePageSvg(index: number, svg: string) {
-			this.pages[index].svg = svg;
-		}
-
-		get openFiles() {
-			// return [{ name: string, file: VFSFile }]
-			return Array.from(this.vfs.entries()).filter(([n, f]) => f.open).map(([name, file]) => {
-				return { name, model: file.model };
-			});
-		}
-	}
-
-	const projectState = new ProjectAppState();
+	let { data }: { data: PageData } = $props();
 
 	// Sveltekit
 	const layoutStore = getLayoutStore(); // For Menu and things
 	// const LOGGER = getLogger();
 	// projectState.logger.logConsole(true);
-	let loading = $state(true);
-	let loadMessage = $state('Initializing the project');
 
 	// *Workers*
 	// Compiler
@@ -141,31 +69,20 @@
 	// let vfs: { name: string; content: string; model: projectState.monaco.editor.ITextModel }[] = $state([]);
 	let currentModelId = 0;
 	let collectedEditorUpdates: any[] = []; // Editor text changes
-	let flowerState: FlowerState = $state({
-		connected: false,
-		status: 'connected',
-		reconnectingAttempts: 0,
-		maxReconnectAttempts: 10,
-		curTimeout: null
-	});
+
+	let flowerServer: FlowerServer;
+
+	const projectState = initializePAS(data.project!.id);
 
 	async function render() {
-		if (loading) {
-			loading = false;
-		}
 		compiler?.compile();
 	}
 
 	const update_bouncer = debounce(() => {
-		flowerServer.send(
-			'EDIT ' +
-				JSON.stringify(
-					collectedEditorUpdates
-						.flat()
-						.sort((a, b) => a.rangeOffset - b.rangeOffset) as RawOperation[]
-				)
-		);
-		for (let change of collectedEditorUpdates.flat()) {
+		const changes = collectedEditorUpdates.flat();
+		changes.sort((a, b) => a.rangeOffset - b.rangeOffset);
+		flowerServer.editFile(data.project_path + '/' + projectState.getCurrentName(), changes);
+		for (let change of changes) {
 			try {
 				projectState.logger.info(
 					MainMonacoSection,
@@ -173,6 +90,8 @@
 					change,
 					projectState.getCurrentName()
 				);
+
+				// offset += change.text.length - change.rangeLength;
 
 				compiler?.edit(
 					projectState.currentModel,
@@ -257,7 +176,6 @@
 		const markers = [];
 
 		const model = projectState.getCurrentFile()!.model;
-		console.log(model);
 
 		for (let err of errs) {
 			convertedErrs.push(err);
@@ -370,68 +288,13 @@
 		}
 	}
 
-	function flowerConnectHandler() {
-		flowerServer = new WebSocket('ws://localhost:3030/users');
-
-		flowerServer.onopen = () => {
-			flowerServer.send('INIT ' + data.project?.id);
-			loadMessage = 'Painting the canvas like picasso';
-			flowerState.connected = true;
-			flowerState.status = 'connected';
-		};
-
-		flowerServer.onerror = (e) => {
-			projectState.logger.error(MainWSFlowerSection, 'Websocket Error', e);
-			flowerServer.close();
-		};
-
-		flowerServer.onclose = (e) => {
-			flowerState.connected = false;
-			flowerReconnectHandler();
-		};
-
-		flowerServer.onmessage = (e: MessageEvent<string>) => {
-			projectState.logger.info(MainWSFlowerSection, `Websocket Message:`, e);
-			if (e.data.startsWith('INIT ')) {
-				projectState.vfs.get('main.typ')?.model.setValue(e.data.slice(5));
-				try {
-					compiler?.add_file('main.typ', e.data.slice(5));
-					render();
-					canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
-					canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
-				} catch (e) {
-					console.error(e);
-				}
-
-				setTimeout(() => {
-					// add delay to prevent an echo
-					projectState.vfs.get('main.typ')?.model.onDidChangeContent((e: any) => {
-						onContentChanged(e);
-					});
-				}, 50);
-			}
-		};
-	}
-
-	function flowerReconnectHandler() {
-		flowerState.reconnectingAttempts++;
-		if (flowerState.reconnectingAttempts < flowerState.maxReconnectAttempts) {
-			flowerState.status = 'reconnecting';
-			flowerState.curTimeout = setTimeout(() => {
-				flowerConnectHandler();
-			}, 2000 * flowerState.reconnectingAttempts);
-		} else {
-			flowerState.status = 'failed';
-		}
-	}
-
 	$effect(() => {
 		layoutStore.setMenubarSnippet(menubar);
 		projectState.logger.clearLogs();
 		const completionProvider = new TypstCompletionProvider((file, offset) => {
 			compiler?.completions(file, offset);
 		});
-		loadMessage = 'Loading WASM Flow';
+		projectState.loadMessage = 'Loading WASM Flow';
 
 		compiler = new CompilerWorkerBridge(new CompilerWorker());
 
@@ -484,7 +347,7 @@
 
 		document.addEventListener('wheel', onWheel, { passive: false });
 
-		loadMessage = 'Loading Monaco Editor';
+		projectState.loadMessage = 'Loading Monaco Editor';
 
 		import('$lib/monaco/editor')
 			.then((iMonaco) => {
@@ -494,7 +357,7 @@
 					editor = _editor;
 
 					// Provide models for the vfs
-					for (let file of data.initial_vfs) {
+					/* for (let file of data.initial_vfs) {
 						let model = iMonaco.createModel(file.content);
 						if (projectState.currentModel === '') {
 							projectState.currentModel = file.filename;
@@ -503,14 +366,78 @@
 							content: file.content,
 							model
 						});
-					}
+					} */
 
 					// Set the first model
 					editor.setModel(projectState.getFirstModel()!);
 
-					loadMessage = 'Connecting to Typst Flower Service';
+					projectState.loadMessage = 'Connecting to Typst Flower Service';
 
-					flowerConnectHandler();
+					flowerServer = new FlowerServer(data.project!.id, data.user.id, projectState);
+					flowerServer.on_init_ok = (msg) => {
+						if (msg.payload.type !== 'InitOk') return;
+
+						// Reset state and editor
+						editor.setModel(null);
+						projectState.currentModel = '';
+						projectState.vfs.forEach((v) => {
+							v.model.dispose();
+						});
+						projectState.vfs.clear();
+
+						// Add the files
+						msg.payload.files.forEach((file) => {
+							let name = file.path.replace(data.project_path + '/', '');
+							let content = file.content;
+							projectState.vfs.set(name, {
+								content,
+								model: iMonaco.createModel(content),
+								path: file.path
+							});
+							try {
+								compiler?.add_file(name, content);
+							} catch (e) {
+								console.error(e);
+							}
+
+							setTimeout(() => {
+								// add delay to prevent an echo
+								projectState.vfs.get(name)?.model.onDidChangeContent((e) => {
+									onContentChanged(e, file.path, name);
+								});
+							}, 50);
+						});
+
+						const possibleEntryPoint = projectState.vfs.has('main.typ')
+							? 'main.typ'
+							: projectState.vfs.has('lib.typ')
+								? 'lib.typ'
+								: projectState.vfs.keys().next().value;
+
+						if (possibleEntryPoint) {
+							projectState.currentModel = possibleEntryPoint;
+							editor.setModel(projectState.vfs.get(possibleEntryPoint)!.model);
+							
+							layoutStore.setSidebarActive(projectState.getCurrentFile()!.path);
+							layoutStore.setSidebarPreview(projectState.getCurrentFile()!.path);
+
+							render();
+							canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
+							canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
+						}
+					};
+					flowerServer.on_open_ok = (msg) => {
+						if (msg.payload.type !== 'OpenFileOk') return;
+
+						const name = msg.payload.file.path.replace(data.project_path + '/', '');
+						const content = msg.payload.file.content;
+						projectState.vfs.set(name, {
+							content,
+							model: iMonaco.createModel(content),
+							path: msg.payload.file.path
+						});
+						projectState.currentModel = name;
+					};
 
 					// Add the listeners
 					/* editor.onDidChangeModelContent((e) => {
@@ -521,6 +448,7 @@
 			.catch((e) => {
 				projectState.logger.error(MainMonacoSection, 'Error initializing editor', e);
 			});
+		// (document.getElementById('new-file-form') as HTMLFormElement).submit();
 
 		return () => {
 			// Cleanup
@@ -534,8 +462,38 @@
 		};
 	});
 
-	function onContentChanged(e: any) {
-		update_bouncer();
+	function onContentChanged(e: monaco.editor.IModelContentChangedEvent, path: string, name: string) {
+		e.changes.sort((a, b) => a.rangeOffset - b.rangeOffset);
+		flowerServer.editFile(path, e.changes);
+		for (let change of e.changes) {
+			try {
+				projectState.logger.info(
+					MainMonacoSection,
+					'Applying change',
+					change,
+					projectState.getCurrentName()
+				);
+
+				// offset += change.text.length - change.rangeLength;
+
+				compiler?.edit(
+					name,
+					change.text,
+					change.rangeOffset,
+					change.rangeOffset + change.rangeLength
+				);
+			} catch (e) {
+				projectState.logger.error(MainMonacoSection, 'Error applying change', e);
+			}
+		}
+		projectState.logger.info(
+			MainMonacoSection,
+			'Content changed',
+			collectedEditorUpdates.map((v) => v[0]) as RawOperation[]
+		);
+		collectedEditorUpdates = [];
+		render();
+		/* update_bouncer();
 		let changes = e.changes.map((v: any) => {
 			return {
 				rangeOffset: v.rangeOffset,
@@ -543,10 +501,35 @@
 				text: v.text
 			};
 		});
-		collectedEditorUpdates.push(changes);
+		collectedEditorUpdates.push(changes); */
 	}
 
-	let flowerServer: WebSocket;
+	$effect(() => {
+		layoutStore.setSidebarActions({
+			onNewFile: (file) => {
+				fetch(`/project/${data.project!.id}/?/newFile`, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/x-www-form-urlencoded'
+					},
+					body: new URLSearchParams({ name: file.filename, path: file.path, content: '' })
+				}).then((res) => {
+					console.log(res);
+				});
+			},
+			onFileClick: (file) => {
+				if (projectState.currentModel === file.filename) return;
+				if (projectState.vfs.has(file.filename)) {
+					projectState.currentModel = file.filename;
+					const vfsfile = projectState.getCurrentFile()!;
+					editor.setModel(vfsfile.model);
+					layoutStore.setSidebarActive(file.path);
+				} else {
+					flowerServer.openFile(file.path);
+				}
+			}
+		});
+	});
 
 	// Set the collapsible panes handles
 	let panes: {
@@ -568,13 +551,9 @@
 			collapsed: false
 		}
 	});
-
-	let delete_form: HTMLFormElement;
-
-	let ctrl_down = $state(false);
-
-	let { data }: { data: PageData } = $props();
 </script>
+
+<form method="POST" action="?/newFile" id="new-file-form" class="hidden"></form>
 
 {#snippet menubar()}
 	<Menubar.Root>
@@ -692,12 +671,18 @@
 	</Menubar.Root>
 	<Tooltip.Provider>
 		<Tooltip.Root>
-			<Tooltip.Trigger class={buttonVariants({ variant: 'outline', size: 'icon' })} onclick={() => {
-				if (flowerState.status === 'failed') {
-					flowerConnectHandler();
-				}
-			}}>
-				{#if flowerState.connected}
+			<Tooltip.Trigger
+				class={buttonVariants({ variant: 'outline', size: 'icon' })}
+				onclick={() => {
+					if (projectState.flowerState.status === 'failed') {
+						if (projectState.flowerState.curTimeout)
+							clearTimeout(projectState.flowerState.curTimeout);
+						flowerServer.close();
+						flowerServer = new FlowerServer(data.project!.id, data.user.id, projectState);
+					}
+				}}
+			>
+				{#if projectState.flowerState.connected}
 					<div class="relative">
 						<Server />
 						<span class="absolute bottom-0 right-0 h-1.5 w-1.5 rounded-full bg-emerald-500"></span>
@@ -706,19 +691,18 @@
 					<div class="relative">
 						<ServerCrash />
 						<span
-							class={`absolute bottom-0 right-0 p-1 ${flowerState.status === 'reconnecting' ? 'bg-orange-500' : 'bg-destructive'} h-1.5 w-1.5 rounded-full`}
+							class={`absolute bottom-0 right-0 p-1 ${projectState.flowerState.status === 'reconnecting' ? 'bg-orange-500' : 'bg-destructive'} h-1.5 w-1.5 rounded-full`}
 						>
 						</span>
 					</div>
 				{/if}
-				</Tooltip.Trigger
-			>
+			</Tooltip.Trigger>
 			<Tooltip.Content>
-				{#if flowerState.connected}
+				{#if projectState.flowerState.connected}
 					<p>Connected to Typst Flower Service</p>
-				{:else if flowerState.status === 'reconnecting'}
+				{:else if projectState.flowerState.status === 'reconnecting'}
 					<p>Reconnecting to Typst Flower Service...</p>
-					<p>Attempt {flowerState.reconnectingAttempts}</p>
+					<p>Attempt {projectState.flowerState.reconnectingAttempts}</p>
 				{:else}
 					<p>Failed to connect to Typst Flower Service</p>
 					<p>Click to retry</p>
@@ -728,17 +712,17 @@
 	</Tooltip.Provider>
 {/snippet}
 
-{#if loading}
+{#if projectState.loading}
 	<div
 		class="absolute left-0 top-0 z-50 flex h-screen w-screen items-center justify-center bg-background"
 		transition:fade
 	>
 		<div class="flex flex-col items-center justify-center">
 			<LoaderCircle class="animate-spin" />
-			<p class="text-center">{loadMessage}...</p>
-			{#if flowerState.status === 'reconnecting'}
-				<p>Attempt {flowerState.reconnectingAttempts}</p>
-			{:else if flowerState.status === 'failed'}
+			<p class="text-center">{projectState.loadMessage}...</p>
+			{#if projectState.flowerState.status === 'reconnecting'}
+				<p>Attempt {projectState.flowerState.reconnectingAttempts}</p>
+			{:else if projectState.flowerState.status === 'failed'}
 				<p>Failed to connect to Typst Flower Service</p>
 			{/if}
 		</div>
@@ -761,20 +745,20 @@
 		bind:this={panes.editor.obj}
 		class=""
 	>
-	<div class="flex gap-2">
-		{#each projectState.openFiles as file}
-			<Button
-				variant="outline"
-				size="sm"
-				onclick={() => {
-					projectState.currentModel = file.name;
-					editor.setModel(file.model);
-				}}
-			>
-				{file.name}
-			</Button>
-		{/each}
-	</div>
+		<div class="flex gap-2">
+			{#each projectState.openFiles as file}
+				<Button
+					variant="outline"
+					size="sm"
+					onclick={() => {
+						projectState.currentModel = file.name;
+						editor.setModel(file.model);
+					}}
+				>
+					{file.name}
+				</Button>
+			{/each}
+		</div>
 		<div bind:this={editorAnchor} id="editor" class="h-full w-full"></div>
 	</Resizable.Pane>
 	<Resizable.Handle />

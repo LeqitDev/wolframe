@@ -116,6 +116,86 @@ declare global {
 
 			type Response = ErrorResponse | CompileResponse | CompletionResponse | LoggerResponse;
 		}
+
+		namespace Sidebar {
+			interface FileSystemFolderType {
+				type: 'directory';
+				depth: number;
+				children: FileSystemNode[];
+				open: boolean;
+			}
+		
+			interface FileSystemFileType {
+				type: 'file';
+				size: number;
+				mimetype: string;
+				etag: string;
+				lastModified: Date;
+			}
+		
+			type FileSystemNodeType = FileSystemFileType | FileSystemFolderType;
+		
+			interface FileMetadata {
+				filename: string;
+				mimetype: string;
+				size: number;
+				lastModified: Date;
+				etag: string;
+				path: string;
+			}
+		
+			interface BaseFileSystemNode {
+				name: string;
+				path: string;
+				new?: boolean;
+			}
+		
+			type FileSystemNode = BaseFileSystemNode & FileSystemNodeType;
+			type FileSystemFolder = BaseFileSystemNode & FileSystemFolderType;
+			type FileSystemFile = BaseFileSystemNode & FileSystemFileType;
+		}
+	}
+
+	namespace Flower {
+		interface RawOperation {
+			text: string;
+			rangeOffset: number;
+			rangeLength: number;
+			restLength: number;
+		}
+
+		type Revision =
+			| { type: 'None'; }
+			| { type: 'Some'; number: number; }
+
+		type ActionType =
+			| { type: 'Init'; projectId: string; }
+			| { type: 'OpenFile'; path: string; }
+			| { type: 'EditFile'; path: string; changes: RawOperation; }
+		
+		interface ClientRequest {
+			revision: Revision;
+			clientId: string;
+			parentRevision: number;
+			timestamp: number;
+			action: ActionType;
+		}
+
+		interface Entry {
+			path: string;
+			content: string;
+		}
+
+		type PayloadType =
+			| { type: 'Error'; message: string; }
+			| { type: 'InitOk'; files: Entry[]; }
+			| { type: 'OpenFileOk'; file: Entry; }
+			| { type: 'EditFileOk'; path: string; }
+
+		interface ServerResponse {
+			revision: Revision;
+			payload: PayloadType;
+		}
 	}
 }
 
