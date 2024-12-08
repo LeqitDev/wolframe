@@ -21,6 +21,10 @@ export class CompilerWorkerBridge extends WorkerBridge<App.Compiler.Request, App
         super.postMessage({ type: 'edit', file, content, offsetStart, offsetEnd } as App.Compiler.EditRequest);
     }
 
+    public move(old_path: string, new_path: string) {
+        super.postMessage({ type: 'move', old_path, new_path } as App.Compiler.MoveRequest);
+    }
+
     public add_file(file: string, content: string) {
         super.postMessage({ type: 'add-file', file, content } as App.Compiler.AddFileRequest);
     }

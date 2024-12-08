@@ -35,7 +35,7 @@ export class ProjectAppState {
     pages: Page[] = $state([]);
     logger: Logger;
     typstCompletionProvider?: TypstCompletionProvider;
-    currentModel: string = '';
+    currentModel: string = $state('');
     flowerState: FlowerState = $state({
 		connected: false,
 		status: 'connected',
@@ -45,10 +45,82 @@ export class ProjectAppState {
 	});
     loading = $state(true);
 	loadMessage = $state('Initializing the project');
+    project_path: string;
+    openFiles: { relativePath: string; persisted: boolean; model: Monaco.editor.ITextModel }[] = $state([]);
+    createModel?: (value: string, language?: string) => Monaco.editor.ITextModel;
+    onCurrentModelChange?: (model: Monaco.editor.ITextModel) => void;
 
-    constructor() {
+    constructor(project_path: string) {
         this.logger = getLogger();
         this.logger.logConsole(true);
+        this.project_path = project_path;
+    }
+
+    resetVFS() {
+        this.currentModel = '';
+        this.vfs.forEach((file) => {
+            file.model.dispose();
+        });
+        this.openFiles = [];
+        this.vfs.clear();
+    }
+
+    addFile(file: Flower.Entry) {
+        if (!this.createModel) return;
+        const relativePath = file.path.replace(this.project_path + '/', '');
+        const content = file.content;
+
+        this.vfs.set(
+            relativePath,
+            {
+                content,
+                model: this.createModel(content),
+                path: file.path
+            }
+        )
+    }
+
+    moveFile(oldPath: string, newPath: string) {
+        if (this.vfs.has(oldPath) === false) return;
+        const file = this.vfs.get(oldPath)!;
+        this.vfs.delete(oldPath);
+        this.vfs.set(newPath, file);
+    }
+
+    setCurrentModel(relativePath: string) {
+        if (this.vfs.has(relativePath) === false) return;
+        this.currentModel = relativePath;
+        this.onCurrentModelChange?.(this.vfs.get(relativePath)!.model);
+    }
+
+    addOpenFile(path: string, relative: boolean = false, persisted: boolean = false) {
+        let relativePath = path;
+        if (!relative) {
+            relativePath = path.replace(this.project_path + '/', '');
+        }
+
+        if (this.vfs.has(relativePath) === false || this.openFiles.findIndex((f) => f.relativePath === relativePath) !== -1) return;
+        const model = this.vfs.get(relativePath)!.model;
+        if (persisted) {
+            this.openFiles.push({ relativePath, persisted, model });
+        } else {
+            const nonPersistedIndex = this.openFiles.findIndex(f => f.persisted === false);
+            if (nonPersistedIndex === -1) {
+                this.openFiles.push({ relativePath, persisted, model });
+            } else {
+                this.openFiles[nonPersistedIndex] = { relativePath, persisted, model };
+            }
+        }
+    }
+
+    removeOpenFile(path: string, relative: boolean = false) {
+        let relativePath = path;
+        if (!relative) {
+            relativePath = path.replace(this.project_path + '/', '');
+        }
+        const index = this.openFiles.findIndex(f => f.relativePath === relativePath);
+        if (index === -1) return;
+        this.openFiles.splice(index, 1);
     }
 
     getFirstModel() {
@@ -90,17 +162,10 @@ export class ProjectAppState {
     updatePageSvg(index: number, svg: string) {
         this.pages[index].svg = svg;
     }
-
-    get openFiles() {
-        // return [{ name: string, file: VFSFile }]
-        return Array.from(this.vfs.entries()).filter(([_, f]) => f.open).map(([name, file]) => {
-            return { name, model: file.model };
-        });
-    }
 }
 
-export function initializePAS(pid: string) {
-    return setContext(Symbol('pas-' + pid), new ProjectAppState());
+export function initializePAS(pid: string, project_path: string) {
+    return setContext(Symbol('pas-' + pid), new ProjectAppState(project_path));
 }
 
 export function getPAS(pid: string): ProjectAppState {

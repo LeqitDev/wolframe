@@ -130,6 +130,9 @@ self.onmessage = async (event: MessageEvent<App.Compiler.Request>) => {
             case 'edit':
                 edit(request);
                 break;
+            case 'move':
+                compiler.move_file(request.old_path, request.new_path);
+                break;
             case 'completion':
                 completion(request);
                 break;

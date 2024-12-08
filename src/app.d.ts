@@ -78,11 +78,12 @@ declare global {
 		export namespace Compiler {
 			type CompileRequest = {type: 'compile'}
 			type EditRequest = {type: 'edit', file: string, content: string, offsetStart: number, offsetEnd: number};
+			type MoveRequest = {type: 'move', old_path: string, new_path: string};
 			type CompletionRequest = {type: 'completion', file: string, offset: number};
 			type InitRequest = {type: 'init', root: string};
 			type AddFileRequest = {type: 'add-file', file: string, content: string};
 
-			type Request = CompileRequest | EditRequest | CompletionRequest | InitRequest | AddFileRequest;
+			type Request = CompileRequest | EditRequest | CompletionRequest | InitRequest | AddFileRequest | MoveRequest;
 
 			interface CompileErrorSpan {
 				file: string;

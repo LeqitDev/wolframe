@@ -72,7 +72,7 @@
 
 	let flowerServer: FlowerServer;
 
-	const projectState = initializePAS(data.project!.id);
+	const projectState = initializePAS(data.project!.id, data.project_path);
 
 	async function render() {
 		compiler?.compile();
@@ -355,6 +355,10 @@
 				iMonaco.initializeEditor(completionProvider).then((_editor) => {
 					projectState.logger.info(MainMonacoSection, 'Editor initialized');
 					editor = _editor;
+					projectState.createModel = iMonaco.createModel;
+					projectState.onCurrentModelChange = (model) => {
+						editor.setModel(model);
+					};
 
 					// Provide models for the vfs
 					/* for (let file of data.initial_vfs) {
@@ -379,21 +383,13 @@
 
 						// Reset state and editor
 						editor.setModel(null);
-						projectState.currentModel = '';
-						projectState.vfs.forEach((v) => {
-							v.model.dispose();
-						});
-						projectState.vfs.clear();
+						projectState.resetVFS();
 
 						// Add the files
 						msg.payload.files.forEach((file) => {
 							let name = file.path.replace(data.project_path + '/', '');
 							let content = file.content;
-							projectState.vfs.set(name, {
-								content,
-								model: iMonaco.createModel(content),
-								path: file.path
-							});
+							projectState.addFile(file);
 							try {
 								compiler?.add_file(name, content);
 							} catch (e) {
@@ -415,8 +411,8 @@
 								: projectState.vfs.keys().next().value;
 
 						if (possibleEntryPoint) {
-							projectState.currentModel = possibleEntryPoint;
-							editor.setModel(projectState.vfs.get(possibleEntryPoint)!.model);
+							projectState.setCurrentModel(possibleEntryPoint);
+							projectState.addOpenFile(possibleEntryPoint, true, true);
 							
 							layoutStore.setSidebarActive(projectState.getCurrentFile()!.path);
 							layoutStore.setSidebarPreview(projectState.getCurrentFile()!.path);
@@ -431,16 +427,9 @@
 						if (msg.payload.type !== 'OpenFileOk') return;
 
 						const name = msg.payload.file.path.replace(data.project_path + '/', '');
-						const content = msg.payload.file.content;
-						projectState.vfs.set(name, {
-							content,
-							model: iMonaco.createModel(content),
-							path: msg.payload.file.path
-						});
-						projectState.currentModel = name;
-						console.log('Opened file', name);
-						const vfsfile = projectState.getCurrentFile()!;
-						editor.setModel(vfsfile.model);
+						projectState.addFile(msg.payload.file);
+						projectState.setCurrentModel(name);
+						projectState.addOpenFile(name, true, false);
 						layoutStore.setSidebarActive(msg.payload.file.path);
 					};
 
@@ -457,9 +446,7 @@
 
 		return () => {
 			// Cleanup
-			projectState.vfs.forEach((v) => {
-				v.model.dispose();
-			});
+			projectState.resetVFS();
 			editor?.dispose();
 			flowerServer.close();
 			document.removeEventListener('wheel', onWheel);
@@ -473,7 +460,7 @@
 			'Content changed',
 			e
 		);
-		e.changes.sort((a, b) => b.rangeOffset - a.rangeOffset);
+		e.changes.sort((a, b) => b.rangeOffset - a.rangeOffset); // reads changes in reverse order
 		flowerServer.editFile(path, e.changes);
 		for (let change of e.changes) {
 			try {
@@ -526,15 +513,22 @@
 				const relativePath = file.path.replace(data.project_path + '/', '');
 				if (projectState.currentModel === relativePath) return;
 				if (projectState.vfs.has(relativePath)) {
-					projectState.currentModel = relativePath;
-					const vfsfile = projectState.getCurrentFile()!;
-					editor.setModel(vfsfile.model);
+					projectState.setCurrentModel(relativePath);
 					layoutStore.setSidebarActive(file.path);
+					// vfsfile.open = true;
+					projectState.addOpenFile(relativePath, true, false);
+					console.log('Opened file', projectState);
 				} else {
 					flowerServer.openFile(file.path);
 				}
 			},
-
+			onNodeMoved: (node, prev_path) => {
+				const relativePath = node.path.replace(data.project_path + '/', '');
+				const prev_relativePath = prev_path.replace(data.project_path + '/', '');
+				projectState.moveFile(prev_relativePath, relativePath);
+				compiler.move(prev_relativePath, relativePath);
+				render();
+			}
 		});
 	});
 
@@ -752,17 +746,18 @@
 		bind:this={panes.editor.obj}
 		class=""
 	>
-		<div class="flex gap-2">
+		<div class="flex px-2 py-1">
 			{#each projectState.openFiles as file}
+				{@const name = file.relativePath.split('/').pop()! }
 				<Button
 					variant="outline"
 					size="sm"
 					onclick={() => {
-						projectState.currentModel = file.name;
-						editor.setModel(file.model);
+						projectState.setCurrentModel(file.relativePath);
 					}}
+					class={`rounded-none first:rounded-tl-md last:rounded-tr-md${projectState.currentModel === file.relativePath ? ' border-b-0 border-secondary/60 hover:bg-background' : ' bg-secondary/60 border-secondary/60'}${file.persisted ? '' : ' italic'}`}
 				>
-					{file.name}
+					{name}
 				</Button>
 			{/each}
 		</div>
