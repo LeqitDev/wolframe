@@ -427,6 +427,7 @@
 						}
 					};
 					flowerServer.on_open_ok = (msg) => {
+						console.log('Open file ok', projectState);
 						if (msg.payload.type !== 'OpenFileOk') return;
 
 						const name = msg.payload.file.path.replace(data.project_path + '/', '');
@@ -437,6 +438,10 @@
 							path: msg.payload.file.path
 						});
 						projectState.currentModel = name;
+						console.log('Opened file', name);
+						const vfsfile = projectState.getCurrentFile()!;
+						editor.setModel(vfsfile.model);
+						layoutStore.setSidebarActive(msg.payload.file.path);
 					};
 
 					// Add the listeners
@@ -463,7 +468,12 @@
 	});
 
 	function onContentChanged(e: monaco.editor.IModelContentChangedEvent, path: string, name: string) {
-		e.changes.sort((a, b) => a.rangeOffset - b.rangeOffset);
+		projectState.logger.info(
+			MainMonacoSection,
+			'Content changed',
+			e
+		);
+		e.changes.sort((a, b) => b.rangeOffset - a.rangeOffset);
 		flowerServer.editFile(path, e.changes);
 		for (let change of e.changes) {
 			try {
@@ -486,11 +496,6 @@
 				projectState.logger.error(MainMonacoSection, 'Error applying change', e);
 			}
 		}
-		projectState.logger.info(
-			MainMonacoSection,
-			'Content changed',
-			collectedEditorUpdates.map((v) => v[0]) as RawOperation[]
-		);
 		collectedEditorUpdates = [];
 		render();
 		/* update_bouncer();
@@ -518,16 +523,18 @@
 				});
 			},
 			onFileClick: (file) => {
-				if (projectState.currentModel === file.filename) return;
-				if (projectState.vfs.has(file.filename)) {
-					projectState.currentModel = file.filename;
+				const relativePath = file.path.replace(data.project_path + '/', '');
+				if (projectState.currentModel === relativePath) return;
+				if (projectState.vfs.has(relativePath)) {
+					projectState.currentModel = relativePath;
 					const vfsfile = projectState.getCurrentFile()!;
 					editor.setModel(vfsfile.model);
 					layoutStore.setSidebarActive(file.path);
 				} else {
 					flowerServer.openFile(file.path);
 				}
-			}
+			},
+
 		});
 	});
 

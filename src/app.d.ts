@@ -184,6 +184,7 @@ declare global {
 		interface Entry {
 			path: string;
 			content: string;
+			revision: Revision;
 		}
 
 		type PayloadType =

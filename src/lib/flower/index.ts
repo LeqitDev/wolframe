@@ -7,7 +7,7 @@ export class FlowerServer {
     project_state: ProjectAppState;
     project_id: string;
     revisionNumbers = new Map<string, number>();
-    lastLengths = new Map<string, number>();
+    lastLengths = new Map<string, string>();
 	editQueue: Array<() => void> = [];
 	isWaitingForEditOk = false;
 	disposed = false;
@@ -104,22 +104,39 @@ export class FlowerServer {
 		});
 	}
 
+	private applyEdit(prev: string, change: { text: string, rangeOffset: number, rangeLength: number}): string {
+		const start = prev.slice(0, change.rangeOffset);
+		const end = prev.slice(change.rangeOffset + change.rangeLength, prev.length);
+		return start + change.text + end;
+	}
+
     editFile(path: string, changes: { text: string, rangeOffset: number, rangeLength: number }[]) {
+		let lastText = this.lastLengths.get(path) ?? "";
         for (const change of changes) {
-			const fullLength = this.lastLengths.get(path) ?? 0;
+			const rangeOffset = this.unicodeLength(lastText.slice(0, change.rangeOffset));
+			const rangeLength = this.unicodeLength(lastText.slice(change.rangeOffset, change.rangeOffset + change.rangeLength));
+			const fullLength = this.unicodeLength(lastText);
+			const restLength = fullLength - (rangeOffset + rangeLength);
+			console.log('rangeOffset', rangeOffset, 'rangeLength', rangeLength, 'fullLength', fullLength, lastText.length, restLength, change);
 			this.editQueue.push(() => {
 				this.rawEditFile(path, {
 					text: change.text,
-					rangeOffset: change.rangeOffset,
-					rangeLength: change.rangeLength,
-					restLength: fullLength - (change.rangeOffset + change.rangeLength)
+					rangeOffset,
+					rangeLength,
+					restLength
 				});
 			});
+			lastText = this.applyEdit(lastText, change);
+			console.log('lastText', lastText);
         }
 
 		this.processNextEdit();
 
-        this.lastLengths.set(path, (this.lastLengths.get(path) ?? 0) + changes.reduce((prev, value) => prev + (this.unicodeLength(value.text) - value.rangeLength), 0));
+		const split = path.split('/files/');
+		split.shift();
+		const relative_path = split.join('/files/');
+		const fullText = this.project_state.vfs.get(relative_path)!.model.getValue();
+        this.lastLengths.set(path, fullText);
     }
 
 	private processNextEdit() {
@@ -175,7 +192,8 @@ export class FlowerServer {
         switch (msg.payload.type) {
             case 'InitOk':
 				msg.payload.files.forEach(file => {
-					this.lastLengths.set(file.path, this.unicodeLength(file.content));
+					this.revisionNumbers.set(file.path, file.revision.type === 'Some' ? file.revision.number : 0);
+					this.lastLengths.set(file.path, file.content);
 				});
                 this.on_init_ok(msg);
                 break;
@@ -183,6 +201,9 @@ export class FlowerServer {
 				if (msg.revision.type === 'Some') this.revisionNumbers.set(msg.payload.path, msg.revision.number);
 				this.isWaitingForEditOk = false;
 				this.processNextEdit();
+				break;
+			case 'OpenFileOk':
+				this.on_open_ok(msg);
 				break;
             default:
                 break;
