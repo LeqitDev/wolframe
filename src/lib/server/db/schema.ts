@@ -61,6 +61,7 @@ export const projects = pgTable('projects', {
 	description: text('description'),
 	teamId: uuid('team_id').references(() => teams.id, { onDelete: 'cascade' }),
 	ownerId: text('owner_id').references(() => user.id, { onDelete: 'cascade' }),
+	isPackage: boolean('is_package').notNull().default(false),
 	isPublic: boolean('is_public').notNull().default(false),
 	createdAt: timestamp('created_at').notNull()
 }, () => {
@@ -95,5 +96,16 @@ export const directories = pgTable('directories', {
 }, (tabel) => {
 	return {
 		unq: unique().on(tabel.projectId, tabel.path)
+	}
+});
+
+export const archive = pgTable('archive', {
+	id: uuid('id').primaryKey().defaultRandom().unique(),
+	projectId: uuid('project_id').notNull().references(() => projects.id, { onDelete: 'cascade' }),
+	version: text('version').notNull(),
+	createdAt: timestamp('created_at').notNull()
+}, (tabel) => {
+	return {
+		unq: unique().on(tabel.projectId, tabel.version)
 	}
 });

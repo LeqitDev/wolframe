@@ -481,16 +481,16 @@
 	<Sidebar.Header>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<div class="flex items-center group-data-[collapsible=icon]:justify-center">
+				<Sidebar.MenuButton size="lg" class="flex items-center aria-disabled:opacity-100" aria-disabled>
 					<img
 						src={projectAvatar}
 						alt="Avatar"
-						class="size-9 rounded-md group-data-[collapsible=icon]:size-7"
+						class="size-8 rounded-md"
 					/>
-					<span class="pl-2 text-lg font-bold group-data-[collapsible=icon]:hidden"
+					<span class="text-lg font-bold"
 						>{pdata.project.name}</span
 					>
-				</div>
+				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
 	</Sidebar.Header>

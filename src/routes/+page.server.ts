@@ -1,7 +1,7 @@
 import { hash, verify } from '@node-rs/argon2';
 import { encodeBase64url } from '@oslojs/encoding';
 import { fail, redirect } from '@sveltejs/kit';
-import { eq } from 'drizzle-orm';
+import { eq, or } from 'drizzle-orm';
 import * as auth from '$lib/server/auth';
 import { db } from '$lib/server/db';
 import * as table from '$lib/server/db/schema';
@@ -17,9 +17,13 @@ export const load: PageServerLoad = async (event) => {
 	}
 
 	const projects = await db
-		.select()
+		.select({
+			projects: table.projects,
+			teamMembersCount: db.$count(table.teamMembers, eq(table.teamMembers.teamId, table.projects.teamId)),
+		})
 		.from(table.projects)
-		.where(eq(table.projects.ownerId, event.locals.user.id));
+		.leftJoin(table.teamMembers, eq(table.projects.teamId, table.teamMembers.teamId))
+		.where(or(eq(table.projects.ownerId, event.locals.user.id), eq(table.projects.teamId, table.teamMembers.teamId)));
 
 	const teams = await db
 		.select()

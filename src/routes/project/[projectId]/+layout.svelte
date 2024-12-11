@@ -1,6 +1,6 @@
 <script lang="ts">
 	import * as Sidebar from '$lib/components/ui/sidebar/index.js';
-	import AppSidebar from '$lib/components/app-sidebar.svelte';
+	import AppSidebar from '$lib/components/project-sidebar.svelte';
 	import * as Menubar from '$lib/components/ui/menubar/index.js';
 	import type { PageData } from './$types';
 	import { createLayoutStore } from '$lib/stores/layoutStore.svelte';

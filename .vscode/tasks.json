@@ -1,0 +1,39 @@
+{
+    "version": "2.0.0",
+    "windows": {
+        "command": "powershell.exe"
+    },
+    "linux": {
+        "command": "bash"
+    },
+    "args": [
+        "-c"
+    ],
+    "tasks": [
+        {
+            "label": "Run wolframe",
+            "group": "build",
+            "dependsOn": ["Flower Server", "SvelteKit"],
+        },
+        {
+            "label": "Flower Server",
+            "type": "shell",
+            "args": ["cd typst-flower; cargo run"],
+        },
+        {
+            "label": "SvelteKit",
+            "type": "shell",
+            "args": ["bun run dev"],
+        },
+        {
+            "label": "Compile Flow WASM",
+            "type": "shell",
+            "args": ["cd typst-flow; wasm-pack build --target web"],
+        },
+        {
+            "label": "Drizzle Push",
+            "type": "shell",
+            "args": ["bun drizzle-kit push"],
+        }
+    ]
+}
