@@ -19,11 +19,19 @@ export const load: PageServerLoad = async (event) => {
 	const projects = await db
 		.select({
 			projects: table.projects,
-			teamMembersCount: db.$count(table.teamMembers, eq(table.teamMembers.teamId, table.projects.teamId)),
+			teamMembersCount: db.$count(
+				table.teamMembers,
+				eq(table.teamMembers.teamId, table.projects.teamId)
+			)
 		})
 		.from(table.projects)
 		.leftJoin(table.teamMembers, eq(table.projects.teamId, table.teamMembers.teamId))
-		.where(or(eq(table.projects.ownerId, event.locals.user.id), eq(table.projects.teamId, table.teamMembers.teamId)));
+		.where(
+			or(
+				eq(table.projects.ownerId, event.locals.user.id),
+				eq(table.projects.teamId, table.teamMembers.teamId)
+			)
+		);
 
 	const teams = await db
 		.select()
@@ -34,6 +42,7 @@ export const load: PageServerLoad = async (event) => {
 	const invites = await db
 		.select()
 		.from(table.teamInvites)
+		.innerJoin(table.teams, eq(table.teams.id, table.teamInvites.teamId))
 		.where(eq(table.teamInvites.userId, event.locals.user.id));
 
 	const newProjectForm = await superValidate(zod(newProjectSchema));
@@ -135,27 +144,75 @@ export const actions: Actions = {
 			description: form.data.description,
 			ownerId: event.locals.user.id,
 			teamId: form.data.teamId,
+			isPackage: form.data.isPackage,
 			isPublic: form.data.isPublic,
 			createdAt: new Date()
-		}
+		};
 
-		const proj = await db.insert(table.projects).values(newPorject).returning({ id: table.projects.id });
+		const proj = await db
+			.insert(table.projects)
+			.values(newPorject)
+			.returning({ id: table.projects.id });
 
 		if (!proj.length) {
 			return fail(500, { message: 'An error has occurred' });
 		}
 
-		minio.uploadProjectFile(proj[0].id, null, 'main.typ', Buffer.from(''), {
-			"userId": event.locals.user.id,
-		}).catch(console.error);
+		if (newPorject.isPackage) {
+			await minio
+				.uploadProjectFile(proj[0].id, null, 'lib.typ', Buffer.from(''), {
+					userId: event.locals.user.id
+				})
+				.catch(console.error);
 
-		await db.insert(table.files).values({
-			projectId: proj[0].id,
-			path: `users/${event.locals.user.id}/projects/${proj[0].id}/files`,
-			name: 'main.typ',
-			size: 0,
-			createdAt: new Date(),
-		});
+			await db.insert(table.files).values({
+				projectId: proj[0].id,
+				path: `users/${event.locals.user.id}/projects/${proj[0].id}/files`,
+				name: 'lib.typ',
+				size: 0,
+				createdAt: new Date()
+			});
+
+			const toml = `[package]
+name = "${form.data.name}"
+version = "0.0.1"
+description = "${form.data.description}"
+authors = ["${event.locals.user.username}"]
+license = "MIT"
+entrypoint = "lib.typ"`;
+
+			const toml_res = await minio.uploadProjectFile(
+				proj[0].id,
+				null,
+				'typst.toml',
+				Buffer.from(toml),
+				{
+					userId: event.locals.user.id
+				}
+			);
+
+			await db.insert(table.files).values({
+				projectId: proj[0].id,
+				path: `users/${event.locals.user.id}/projects/${proj[0].id}/files`,
+				name: 'typst.toml',
+				size: toml_res.size,
+				createdAt: new Date()
+			});
+		} else {
+			minio
+				.uploadProjectFile(proj[0].id, null, 'main.typ', Buffer.from(''), {
+					userId: event.locals.user.id
+				})
+				.catch(console.error);
+
+			await db.insert(table.files).values({
+				projectId: proj[0].id,
+				path: `users/${event.locals.user.id}/projects/${proj[0].id}/files`,
+				name: 'main.typ',
+				size: 0,
+				createdAt: new Date()
+			});
+		}
 
 		return redirect(302, `/project/${proj[0].id}`);
 	}

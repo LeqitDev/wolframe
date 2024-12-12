@@ -29,6 +29,14 @@ export class CompilerWorkerBridge extends WorkerBridge<App.Compiler.Request, App
         super.postMessage({ type: 'add-file', file, content } as App.Compiler.AddFileRequest);
     }
 
+    public set_root(root: string) {
+        super.postMessage({ type: 'set-root', root } as App.Compiler.SetRootRequest);
+    }
+
+    public print_files() {
+        super.postMessage({ type: 'print-files' } as App.Compiler.PrintFilesRequest);
+    }
+
     public onMessage(callback: (message: App.Compiler.Response) => void): void {
         super.onMessageRaw(callback);
     }

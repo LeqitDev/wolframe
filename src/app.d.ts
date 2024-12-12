@@ -82,8 +82,10 @@ declare global {
 			type CompletionRequest = {type: 'completion', file: string, offset: number};
 			type InitRequest = {type: 'init', root: string};
 			type AddFileRequest = {type: 'add-file', file: string, content: string};
+			type SetRootRequest = {type: 'set-root', root: string};
+			type PrintFilesRequest = {type: 'print-files'};
 
-			type Request = CompileRequest | EditRequest | CompletionRequest | InitRequest | AddFileRequest | MoveRequest;
+			type Request = CompileRequest | EditRequest | CompletionRequest | InitRequest | AddFileRequest | MoveRequest | SetRootRequest | PrintFilesRequest;
 
 			interface CompileErrorSpan {
 				file: string;

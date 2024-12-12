@@ -497,6 +497,13 @@
 	}
 
 	$effect(() => {
+		let previewRelativePath = layoutStore.sidebarPreview.replace(data.project_path + '/', '');
+		console.log("HIHIHI", previewRelativePath);
+		
+		compiler.set_root(previewRelativePath);
+	})
+
+	$effect(() => {
 		layoutStore.setSidebarActions({
 			onNewFile: (file) => {
 				fetch(`/project/${data.project!.id}/?/newFile`, {
@@ -588,6 +595,13 @@
 		<Menubar.Menu>
 			<Menubar.Trigger>Project</Menubar.Trigger>
 			<Menubar.Content>
+				<Menubar.Item
+					onclick={() => {
+						compiler.print_files();
+					}}
+				>
+					Print Files
+				</Menubar.Item>
 				<Menubar.Item
 					onclick={() => {
 						delete_form.submit();

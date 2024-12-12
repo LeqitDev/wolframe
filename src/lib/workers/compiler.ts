@@ -139,6 +139,12 @@ self.onmessage = async (event: MessageEvent<App.Compiler.Request>) => {
             case 'add-file':
                 add_file(request);
                 break;
+            case 'set-root':
+                compiler.set_root(request.root);
+                break;
+            case 'print-files':
+                sendLoggerResponse("info", WASMSection, compiler.get_files());
+                break;
             default:
                 sendError('Unknown request type');
         }

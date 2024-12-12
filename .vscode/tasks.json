@@ -13,27 +13,40 @@
         {
             "label": "Run wolframe",
             "group": "build",
-            "dependsOn": ["Flower Server", "SvelteKit"],
+            "dependsOn": [
+                "Flower Server",
+                "SvelteKit"
+            ]
         },
         {
             "label": "Flower Server",
             "type": "shell",
-            "args": ["cd typst-flower; cargo run"],
+            "args": [
+                "cd typst-flower; cargo run"
+            ]
         },
         {
             "label": "SvelteKit",
             "type": "shell",
-            "args": ["bun run dev"],
+            "args": [
+                "bun run dev"
+            ],
+            "problemMatcher": []
         },
         {
             "label": "Compile Flow WASM",
             "type": "shell",
-            "args": ["cd typst-flow; wasm-pack build --target web"],
+            "args": [
+                "cd typst-flow-wasm; wasm-pack build --target web"
+            ],
+            "problemMatcher": []
         },
         {
             "label": "Drizzle Push",
             "type": "shell",
-            "args": ["bun drizzle-kit push"],
+            "args": [
+                "bun drizzle-kit push"
+            ]
         }
     ]
 }
