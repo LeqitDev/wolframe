@@ -92,6 +92,9 @@ export class ProjectAppState {
 
     moveFile(oldPath: string, newPath: string) {
         if (this.vfs.has(oldPath) === false) return;
+        if (this.currentModel === oldPath) {
+            this.currentModel = newPath;
+        }
         const file = this.vfs.get(oldPath)!;
         this.vfs.delete(oldPath);
         this.vfs.set(newPath, file);

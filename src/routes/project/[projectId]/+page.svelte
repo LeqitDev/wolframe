@@ -338,7 +338,6 @@
 			if (msg.type === 'error') {
 				projectState.logger.error(WorkerRendererSection, 'Error Page Render Worker', msg.error);
 			} else if (msg.type === 'render-success') {
-				projectState.logger.info(WorkerRendererSection, 'Message', msg, $state.snapshot(projectState.pages));
 				projectState.setPageDimensions(msg.pageId, msg.dimensions);
 
 				/* const svg = document.getElementById(`preview-page-${msg.pageId}`);
