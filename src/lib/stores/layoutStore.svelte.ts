@@ -75,6 +75,10 @@ export class LayoutStore {
 		this._sidebarPreview = path;
 	}
 
+	set sidebarActive(path: string) {
+		this._sidebarActive = path;
+	}
+
 	setSidebarActive(path: string) {
 		this._sidebarActive = path;
 	}
