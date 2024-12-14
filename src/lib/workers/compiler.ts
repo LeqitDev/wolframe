@@ -86,7 +86,7 @@ async function collect_imports() {
     const preview = await fetch('https://packages.typst.org/preview/index.json');
     const previewJson = await preview.json();
 
-    const wolframePackages = await fetch('http://localhost:5173/packages/index');
+    const wolframePackages = await fetch('/packages/index');
     const wolframeJson = await wolframePackages.json();
 
     const previewImports = [] as typst.RawPackageSpec[];
