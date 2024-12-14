@@ -59,8 +59,6 @@ async function render(req: App.PageRenderer.RenderRequest) {
 	try {
 		if (req.svg) {
 			page.canvg.renderSVG(req.svg);
-		} else {
-			page.canvg.render();
 		}
 
 		send_render_success(req.pageId, page.canvg.dimension);

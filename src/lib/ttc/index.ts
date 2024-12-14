@@ -190,6 +190,7 @@ export class TypstToCanvas {
     private maxWidthScale: number = 1;
     private blankContext: boolean = true;
     private viewbox: { x: number, y: number, width: number, height: number } = { x: 0, y: 0, width: 0, height: 0 };
+    private ctx: SuitableCanvasContext | null = null;
 
     private glyphs: Map<string, string> = new Map();
 
@@ -199,13 +200,17 @@ export class TypstToCanvas {
         this.canvas = canvas;
         this.domParser = new XMLDOMParser();
         this.maxWidth = maxWidth;
+        this.ctx = this.canvas.getContext('2d') as SuitableCanvasContext | null;
+
+        if (!this.ctx) return; 
+
+        this.rawRender(this.ctx);
     }
 
     renderSVG(svg: string) {
         const doc = this.domParser.parseFromString(svg, 'image/svg+xml');
 
-        const ctx = this.canvas.getContext('2d') as SuitableCanvasContext | null;
-        if (!ctx) return;
+        if (!this.ctx) return;
 
         const hasSvgElement = doc.getElementsByTagName('svg')[0];
         const viewBox = hasSvgElement?.getAttribute('viewBox');
@@ -254,7 +259,6 @@ export class TypstToCanvas {
                 }
             }
 
-            this.rawRender(ctx);
         }
     }
 
@@ -278,12 +282,9 @@ export class TypstToCanvas {
     }
 
     setNewMaxWidth(maxWidth: number) {
-        const ctx = this.canvas.getContext('2d') as SuitableCanvasContext | null;
-        if (!ctx) return;
+        if (!this.ctx) return;
 
         this.rawSetNewMaxWidth(maxWidth);
-
-        this.rawRender(ctx);
     }
 
     private rawSetNewMaxWidth(maxWidth: number) {
@@ -303,8 +304,7 @@ export class TypstToCanvas {
     }
 
     scale(factor: number) {
-        const ctx = this.canvas.getContext('2d') as SuitableCanvasContext | null;
-        if (!ctx) return;
+        if (!this.ctx) return;
 
         this.contextScale = this.maxWidthScale * factor;
 
@@ -312,8 +312,6 @@ export class TypstToCanvas {
         this.canvas.width = width;
         this.canvas.height = height;
         this.blankContext = true;
-        
-        this.rawRender(ctx);
     }
 
     private rawScaledRender(factor: number, ctx: SuitableCanvasContext) {
@@ -325,13 +323,7 @@ export class TypstToCanvas {
     }
 
     private rawRender(ctx: SuitableCanvasContext) {
-        requestAnimationFrame(() => this.rawScaledRender(this.contextScale, ctx));
-    }
-
-    render() {
-        const ctx = this.canvas.getContext('2d') as SuitableCanvasContext | null;
-        if (!ctx) return;
-
-        this.rawRender(ctx);
+        this.rawScaledRender(this.contextScale, ctx)
+        requestAnimationFrame(() => this.rawRender(ctx));
     }
 }
