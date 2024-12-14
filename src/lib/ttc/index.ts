@@ -191,6 +191,7 @@ export class TypstToCanvas {
     private blankContext: boolean = true;
     private viewbox: { x: number, y: number, width: number, height: number } = { x: 0, y: 0, width: 0, height: 0 };
     private ctx: SuitableCanvasContext | null = null;
+    private needRender: boolean = false;
 
     private glyphs: Map<string, string> = new Map();
 
@@ -259,6 +260,7 @@ export class TypstToCanvas {
                 }
             }
 
+            this.needRender = true;
         }
     }
 
@@ -312,6 +314,8 @@ export class TypstToCanvas {
         this.canvas.width = width;
         this.canvas.height = height;
         this.blankContext = true;
+        
+        this.needRender = true;
     }
 
     private rawScaledRender(factor: number, ctx: SuitableCanvasContext) {
@@ -322,8 +326,21 @@ export class TypstToCanvas {
         this.root.render(ctx, this.glyphs);
     }
 
-    private rawRender(ctx: SuitableCanvasContext) {
-        this.rawScaledRender(this.contextScale, ctx)
+    private async hasPageUpdate() {
+        return new Promise<void>((resolve) => {
+            const interval = setInterval(() => {
+                if (this.needRender) {
+                    this.needRender = false;
+                    clearInterval(interval);
+                    resolve();
+                }
+            }, 100);
+        });
+    }
+
+    private async rawRender(ctx: SuitableCanvasContext) {
+        this.rawScaledRender(this.contextScale, ctx);
+        await this.hasPageUpdate();
         requestAnimationFrame(() => this.rawRender(ctx));
     }
 }

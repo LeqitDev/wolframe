@@ -233,6 +233,15 @@
 
 		// Remove any extra pages
 		if (projectState.getPageCount() > compiled.length) {
+			projectState.logger.info(WorkerRendererSection, 'Removing extra pages', projectState.getPageCount() - compiled.length);
+			for (let i = compiled.length; i < projectState.getPageCount(); i++) {
+				projectState.logger.info(WorkerRendererSection, 'Removing page', i);
+				pageRenderer?.delete(i);
+
+				const canvas = canvasContainer.children[i] as HTMLCanvasElement;
+				canvas.remove();
+			}
+
 			projectState.slicePages(compiled.length);
 		}
 
@@ -329,6 +338,7 @@
 			if (msg.type === 'error') {
 				projectState.logger.error(WorkerRendererSection, 'Error Page Render Worker', msg.error);
 			} else if (msg.type === 'render-success') {
+				projectState.logger.info(WorkerRendererSection, 'Message', msg, $state.snapshot(projectState.pages));
 				projectState.setPageDimensions(msg.pageId, msg.dimensions);
 
 				/* const svg = document.getElementById(`preview-page-${msg.pageId}`);
@@ -340,6 +350,8 @@
 				// projectState.setPageDimensions(msg.pageId, msg.dimensions);
 
 				projectState.logger.info(WorkerRendererSection, 'Page', msg.pageId, 'finished!');
+			} else {
+				projectState.logger.info(WorkerRendererSection, 'Message', msg);
 			}
 		});
 

@@ -91,7 +91,10 @@ function deletePage(req: App.PageRenderer.DeleteRequest) {
 		return;
 	}
 
-	delete pages[req.pageId];
+	pages.splice(req.pageId, 1);
+
+	console.log('Deleted page', req.pageId, pages);
+	
 
 	send_success(req.pageId);
 }
