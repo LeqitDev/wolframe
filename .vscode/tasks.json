@@ -23,7 +23,8 @@
             "type": "shell",
             "args": [
                 "cd typst-flower; cargo run"
-            ]
+            ],
+            "problemMatcher": []
         },
         {
             "label": "SvelteKit",

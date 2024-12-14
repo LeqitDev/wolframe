@@ -82,6 +82,28 @@ function add_file(request: App.Compiler.AddFileRequest) {
     compiler.add_file(request.file, request.content);
 }
 
+async function collect_imports() {
+    const preview = await fetch('https://packages.typst.org/preview/index.json');
+    const previewJson = await preview.json();
+
+    const wolframePackages = await fetch('http://localhost:5173/packages/index');
+    const wolframeJson = await wolframePackages.json();
+
+    const previewImports = [] as typst.RawPackageSpec[];
+
+    for (const pkg of wolframeJson) {
+        previewImports.push(new typst.RawPackageSpec(`wolframe-${pkg.uname}`, pkg.name, pkg.version, pkg.description));
+    }
+
+    for (const pkg of previewJson) {
+        previewImports.push(new typst.RawPackageSpec("preview", pkg.name, pkg.version, pkg.description));
+    }
+
+    logWasm('Adding preview packages to compiler', previewImports);
+
+    compiler.add_packages(previewImports);
+}
+
 // Logging functions for use inside WASM TODO: implement inside wasm
 function logWasm(...e: unknown[]) {
     sendLoggerResponse('info', WASMSection, ...e);
@@ -112,6 +134,7 @@ self.onmessage = async (event: MessageEvent<App.Compiler.Request>) => {
 
             await init();
             compiler = new typst.SuiteCore(request.root);
+            collect_imports();
             initialized = true;
             sendLoggerResponse('info', WASMSection, 'Worker initialized');
         }
@@ -140,6 +163,7 @@ self.onmessage = async (event: MessageEvent<App.Compiler.Request>) => {
                 add_file(request);
                 break;
             case 'set-root':
+                logWasm('Setting root', request.root);
                 compiler.set_root(request.root);
                 break;
             case 'print-files':

@@ -10,8 +10,11 @@ export async function GET({ locals, url }) {
 		return new Response('Unauthorized', { status: 401 });
 	}
 
+	if (!url.searchParams.has('version')) {
+		return new Response('Missing version', { status: 400 });
+	}
+
 	let projectId;
-	let version = 'latest';
 
 	if (url.searchParams.has('pid')) {
 		projectId = url.searchParams.get('pid')!;
@@ -44,14 +47,14 @@ export async function GET({ locals, url }) {
 		return new Response('Missing project id', { status: 400 });
 	}
 
-	if (url.searchParams.has('version')) {
-		version = url.searchParams.get('version')!;
-	}
+	const version = url.searchParams.get('version')!;
 
 	let tar;
 	let name = '';
 
 	if (version === 'latest') {
+		return new Response('Deprecated endpoint! Use the version format major.minor.patch (e.g. 3.1.4)', { status: 501 });
+
 		const projects = await db
 			.select()
 			.from(table.projects)
@@ -61,8 +64,8 @@ export async function GET({ locals, url }) {
 					eq(table.projects.id, projectId),
 					or(
 						eq(table.projects.isPublic, true),
-						eq(table.projects.ownerId, locals.user.id),
-						eq(table.teamMembers.userId, locals.user.id)
+						eq(table.projects.ownerId, locals.user!.id),
+						eq(table.teamMembers.userId, locals.user!.id)
 					)
 				)
 			);
@@ -102,7 +105,7 @@ export async function GET({ locals, url }) {
 		if (toml_file === undefined) {
 			return new Response('No toml file found', { status: 404 });
 		}
-		const toml = parse(toml_file.data);
+		const toml = parse(toml_file!.data);
 
 		console.log(files);
 

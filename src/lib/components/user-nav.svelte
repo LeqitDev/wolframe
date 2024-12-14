@@ -20,8 +20,8 @@
 
 <DropdownMenu.Root>
 	<DropdownMenu.Trigger>
-        <Avatar.Root>
-            <Avatar.Image src="https://api.dicebear.com/9.x/shapes/svg?seed=cubecoder" alt="@cubecoder" />
+        <Avatar.Root class="size-8">
+            <Avatar.Image src="https://api.dicebear.com/9.x/shapes/svg?seed=cubecoder" class="size-8" alt="@cubecoder" />
             <Avatar.Fallback>UN</Avatar.Fallback>
         </Avatar.Root>
     </DropdownMenu.Trigger>

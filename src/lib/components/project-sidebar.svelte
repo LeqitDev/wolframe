@@ -540,7 +540,7 @@
 					{#if cur.item.path !== data.tree.path}
 						<ContextMenu.Item onclick={deleteNode}>Delete {!cur.isDir ? 'File' : 'Folder'}</ContextMenu.Item>
 					{/if}
-					{#if !cur.isDir}
+					{#if !cur.isDir && cur.item.path.endsWith('.typ')}
 						<ContextMenu.CheckboxItem checked={cur.item.path === previewFile} onCheckedChange={(checked) => {
 							if (checked) {
 								onPreviewFileChange(fileSystemFileToFileMetadata(cur.item as App.Sidebar.FileSystemFile));
@@ -548,7 +548,6 @@
 							}
 						}}>
 							Preview This File
-							<ContextMenu.Shortcut>⌘⇧P</ContextMenu.Shortcut>
 						</ContextMenu.CheckboxItem>
 					{/if}
 				{/if}
@@ -608,7 +607,7 @@
 		{:else}
 			<Sidebar.MenuButton
 				isActive={item.path === activeFile}
-				class="relative select-none from-emerald-500/20 to-cyan-500/20 data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold"
+				class="relative select-none rounded-none from-emerald-500/20 to-cyan-500/20 data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold"
 				style="-webkit-user-drag: element;"
 				onmouseenter={() => {
 					currentHovered = { item, isDir: false };
@@ -641,7 +640,7 @@
 			/>
 		</Sidebar.MenuButton>
 	{:else}
-		<Sidebar.MenuItem class={dragTarget?.path == item.path ? 'bg-sidebar-accent' : ''}>
+		<Sidebar.MenuItem class={`rounded-none ${dragTarget?.path == item.path ? 'bg-sidebar-accent' : ''}`}>
 			<Collapsible.Root
 				class="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
 				open={item.name === 'lib' || item.name === 'components' || item.open}
@@ -665,6 +664,7 @@
 				<Collapsible.Trigger draggable="true" ondragstart={(e) => dragStart(e, item)}>
 					{#snippet child({ props })}
 						<Sidebar.MenuButton
+							class="rounded-none"
 							{...props}
 							onmouseenter={() => {
 								currentHovered = { item, isDir: true };

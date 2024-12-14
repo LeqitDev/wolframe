@@ -2,7 +2,7 @@ import { redirect } from "@sveltejs/kit";
 import type { LayoutServerLoad } from "./$types";
 import { db } from "$lib/server/db";
 import * as table from "$lib/server/db/schema";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { getPath, minio } from "$lib/server/bucket";
 
 export const load: LayoutServerLoad = async (event) => {
@@ -36,5 +36,9 @@ export const load: LayoutServerLoad = async (event) => {
         }
     }
 
-    return { project: project.at(0), user: event.locals.user, files: files, project_path, initial_vfs: vfs };
+    const newestVersionArchive = await db.select().from(table.archive).where(eq(table.archive.projectId, slug)).orderBy(desc(table.archive.version)).limit(1);
+
+    const newestVersion = newestVersionArchive.at(0)?.version ?? null;
+
+    return { project: project.at(0), user: event.locals.user, files: files, project_path, initial_vfs: vfs, newestVersion };
 };

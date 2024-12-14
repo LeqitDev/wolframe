@@ -15,8 +15,8 @@
 		WorkerRendererSection
 	} from '$lib/stores/logger.svelte';
 	import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
-	import { fade, scale } from 'svelte/transition';
-	import { LoaderCircle } from 'lucide-svelte';
+	import { fade, scale, slide } from 'svelte/transition';
+	import { FileQuestion, FolderOpen, LoaderCircle, PlusCircle, X } from 'lucide-svelte';
 	import { TypstCompletionProvider } from '$lib/monaco';
 	import { convertRemToPixels, debounce, PreviewDragger } from '$lib/utils';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -29,6 +29,7 @@
 	import { FlowerServer } from '$lib/flower';
 	import { initializePAS } from '$lib/stores/project.svelte';
 	import type monaco from '$lib/monaco/editor';
+	import PublishVersionDialog from '$lib/components/publish-version-dialog.svelte';
 
 	interface RawOperation {
 		range: {
@@ -66,9 +67,12 @@
 	// let monaco: typeof Monaco;
 	let editorAnchor: HTMLDivElement;
 	let editor: Monaco.editor.IStandaloneCodeEditor;
+	let isEditorEmpty = $state(true);
 	// let vfs: { name: string; content: string; model: projectState.monaco.editor.ITextModel }[] = $state([]);
 	let currentModelId = 0;
 	let collectedEditorUpdates: any[] = []; // Editor text changes
+
+	let openPublishDialog = $state(false);
 
 	let flowerServer: FlowerServer;
 
@@ -298,8 +302,6 @@
 
 		compiler = new CompilerWorkerBridge(new CompilerWorker());
 
-		compiler.init('');
-
 		compiler.onMessage((res) => handleCompilerResponse(res, completionProvider));
 
 		pageRenderer = new PageRendererWorkerBridge(
@@ -358,6 +360,11 @@
 					projectState.createModel = iMonaco.createModel;
 					projectState.onCurrentModelChange = (model) => {
 						editor.setModel(model);
+						if (model) {
+							isEditorEmpty = false;
+						} else {
+							isEditorEmpty = true;
+						}
 					};
 
 					// Provide models for the vfs
@@ -388,13 +395,7 @@
 						// Add the files
 						msg.payload.files.forEach((file) => {
 							let name = file.path.replace(data.project_path + '/', '');
-							let content = file.content;
 							projectState.addFile(file);
-							try {
-								compiler?.add_file(name, content);
-							} catch (e) {
-								console.error(e);
-							}
 
 							setTimeout(() => {
 								// add delay to prevent an echo
@@ -408,14 +409,29 @@
 							? 'main.typ'
 							: projectState.vfs.has('lib.typ')
 								? 'lib.typ'
-								: projectState.vfs.keys().next().value;
+								: projectState.vfs
+										.keys()
+										.filter((file) => file.endsWith('.typ'))
+										.next().value;
 
 						if (possibleEntryPoint) {
 							projectState.setCurrentModel(possibleEntryPoint);
 							projectState.addOpenFile(possibleEntryPoint, true, true);
-							
+
 							layoutStore.setSidebarActive(projectState.getCurrentFile()!.path);
 							layoutStore.setSidebarPreview(projectState.getCurrentFile()!.path);
+
+							compiler.init(possibleEntryPoint);
+
+							for (let file of msg.payload.files) {
+								let name = file.path.replace(data.project_path + '/', '');
+								let content = file.content;
+								try {
+									compiler?.add_file(name, content);
+								} catch (e) {
+									console.error(e);
+								}
+							}
 
 							render();
 							canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
@@ -454,12 +470,13 @@
 		};
 	});
 
-	function onContentChanged(e: monaco.editor.IModelContentChangedEvent, path: string, name: string) {
-		projectState.logger.info(
-			MainMonacoSection,
-			'Content changed',
-			e
-		);
+	function onContentChanged(
+		e: monaco.editor.IModelContentChangedEvent,
+		path: string,
+		name: string
+	) {
+		projectState.logger.info(MainMonacoSection, 'Content changed', e);
+		projectState.openFiles.find((file) => file.relativePath === name)!.persisted = true;
 		e.changes.sort((a, b) => b.rangeOffset - a.rangeOffset); // reads changes in reverse order
 		flowerServer.editFile(path, e.changes);
 		for (let change of e.changes) {
@@ -498,10 +515,11 @@
 
 	$effect(() => {
 		let previewRelativePath = layoutStore.sidebarPreview.replace(data.project_path + '/', '');
-		console.log("HIHIHI", previewRelativePath);
-		
+
+		compiler.print_files();
 		compiler.set_root(previewRelativePath);
-	})
+		render();
+	});
 
 	$effect(() => {
 		layoutStore.setSidebarActions({
@@ -561,6 +579,32 @@
 	});
 </script>
 
+{#snippet emptyEditor()}
+	<div
+		class="flex h-full w-full flex-col items-center justify-center"
+	>
+		<div>
+			<FileQuestion class="mb-6 size-20 text-primary" />
+		</div>
+		<h2 class="mb-4 text-center text-3xl font-bold">Oops! This Space Looks Empty</h2>
+		<p class="mb-8 max-w-md text-center text-muted-foreground">
+			Looks like your code took a break. Don't worry, <span class="italic underline">click</span> on
+			a file on the left to get started or create a new file for all your
+			<span class="italic underline">amazing</span> ideas.
+		</p>
+		<div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
+			<Button variant="outline" class="flex items-center gap-2">
+				<PlusCircle class="size-4" />
+				New File
+			</Button>
+			<Button variant="outline" class="flex items-center gap-2">
+				<FolderOpen class="size-4" />
+				Open File
+			</Button>
+		</div>
+	</div>
+{/snippet}
+
 <form method="POST" action="?/newFile" id="new-file-form" class="hidden"></form>
 
 {#snippet menubar()}
@@ -595,6 +639,15 @@
 		<Menubar.Menu>
 			<Menubar.Trigger>Project</Menubar.Trigger>
 			<Menubar.Content>
+				{#if data.project?.isPackage}
+					<Menubar.Item
+						onclick={() => {
+							openPublishDialog = true;
+						}}
+					>
+						Publish Version
+					</Menubar.Item>
+				{/if}
 				<Menubar.Item
 					onclick={() => {
 						compiler.print_files();
@@ -762,20 +815,42 @@
 	>
 		<div class="flex px-2 py-1">
 			{#each projectState.openFiles as file}
-				{@const name = file.relativePath.split('/').pop()! }
+				{@const name = file.relativePath.split('/').pop()!}
 				<Button
 					variant="outline"
 					size="sm"
 					onclick={() => {
-						projectState.setCurrentModel(file.relativePath);
+						if (projectState.openFiles.find((f) => f.relativePath === file.relativePath)) {
+							projectState.setCurrentModel(file.relativePath);
+							layoutStore.setSidebarActive(projectState.getCurrentFile()!.path);
+						}
 					}}
-					class={`rounded-none first:rounded-tl-md last:rounded-tr-md${projectState.currentModel === file.relativePath ? ' border-b-0 border-secondary/60 hover:bg-background' : ' bg-secondary/60 border-secondary/60'}${file.persisted ? '' : ' italic'}`}
+					class={`flex space-x-2 rounded-none first:rounded-tl-md last:rounded-tr-md${projectState.currentModel === file.relativePath ? ' border-b-0 border-secondary/60 hover:bg-background' : ' border-secondary/60 bg-secondary/60'}${file.persisted ? '' : ' italic'}`}
 				>
 					{name}
+					<Button
+						variant="secondary"
+						size="icon"
+						class="size-3"
+						onclick={() => {
+							const idx = projectState.openFiles.findIndex(
+								(f) => f.relativePath === file.relativePath
+							);
+							projectState.removeOpenFile(file.relativePath);
+							projectState.setCurrentModel(projectState.openFiles[idx - 1]?.relativePath ?? projectState.openFiles[idx]?.relativePath ?? '');
+							layoutStore.setSidebarActive(projectState.getCurrentFile()?.path ?? '');
+						}}
+					>
+						<X />
+					</Button>
 				</Button>
 			{/each}
 		</div>
-		<div bind:this={editorAnchor} id="editor" class="h-full w-full"></div>
+		<div bind:this={editorAnchor} id="editor" class="h-full w-full">
+			{#if isEditorEmpty}
+				{@render emptyEditor()}
+			{/if}
+		</div>
 	</Resizable.Pane>
 	<Resizable.Handle />
 	<Resizable.Pane collapsedSize={0} collapsible={true} minSize={15}>
@@ -787,6 +862,13 @@
 		></div>
 	</Resizable.Pane>
 </Resizable.PaneGroup>
+
+<PublishVersionDialog
+	bind:open={openPublishDialog}
+	{projectState}
+	newestVersion={data.newestVersion}
+	handlePublish={() => {}}
+/>
 
 <style>
 	:global(.typst-doc) {

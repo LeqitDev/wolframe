@@ -8,12 +8,25 @@ import type { TypstCompletionProvider } from "$lib/monaco";
 
 
 
-export interface VFSFile {
+export class VFSFile {
+    // content: string = '';
+    model: Monaco.editor.ITextModel;
+    path: string;
+    open: boolean = false;
+
+    constructor(content: string, model: Monaco.editor.ITextModel, path: string) {
+        // this.content = content;
+        this.model = model;
+        this.path = path;
+    }
+}
+
+/* export interface VFSFile {
     content: string;
     model: Monaco.editor.ITextModel;
     path: string;
     open?: boolean;
-}
+} */
 
 export interface Page {
     // canvas: HTMLCanvasElement;
@@ -48,7 +61,7 @@ export class ProjectAppState {
     project_path: string;
     openFiles: { relativePath: string; persisted: boolean; model: Monaco.editor.ITextModel }[] = $state([]);
     createModel?: (value: string, language?: string) => Monaco.editor.ITextModel;
-    onCurrentModelChange?: (model: Monaco.editor.ITextModel) => void;
+    onCurrentModelChange?: (model: Monaco.editor.ITextModel | null) => void;
 
     constructor(project_path: string) {
         this.logger = getLogger();
@@ -72,11 +85,8 @@ export class ProjectAppState {
 
         this.vfs.set(
             relativePath,
-            {
-                content,
-                model: this.createModel(content),
-                path: file.path
-            }
+            new VFSFile(content,
+                this.createModel(content), file.path)
         )
     }
 
@@ -88,6 +98,10 @@ export class ProjectAppState {
     }
 
     setCurrentModel(relativePath: string) {
+        if (relativePath === '') {
+            this.onCurrentModelChange?.(null);
+            this.currentModel = '';
+        }
         if (this.vfs.has(relativePath) === false) return;
         this.currentModel = relativePath;
         this.onCurrentModelChange?.(this.vfs.get(relativePath)!.model);
