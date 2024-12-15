@@ -324,6 +324,8 @@ class EditorSetup {
 // Example usage: https://github.com/ekzhang/rustpad/
 async function initializeEditor(completionProvider: monaco.languages.CompletionItemProvider) {
 	try {
+		console.log('Initializing Monaco editor... Worker: ', editorWorker);
+		
 		self.MonacoEnvironment = {
 			getWorkerUrl: function () {
 				return editorWorker;

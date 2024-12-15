@@ -109,6 +109,10 @@ function logWasm(...e: unknown[]) {
     sendLoggerResponse('info', WASMSection, ...e);
 }
 
+function warnWasm(...e: unknown[]) {
+    sendLoggerResponse('warn', WASMSection, ...e);
+}
+
 function errorWasm(...e: unknown[]) {
     sendLoggerResponse('error', WASMSection, ...e);
 }
@@ -140,7 +144,7 @@ self.onmessage = async (event: MessageEvent<App.Compiler.Request>) => {
         }
     } else {
         if (!initialized && !promise) {
-            sendError('Worker not initialized');
+            warnWasm('Worker not initialized');
             return;
         } else if (!initialized) {
             await promise;
