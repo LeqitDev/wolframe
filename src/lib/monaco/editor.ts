@@ -11,7 +11,7 @@ import onigWasm from 'vscode-oniguruma/release/onig.wasm?url';
 import typstGrammar from '$lib/assets/typst.tmLanguage.json?url';
 import typstTheme from '$lib/assets/typstTokio.json';
 import darkPlusTheme from '$lib/textmate/themes/dark-plus.json';
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?url';
+import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
 import { convertTheme, TokensProviderCache } from '../textmate';
 import * as typst from '$rust/typst_flow_wasm';
 
@@ -327,8 +327,18 @@ async function initializeEditor(completionProvider: monaco.languages.CompletionI
 		console.log('Initializing Monaco editor... Worker: ', editorWorker);
 		
 		self.MonacoEnvironment = {
-			getWorkerUrl: function () {
-				return editorWorker;
+			getWorker: function (_: string, label: string) {
+				try {
+					console.log('Creating worker:', label);
+					
+					switch (label) {
+						default:
+							return new editorWorker();
+					}
+				} catch (error) {
+					console.error('Worker initialization failed:', error);
+					throw error;
+				}
 			}
 		};
 

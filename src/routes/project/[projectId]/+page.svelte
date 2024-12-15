@@ -3,7 +3,7 @@
 	import { getLayoutStore } from '$lib/stores/layoutStore.svelte';
 	// import { editor as meditor } from 'monaco-editor';
 	import type { PageData } from './$types';
-	import PageRenderWorker from '$lib/workers/page_renderer?url';
+	import PageRenderWorker from '$lib/workers/page_renderer?worker';
 	import CompilerWorker from '$lib/workers/compiler?worker';
 	import { CompilerWorkerBridge, PageRendererWorkerBridge } from '$lib/workerBridges';
 	import {
@@ -314,9 +314,7 @@
 		compiler.onMessage((res) => handleCompilerResponse(res, completionProvider));
 
 		pageRenderer = new PageRendererWorkerBridge(
-			new Worker(PageRenderWorker, {
-				type: 'module'
-			})
+			new PageRenderWorker()
 		);
 
 		const resizeObserver = new ResizeObserver((entries) => {
@@ -464,6 +462,8 @@
 					/* editor.onDidChangeModelContent((e) => {
 					onContentChanged(e);
 				}); */
+				}).catch((e) => {
+					projectState.logger.error(MainMonacoSection, 'Error initializing editor', e);
 				});
 			})
 			.catch((e) => {
