@@ -47,5 +47,6 @@ services:
       - db
     environment:
       DATABASE_URL: postgres://root:mysecretpassword@db:5432/local
+      PUBLIC_FLOWER_WEBSOCKET_URL: ws://localhost:3030
       ORIGIN: http://localhost:3000
       <<: *environment
