@@ -1,5 +1,6 @@
 import { MainWSFlowerSection } from "$lib/stores/logger.svelte";
 import type { ProjectAppState } from "$lib/stores/project.svelte";
+import { env } from "$env/dynamic/private";
 
 export class FlowerServer {
 	ws: WebSocket | null = null;
@@ -23,7 +24,11 @@ export class FlowerServer {
 	}
 
     tryConnect() {
-        const url = 'ws://localhost:3030/users/' + this.project_id;
+		if (env.FLOWER_WEBSOCKET_URL === undefined) {
+			console.error('FLOWER_WEBSOCKET_URL is not defined');
+			return;
+		};
+        const url = env.FLOWER_WEBSOCKET_URL + '/users/' + this.project_id;
         this.project_state.logger.info(MainWSFlowerSection, 'Connecting to', url);
         const flowerServer = new WebSocket(url);
 
