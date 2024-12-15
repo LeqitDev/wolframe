@@ -36,7 +36,7 @@
 
 			
 
-			import('$lib/editor').then(({ EditorSetup, initializeEditor, createModel }) => {
+			/* import('$lib/editor').then(({ EditorSetup, initializeEditor, createModel }) => {
 				initializeEditor(compiler).then((_editor) => {
 					console.log('Editor initialized');
 					editor = _editor;
@@ -72,7 +72,7 @@
 						}
 					});
 				});
-			});
+			}); */
 		});
 
 		return () => {

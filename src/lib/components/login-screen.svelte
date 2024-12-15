@@ -24,7 +24,7 @@
             </div>
             <p style="color: red">{form?.message ?? ''}</p>
             <Button type="submit" class="w-full">Login</Button>
-            <Button size="sm" variant="ghost" class="w-full" formaction="?/register">Register</Button>
+            <Button type="submit" size="sm" variant="ghost" class="w-full" formaction="?/register">Register</Button>
         </form>
     </Card.Content>
 </Card.Root>
