@@ -1,6 +1,7 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 
 import type { Sections } from '$lib/stores/logger.svelte';
+import type * as Monaco from 'monaco-editor';
 
 // for information about these interfaces
 declare global {
@@ -43,6 +44,28 @@ declare global {
 		interface IProjectCacheMetaData {
 			content: null | string;
 			metadata: FileMetadata;
+		}
+
+		export namespace Editor {
+
+			interface Language {
+				init: (monaco: typeof Monaco) => void;
+				postInit?: (monaco: typeof Monaco, editor: Monaco.editor.IStandaloneCodeEditor) => void;
+				onDidChangeModelContent?: (model: Monaco.editor.ITextModel, e: Monaco.editor.IModelContentChangedEvent) => void;
+			}
+
+			interface Theme {
+				init: (monaco: typeof Monaco) => void;
+				postInit?: (monaco: typeof Monaco, editor: Monaco.editor.IStandaloneCodeEditor) => void;
+			}
+
+			interface Controller {
+				addModel?: (value: string, uri: string, language?: string) => void;
+				removeModel?: (uri: string) => void;
+				getModel?: (uri: string) => Monaco.editor.ITextModel | null;
+				setModel?: (uri: string | null) => void;
+			}
+
 		}
 
 		export namespace PageRenderer {

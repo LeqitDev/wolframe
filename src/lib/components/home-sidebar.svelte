@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Folder, PlusCircle } from "lucide-svelte";
+	import { Folder, LayoutDashboard, PlusCircle } from "lucide-svelte";
 import { Button } from "./ui/button";
 
     let {
@@ -32,8 +32,11 @@ import { Button } from "./ui/button";
                 <h2 class="mb-2 px-4 text-lg font-semibold tracking-tight">Personal</h2>
                 <div class="space-y-1">
                     <Button onclick={() => {
+                        curView = 'home';
+                    }} variant="ghost" class={`w-full justify-start${curView === 'home' ? ' bg-secondary' : ''}`}><LayoutDashboard class="mr-2 size-4" />Overview</Button>
+                    <Button onclick={() => {
                         curView = 'personal';
-                    }} variant="ghost" class="w-full justify-start"><Folder class="mr-2 size-4" />Projects</Button>
+                    }} variant="ghost" class={`w-full justify-start${curView === 'personal' ? ' bg-secondary' : ''}`}><Folder class="mr-2 size-4" />Projects</Button>
                 </div>
             </div>
             <div class="px-3 py-2">

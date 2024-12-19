@@ -56,7 +56,9 @@
 					</Card.Root>
 				</NewProjectDialog>
 			</div>
-			<RecentProjectsList projects={data.projects!} />
+			{#if data.projects && data.projects.length > 0}
+				<RecentProjectsList projects={data.projects!} />
+			{/if}
 		</div>
 	</div>
     </div>
