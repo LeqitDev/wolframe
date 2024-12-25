@@ -12,6 +12,7 @@ export const load: LayoutServerLoad = async (event) => {
 
     return { project: {
         id: '0',
+        name: 'Playground',
         isPackage: false,
     }, files: [
         { path: '/main.typ', filename: 'main.typ', content: '' },

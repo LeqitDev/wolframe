@@ -1,10 +1,18 @@
+import { getUniLogger } from "$lib/stores/logger.svelte";
+
 export abstract class WorkerBridge<Req, Res> {
     private worker: Worker;
-    private messageHandler?: MessageHandler<Res>;
+    private observer: MessageHandler<Res>[] = [];
 
-    constructor(worker: Worker, messageHandler?: MessageHandler<Res>) {
+    constructor(worker: Worker) {
         this.worker = worker;
-        this.messageHandler = messageHandler;
+        this.worker.onmessage = (event) => {
+            this.observer.forEach((o) => o.onMessage(event.data));
+        };
+    }
+    
+    addObserver(observer: MessageHandler<Res>) {
+        this.observer.push(observer);
     }
 
     protected postMessage(message: Req, options?: StructuredSerializeOptions) {
@@ -17,7 +25,7 @@ export abstract class WorkerBridge<Req, Res> {
 
     protected onMessageRaw(callback: (message: Res) => void) {
         this.worker.onmessage = (event) => {
-            this.messageHandler?.onMessage(event.data);
+            this.observer.forEach((o) => o.onMessage(event.data));
             callback(event.data);
         };
     }

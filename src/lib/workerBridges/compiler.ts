@@ -1,8 +1,27 @@
+import { getUniLogger } from "$lib/stores/logger.svelte";
 import { WorkerBridge } from "./default";
 
 export class CompilerWorkerBridge extends WorkerBridge<App.Compiler.Request, App.Compiler.Response> {
     constructor(worker: Worker) {
         super(worker);
+        super.addObserver({
+            onMessage(message) {
+                const logger = getUniLogger();
+                if (message.type === 'logger') {
+                    switch (message.severity) {
+                        case 'error':
+                            logger.error(message.section, ...message.message);
+                            break;
+                        case 'warn':
+                            logger.warn(message.section, ...message.message);
+                            break;
+                        case 'info':
+                            logger.info(message.section, ...message.message);
+                            break;
+                    }
+                }
+            },
+        })
     }
 
     public init(root: string) {

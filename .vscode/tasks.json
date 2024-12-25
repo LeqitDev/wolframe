@@ -6,6 +6,9 @@
     "linux": {
         "command": "bash"
     },
+    "osx": {
+        "command": "bash"
+    },
     "args": [
         "-c"
     ],

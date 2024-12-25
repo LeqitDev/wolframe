@@ -7,7 +7,7 @@ const CompletionItemKinds = [
 	1, //Monaco.languages.CompletionItemKind.Function,
 	24, //Monaco.languages.CompletionItemKind.TypeParameter,
 	4, //Monaco.languages.CompletionItemKind.Variable,
-	14, //Monaco.languages.CompletionItemKind.Constant,
+	8, //Monaco.languages.CompletionItemKind.Module,
 	21 //Monaco.languages.CompletionItemKind.Reference
 ];
 
@@ -32,9 +32,10 @@ const getCompletionItemsFromCore = (
 
 	return items.map((completion) => {
         const parsed = convertToMonacoSnippet(completion.apply);
+		
 		return {
 			label: completion.label,
-			kind: CompletionItemKinds[CoreCompletionKinds.indexOf(completion.kind.kind)],
+			kind: CompletionItemKinds[parseInt(completion.kind.kind)],
 			insertText: parsed ?? completion.label,
 			insertTextRules: parsed
 				? 4 /* Monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet */
@@ -96,7 +97,7 @@ export class TypstCompletionProvider implements Monaco.languages.CompletionItemP
 			endColumn: position.column
 		}); */
 
-        this.requestCompletions('main.typ', model.getOffsetAt(position));
+        this.requestCompletions(model.uri.path, model.getOffsetAt(position));
 
         return new Promise((resolve) => {
             const interval = setInterval(() => {

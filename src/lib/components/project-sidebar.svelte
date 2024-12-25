@@ -151,8 +151,6 @@
 			filesByDirectory.get(dirPath)?.push(file);
 		});
 
-		console.log(filesByDirectory);
-
 		const buildDirectoryTree = (basePath: string, parentNode: App.Sidebar.FileSystemNode) => {
 			if (parentNode.type === 'file') return;
 
@@ -336,7 +334,7 @@
 				size: 0,
 				lastModified: new Date(),
 				etag: '',
-				path: hovered.item.path + '/...'
+				path: hovered.item.path + '...'
 			} as App.Sidebar.FileSystemNode;
 
 			insertItemInFolder(data.tree, hovered.item as App.Sidebar.FileSystemNode, newFile);
@@ -351,11 +349,13 @@
 	}
 
 	function finalizeNewFile(e: FocusEvent | KeyboardEvent, item: App.Sidebar.FileSystemNode) {
-		if (e.type === 'keypress' && (e as KeyboardEvent).key !== 'Enter') return;
+		if (e.type === 'keypress' && (e as KeyboardEvent).key !== 'Enter' || !item.new) return;
 		if (item.name === '') {
 			findAndRemoveItem(data.tree, item);
 		} else {
 			item.path = item.path.substring(0, item.path.length - 3) + item.name;
+			console.log('New file:', $state.snapshot(item));
+			
 			// TODO: New file callback
 			onNewFile(fileSystemFileToFileMetadata(item as App.Sidebar.FileSystemFile));
 			item.new = false;

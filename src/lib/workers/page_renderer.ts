@@ -17,8 +17,8 @@ async function update(req: App.PageRenderer.UpdateRequest) {
 
 	for (const page of pages) {
 		page.canvg.setNewMaxWidth(maxWidth);
-
-		// page.canvg.render();
+		
+		page.canvg.renderSVG(page.svg!);
 
 		send_render_success(pages.indexOf(page), page.canvg.dimension);
 	}
@@ -40,6 +40,7 @@ async function initPage(req: App.PageRenderer.InitPageRequest) {
 
 	const page = {
 		canvg,
+		svg: req.svg,
 		updated: false,
 	};
 
@@ -59,6 +60,8 @@ async function render(req: App.PageRenderer.RenderRequest) {
 	try {
 		if (req.svg) {
 			page.canvg.renderSVG(req.svg);
+
+			page.svg = req.svg;
 		}
 
 		send_render_success(req.pageId, page.canvg.dimension);

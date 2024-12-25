@@ -46,20 +46,32 @@ declare global {
 			metadata: FileMetadata;
 		}
 
+		interface FileEntry {
+			path: string;
+			content: string;
+		}
+
+		interface WorkerObserver {
+			onMessage: (message: any) => void;
+		}
+
 		export namespace Editor {
 
 			interface Language {
 				init: (monaco: typeof Monaco) => void;
 				postInit?: (monaco: typeof Monaco, editor: Monaco.editor.IStandaloneCodeEditor) => void;
 				onDidChangeModelContent?: (model: Monaco.editor.ITextModel, e: Monaco.editor.IModelContentChangedEvent) => void;
+				dispose?: () => void;
 			}
 
 			interface Theme {
 				init: (monaco: typeof Monaco) => void;
 				postInit?: (monaco: typeof Monaco, editor: Monaco.editor.IStandaloneCodeEditor) => void;
+				dispose?: () => void;
 			}
 
 			interface Controller {
+				activeModelPath?: string | null;
 				addModel?: (value: string, uri: string, language?: string) => void;
 				removeModel?: (uri: string) => void;
 				getModel?: (uri: string) => Monaco.editor.ITextModel | null;
