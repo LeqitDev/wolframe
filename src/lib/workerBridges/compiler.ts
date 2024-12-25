@@ -32,6 +32,10 @@ export class CompilerWorkerBridge extends WorkerBridge<App.Compiler.Request, App
         super.postMessage({ type: 'compile' } as App.Compiler.CompileRequest);
     }
 
+    public definition(file: string, offset: number) {
+        super.postMessage({ type: 'definition', file, offset } as App.Compiler.DefinitionRequest);
+    }
+
     public completions(file: string, offset: number) {
         super.postMessage({ type: 'completion', file, offset } as App.Compiler.CompletionRequest);
     }

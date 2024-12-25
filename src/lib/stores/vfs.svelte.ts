@@ -36,6 +36,10 @@ export class VFS {
 		this.entries.push(new VFSEntry(path, content));
 	}
 
+    deleteFile(path: string) {
+        this.entries = this.entries.filter((entry) => entry.path !== path);
+    }
+
     fileMutated(path: string) {
         const entry = this.entries.find((entry) => entry.path === path);
         if (entry === undefined) return;

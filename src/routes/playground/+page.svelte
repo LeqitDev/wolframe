@@ -89,13 +89,21 @@
 		layoutStore.setSidebarActive('');
 		layoutStore.setSidebarPreview('');
 		layoutStore.setSidebarActions({
-			onFileClick: (file) => {
+			onFileClick(file) {
 				openFile(file.path);
 			},
-			onNewFile: (file) => {
+			onNewFile(file) {
 				newFile(file.path, '');
 				openFile(file.path);
-			}
+			},
+			onPreviewFileChange(file) {
+				setPreview(file.path);
+			},
+			onFileDeleted(file) {
+				vfs.deleteFile(file.path);
+				controller.removeModel!(file.path);
+				// TODO: Remove from compiler
+			},
 		});
 	}
 

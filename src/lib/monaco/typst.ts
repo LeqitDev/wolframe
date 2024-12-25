@@ -3,17 +3,19 @@ import typstTheme from '$lib/assets/typstTokio.json';
 import type { CompilerWorkerBridge } from '$lib/workerBridges';
 import { TypstCompletionProvider } from './completionProvider';
 import { error } from '@sveltejs/kit';
+import { TypstHoverProvider } from './typst/hoverProvider';
 
 export class TypstLanguage implements App.Editor.Language {
 	private compiler?: CompilerWorkerBridge;
 	private completionProvider?: TypstCompletionProvider;
+	private hoverProvider?: TypstHoverProvider;
 	private disposables: Monaco.IDisposable[] = [];
 	private monaco?: typeof Monaco;
 
 	setCompiler(compiler: CompilerWorkerBridge) {
 		this.compiler = compiler;
 		this.completionProvider = new TypstCompletionProvider((f, o) => this.getCompletions(f, o));
-		console.log('Setting compiler', this.compiler);
+		this.hoverProvider = new TypstHoverProvider((f, o) => this.getDefinition(f, o));
 		this.compiler.addObserver({
 			onMessage: this.onCompilerMessage.bind(this)
 		})
@@ -59,6 +61,17 @@ export class TypstLanguage implements App.Editor.Language {
 			disposer = monaco.languages.registerCompletionItemProvider('typst', this.completionProvider);
 			this.disposables.push(disposer);
 		}
+
+		if (this.hoverProvider) {
+			disposer = monaco.languages.registerHoverProvider('typst', this.hoverProvider);
+			this.disposables.push(disposer);
+		}
+	}
+
+	private getDefinition(file: string, offset: number) {
+		if (!this.compiler) return;
+
+		this.compiler.definition(file, offset);
 	}
 
 	private getCompletions(file: string, offset: number) {
@@ -75,10 +88,17 @@ export class TypstLanguage implements App.Editor.Language {
 			case 'error':
 				this.onCompileError(message);
 				break;
+			case 'definition':
+				this.onDefinitionMessage(message);
+				break;
 			case 'compile':
 				this.onCompileSuccess(message);
 				break;
 		}
+	}
+
+	private onDefinitionMessage(message: App.Compiler.DefinitionResponse) {
+		this.hoverProvider!.setHover(message.definition)
 	}
 
 	private onCompileSuccess(message: App.Compiler.CompileResponse) {

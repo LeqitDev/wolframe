@@ -1,6 +1,7 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 
 import type { Sections } from '$lib/stores/logger.svelte';
+import type { Definition } from '$rust/typst_flow_wasm';
 import type * as Monaco from 'monaco-editor';
 
 // for information about these interfaces
@@ -53,6 +54,19 @@ declare global {
 
 		interface WorkerObserver {
 			onMessage: (message: any) => void;
+		}
+
+		interface Definition {
+			name: string;
+			span: {
+				range: [number, number];
+			};
+			name_span: {
+				range: [number, number];
+			};
+			kind: string;
+			docs: string | undefined;
+			val_name: string | undefined;
 		}
 
 		export namespace Editor {
@@ -115,12 +129,13 @@ declare global {
 			type EditRequest = {type: 'edit', file: string, content: string, offsetStart: number, offsetEnd: number};
 			type MoveRequest = {type: 'move', old_path: string, new_path: string};
 			type CompletionRequest = {type: 'completion', file: string, offset: number};
+			type DefinitionRequest = {type: 'definition', file: string, offset: number};
 			type InitRequest = {type: 'init', root: string};
 			type AddFileRequest = {type: 'add-file', file: string, content: string};
 			type SetRootRequest = {type: 'set-root', root: string};
 			type PrintFilesRequest = {type: 'print-files'};
 
-			type Request = CompileRequest | EditRequest | CompletionRequest | InitRequest | AddFileRequest | MoveRequest | SetRootRequest | PrintFilesRequest;
+			type Request = CompileRequest | EditRequest | CompletionRequest | InitRequest | AddFileRequest | MoveRequest | SetRootRequest | PrintFilesRequest | DefinitionRequest;
 
 			interface CompileErrorSpan {
 				file: string;
@@ -150,9 +165,10 @@ declare global {
 
 			type CompileResponse = {type: 'compile'; svgs: string[]};
 			type CompletionResponse = {type: 'completion'; completions: CompletionItemType[]};
+			type DefinitionResponse = {type: 'definition'; definition: Definition};
 			type LoggerResponse = {type: 'logger'; severity: 'error' | 'warn' | 'info'; section: Sections; message: unknown[]; }
 
-			type Response = ErrorResponse | CompileResponse | CompletionResponse | LoggerResponse;
+			type Response = ErrorResponse | CompileResponse | CompletionResponse | LoggerResponse | DefinitionResponse;
 		}
 
 		namespace Sidebar {

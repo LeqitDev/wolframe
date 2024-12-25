@@ -1,4 +1,4 @@
-import { WASMSection, type Sections } from '$lib/stores/logger.svelte';
+import { getUniLogger, WASMSection, type Sections } from '$lib/stores/logger.svelte';
 import init, * as typst from '$rust/typst_flow_wasm';
 
 type compilerGlobalThis = typeof globalThis & {
@@ -76,6 +76,35 @@ function completion(request: App.Compiler.CompletionRequest) {
     });
 
     sendCompletionResponse(items);
+}
+
+function definition(request: App.Compiler.DefinitionRequest) {
+    let definition: typst.JsDefinition | App.Definition | undefined = compiler.definition(request.file, request.offset);
+
+    if (definition) {
+        getUniLogger().info('worker/compiler', 'Definition found', definition.span().get_range(), definition.name_span().get_range());
+
+        definition = {
+            name: definition.name(),
+            span: {
+                range: [definition.span().get_range()[0], definition.span().get_range()[1]],
+            },
+            name_span: {
+                range: [definition.name_span().get_range()[0], definition.name_span().get_range()[1]],
+            },
+            kind: definition.kind().toString(),
+            docs: definition.value()?.docs(),
+            val_name: definition.value()?.name(),
+        } as App.Definition;
+
+        getUniLogger().info('worker/compiler', 'Definition found', definition);
+        sendDefinitionResponse({
+            type: 'definition',
+            definition: definition,
+        });
+    } else {
+        sendLoggerResponse('info', WASMSection, 'Definition not found');
+    }
 }
 
 function add_file(request: App.Compiler.AddFileRequest) {
@@ -163,6 +192,9 @@ self.onmessage = async (event: MessageEvent<App.Compiler.Request>) => {
             case 'completion':
                 completion(request);
                 break;
+            case 'definition':
+                definition(request);
+                break;
             case 'add-file':
                 add_file(request);
                 break;
@@ -193,6 +225,10 @@ function sendCompileResponse(svgs: string[]) {
 
 function sendCompletionResponse(completions: App.Compiler.CompletionItemType[]) {
     self.postMessage({ type: 'completion', completions } as App.Compiler.CompletionResponse);
+}
+
+function sendDefinitionResponse(definition: App.Compiler.DefinitionResponse) {
+    self.postMessage(definition);
 }
 
 function sendLoggerResponse(severity: 'error' | 'warn' | 'info', section: Sections, ...message: unknown[]) {

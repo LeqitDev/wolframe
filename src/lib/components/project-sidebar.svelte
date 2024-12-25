@@ -137,7 +137,6 @@
 
 	let hoverQueue = new HoverQueue();
 	let reloadedStaticHovered = $state(true);
-	$inspect(hoverQueue.queue);
 	let contextMenuVisibility = $state(false);
 	/* let currentHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null);
 	let staticHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null); */
