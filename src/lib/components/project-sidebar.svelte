@@ -14,9 +14,33 @@
 	import * as ContextMenu from '$lib/components/ui/context-menu/index.js';
 	import Separator from './ui/separator/separator.svelte';
 	import { Input } from './ui/input';
-	import { tick } from 'svelte';
+	import { tick, untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { flip } from 'svelte/animate';
+
+	class HoverQueue {
+		queue: { item: App.Sidebar.FileSystemNode; isDir: boolean }[] = $state([]);
+		freezedHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null);
+
+		add(item: App.Sidebar.FileSystemNode, isDir: boolean) {
+			this.queue.push({ item, isDir });
+		}
+
+		remove(item: App.Sidebar.FileSystemNode) {
+			this.queue = this.queue.filter((i) => i.item !== item);
+		}
+
+		get hovered() {
+			return this.queue[this.queue.length - 1];
+		}
+
+		staticHovered() {
+			return untrack(() => {
+				this.freezedHovered = this.queue[this.queue.length - 1];
+				return this.freezedHovered;
+			});
+		}
+	}
 
 	// https://github.com/Microsoft/monaco-editor/issues/366
 
@@ -111,15 +135,18 @@
 		}
 	});
 
-	let currentHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null);
+	let hoverQueue = new HoverQueue();
+	let reloadedStaticHovered = $state(true);
+	$inspect(hoverQueue.queue);
 	let contextMenuVisibility = $state(false);
-	let staticHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null);
+	/* let currentHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null);
+	let staticHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null); */
 
-	$effect(() => {
+	/* $effect(() => {
 		if (!contextMenuVisibility) {
 			staticHovered = currentHovered;
 		}
-	});
+	}); */
 
 	function fileSystemFileToFileMetadata(file: App.Sidebar.FileSystemFile): App.Sidebar.FileMetadata {
 		return {
@@ -323,7 +350,7 @@
 	}
 
 	function addFile() {
-		let hovered = $state.snapshot(staticHovered);
+		let hovered = hoverQueue.freezedHovered;
 
 		if (hovered && hovered.isDir) {
 			const newFile = {
@@ -363,7 +390,7 @@
 	}
 
 	function addDir() {
-		let hovered = $state.snapshot(staticHovered);
+		let hovered = hoverQueue.freezedHovered;
 
 		if (hovered && hovered.isDir) {
 			hovered.item = hovered.item as App.Sidebar.FileSystemNode;
@@ -462,7 +489,7 @@
 	}
 
 	function deleteNode() {
-		let hovered = $state.snapshot(staticHovered);
+		let hovered = hoverQueue.freezedHovered;
 
 		if (hovered) {
 			const item = hovered.item;
@@ -497,21 +524,22 @@
 	<Sidebar.Content>
 		<ContextMenu.Root
 			bind:open={contextMenuVisibility}
-			onOpenChange={() => (staticHovered = currentHovered)}
+			onOpenChange={async () => {
+				reloadedStaticHovered = false;
+				await tick();
+				reloadedStaticHovered = true;
+			}}
 		>
 			<ContextMenu.Trigger class="h-full">
 				<Sidebar.Group class="h-full group-data-[collapsible=icon]:hidden">
 					<Sidebar.GroupLabel>Project Files</Sidebar.GroupLabel>
 					<Sidebar.GroupContent class="h-full">
 						<Sidebar.Menu
-							onmouseover={() => {
-								currentHovered = {
-									item: data.tree,
-									isDir: true
-								};
+							onmouseenter={() => {
+								hoverQueue.add(data.tree, true);
 							}}
 							onmouseleave={() => {
-								currentHovered = null;
+								hoverQueue.remove(data.tree);
 							}}
 							ondragover={(e) => dragOverFolder(e, data.tree)}
 							ondrop={drop}
@@ -528,36 +556,38 @@
 				</Sidebar.Group>
 			</ContextMenu.Trigger>
 			<ContextMenu.Content class="w-screen max-w-60 bg-sidebar shadow-xl">
-				{@const cur = $state.snapshot(staticHovered)}
-				{#if cur}
-					{#if cur.isDir}
-						<ContextMenu.Item onclick={addFile}>New file...</ContextMenu.Item>
-						<ContextMenu.Item onclick={addDir}>New folder...</ContextMenu.Item>
-						{#if !cur.isDir || cur.item.path !== data.tree.path}
-							<ContextMenu.Separator />
+				{#if reloadedStaticHovered}
+					{@const cur = hoverQueue.staticHovered()}
+					{#if cur}
+						{#if cur.isDir}
+							<ContextMenu.Item onclick={addFile}>New file...</ContextMenu.Item>
+							<ContextMenu.Item onclick={addDir}>New folder...</ContextMenu.Item>
+							{#if !cur.isDir || cur.item.path !== data.tree.path}
+								<ContextMenu.Separator />
+							{/if}
+						{/if}
+						{#if cur.item.path !== data.tree.path}
+							<ContextMenu.Item onclick={deleteNode}>Delete {!cur.isDir ? 'File' : 'Folder'}</ContextMenu.Item>
+						{/if}
+						{#if !cur.isDir && cur.item.path.endsWith('.typ')}
+							<ContextMenu.CheckboxItem checked={cur.item.path === previewFile} onCheckedChange={(checked) => {
+								if (checked) {
+									onPreviewFileChange(fileSystemFileToFileMetadata(cur.item as App.Sidebar.FileSystemFile));
+									previewFile = cur.item.path;
+								}
+							}}>
+								Preview This File
+							</ContextMenu.CheckboxItem>
 						{/if}
 					{/if}
-					{#if cur.item.path !== data.tree.path}
-						<ContextMenu.Item onclick={deleteNode}>Delete {!cur.isDir ? 'File' : 'Folder'}</ContextMenu.Item>
+					{#if debug}
+						<ContextMenu.Separator />
+						<ContextMenu.Item
+							onclick={() => {
+								console.log($state.snapshot(data.tree));
+							}}>Log tree</ContextMenu.Item
+						>
 					{/if}
-					{#if !cur.isDir && cur.item.path.endsWith('.typ')}
-						<ContextMenu.CheckboxItem checked={cur.item.path === previewFile} onCheckedChange={(checked) => {
-							if (checked) {
-								onPreviewFileChange(fileSystemFileToFileMetadata(cur.item as App.Sidebar.FileSystemFile));
-								previewFile = cur.item.path;
-							}
-						}}>
-							Preview This File
-						</ContextMenu.CheckboxItem>
-					{/if}
-				{/if}
-				{#if debug}
-					<ContextMenu.Separator />
-					<ContextMenu.Item
-						onclick={() => {
-							console.log($state.snapshot(data.tree));
-						}}>Log tree</ContextMenu.Item
-					>
 				{/if}
 			</ContextMenu.Content>
 		</ContextMenu.Root>
@@ -610,10 +640,10 @@
 				class="relative select-none rounded-none from-emerald-500/20 to-cyan-500/20 data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold"
 				style="-webkit-user-drag: element;"
 				onmouseenter={() => {
-					currentHovered = { item, isDir: false };
+					hoverQueue.add(item, false);
 				}}
 				onmouseleave={() => {
-					currentHovered = null;
+					hoverQueue.remove(item);
 				}}
 				draggable="true"
 				ondragstart={(e) => dragStart(e, item)}
@@ -667,10 +697,10 @@
 							class="rounded-none"
 							{...props}
 							onmouseenter={() => {
-								currentHovered = { item, isDir: true };
+								hoverQueue.add(item, true);
 							}}
 							onmouseleave={() => {
-								currentHovered = null;
+								hoverQueue.remove(item);
 							}}
 						>
 							<ChevronRight className="transition-transform" />
