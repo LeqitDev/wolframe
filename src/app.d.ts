@@ -1,7 +1,7 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 
 import type { Sections } from '$lib/stores/logger.svelte';
-import type { Definition } from '$rust/typst_flow_wasm';
+import type { Completion, Definition, Diagnostics } from '$rust/typst_flow_wasm';
 import type * as Monaco from 'monaco-editor';
 
 // for information about these interfaces
@@ -54,19 +54,6 @@ declare global {
 
 		interface WorkerObserver {
 			onMessage: (message: any) => void;
-		}
-
-		interface Definition {
-			name: string;
-			span: {
-				range: [number, number];
-			};
-			name_span: {
-				range: [number, number];
-			};
-			kind: string;
-			docs: string | undefined;
-			val_name: string | undefined;
 		}
 
 		export namespace Editor {
@@ -160,11 +147,11 @@ declare global {
 			}
 
 			type DefaultErrorResponse = {sub: 'default'; error: string;};
-			type CompileErrorResponse = {sub: 'compile'; errors: CompileErrorType[];};
+			type CompileErrorResponse = {sub: 'compile'; errors: Diagnostics[];};
 			type ErrorResponse = {type: 'error';} & (DefaultErrorResponse | CompileErrorResponse);
 
 			type CompileResponse = {type: 'compile'; svgs: string[]};
-			type CompletionResponse = {type: 'completion'; completions: CompletionItemType[]};
+			type CompletionResponse = {type: 'completion'; completions: Completion[]};
 			type DefinitionResponse = {type: 'definition'; definition: Definition};
 			type LoggerResponse = {type: 'logger'; severity: 'error' | 'warn' | 'info'; section: Sections; message: unknown[]; }
 

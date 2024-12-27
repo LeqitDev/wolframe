@@ -1,4 +1,5 @@
 import { getUniLogger } from "$lib/stores/logger.svelte";
+import { string } from "zod";
 
 export abstract class WorkerBridge<Req, Res> {
     private worker: Worker;
@@ -7,7 +8,8 @@ export abstract class WorkerBridge<Req, Res> {
     constructor(worker: Worker) {
         this.worker = worker;
         this.worker.onmessage = (event) => {
-            this.observer.forEach((o) => o.onMessage(event.data));
+            let data = event.data;
+            this.observer.forEach((o) => o.onMessage(data));
         };
     }
     

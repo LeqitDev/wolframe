@@ -121,16 +121,16 @@ export class TypstLanguage implements App.Editor.Language {
 			}
 
 			for (const error of message.errors) {
-				const model = this.monaco.editor.getModel(this.monaco.Uri.parse(error.span.file));
+				const model = this.monaco.editor.getModel(this.monaco.Uri.parse(error.root.file_path));
 
 				if (!model) {
-					console.error('No model found for file', error.span.file);
+					console.error('No model found for file', error.root.file_path);
 					continue;
 				}
 
 				const pos = {
-					start: model.getPositionAt(error.span.range[0]),
-					end: model.getPositionAt(error.span.range[1])
+					start: model.getPositionAt(error.root.start_offset),
+					end: model.getPositionAt(error.root.end_offset)
 				};
 
 				const modelRange = this.monaco.Range.fromPositions(pos.start, pos.end);
@@ -144,10 +144,10 @@ export class TypstLanguage implements App.Editor.Language {
 					severity: this.monaco.MarkerSeverity.Error
 				};
 
-				if (!markers.has(error.span.file)) {
-					markers.set(error.span.file, [marker]);
+				if (!markers.has(error.root.file_path)) {
+					markers.set(error.root.file_path, [marker]);
 				} else {
-					markers.get(error.span.file)!.push(marker);
+					markers.get(error.root.file_path)!.push(marker);
 				}
 			}
 

@@ -1,6 +1,31 @@
 import { getUniLogger } from '$lib/stores/logger.svelte';
-import type { JsDefinition } from '$rust/typst_flow_wasm';
+import type { Definition } from '$rust/typst_flow_wasm';
 import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
+
+function parseDocs(docs: string) {
+    const lines = docs.replaceAll('```example', '```typst').split('\n');
+    let sections: { heading: string; content: string[] }[] = [];
+    let currentHeading = '';
+    let currentContent: string[] = [];
+
+    for (const line of lines) {
+        if (line.trim().startsWith('# ')) {
+            if (currentHeading || currentContent.length) {
+                sections.push({ heading: currentHeading, content: currentContent });
+            }
+            currentHeading = line.trim().replace(/^#\s*/, '');
+            currentContent = [];
+        } else {
+            currentContent.push(line);
+        }
+    }
+
+    if (currentHeading || currentContent.length) {
+        sections.push({ heading: currentHeading, content: currentContent });
+    }
+
+    return sections;
+}
 
 export class TypstHoverProvider implements Monaco.languages.HoverProvider {
     hasHover = true;
@@ -13,14 +38,31 @@ export class TypstHoverProvider implements Monaco.languages.HoverProvider {
         this.requestDefinition = requestDefinition;
     }
 
-    setHover(definition: App.Definition) {
+    setHover(definition: Definition) {
 
         this.logger.info('monaco/typst/hoverProvider', 'Hovering over', definition);
 
         if (!this.curModel) return;
 
-        const start = this.curModel.getPositionAt(definition.name_span.range[0]);
-        const end = this.curModel.getPositionAt(definition.name_span.range[1]);
+        const start = this.curModel.getPositionAt(definition.name_span.start_offset);
+        const end = this.curModel.getPositionAt(definition.name_span.end_offset);
+
+        const contents: Monaco.IMarkdownString[] = [];
+        contents.push({ value: `**${definition.value?.name ?? definition.name}** *(${(definition.kind as string).toLowerCase()})*` });
+
+        if (definition.value && definition.value.docs) {
+            let sections = parseDocs(definition.value.docs);
+
+            contents.push({ value: '**DOCS**' });
+            contents.push({ value: sections[0].content.join('\n') });
+
+            sections = sections.slice(1);
+
+            sections.forEach((section) => {
+                contents.push({ value: `**${section.heading}**` });
+                contents.push({ value: section.content.join('\n') });
+            });
+        }
 
         this.hover = {
             range: {
@@ -29,15 +71,14 @@ export class TypstHoverProvider implements Monaco.languages.HoverProvider {
                 endLineNumber: end.lineNumber,
                 endColumn: end.column
             },
-            contents: [
-                { value: definition.name ?? '' }
-            ]
+            contents
         };
         this.hasHover = true;
     }
 
     provideHover(model: Monaco.editor.ITextModel, position: Monaco.Position, token: Monaco.CancellationToken, context?: Monaco.languages.HoverContext<Monaco.languages.Hover> | undefined): Monaco.languages.ProviderResult<Monaco.languages.Hover> {
         this.curModel = model;
+        this.hover = null;
 
         console.log('Hovering over', model.getValueInRange({
             startLineNumber: position.lineNumber,

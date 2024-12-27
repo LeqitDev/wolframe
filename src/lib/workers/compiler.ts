@@ -33,26 +33,9 @@ function compile() {
         const svgs = compiler.compile(false);
         sendCompileResponse(svgs);
     } catch (e) {
-        const err = e as typst.CompileError[];
-        const ret = [] as App.Compiler.CompileErrorType[];
+        const err = (e as typst.Diagnostics[]).map((e) => e.to_json()) as typst.Diagnostics[];
 
-        for (const e of err) {
-            ret.push({
-                span: {
-                    file: e.get_root().get_file_path(),
-                    range: e.get_root().get_range(),
-                },
-                message: e.get_message(),
-                severity: e.get_severity(),
-                hints: e.get_hints(),
-                trace: e.get_trace().map((t) => ({
-                    file: t.get_file_path(),
-                    range: t.get_range(),
-                })),
-            });
-        }
-
-        sendCompileError(ret);
+        sendCompileError(err);
     }
 }
 
@@ -63,45 +46,15 @@ function edit(request: App.Compiler.EditRequest) {
 function completion(request: App.Compiler.CompletionRequest) {
     const completions = compiler.autocomplete(request.file, request.offset);
 
-    const items = completions.map((completion) => {
-        return {
-            label: completion.label(),
-            kind: {
-                kind: completion.kind().kind.toString(),
-                detail: completion.kind().detail
-            },
-            apply: completion.apply(),
-            detail: completion.detail(),
-        } as App.Compiler.CompletionItemType;
-    });
-
-    sendCompletionResponse(items);
+    sendCompletionResponse(completions.map((completion) => completion.to_json()));
 }
 
 function definition(request: App.Compiler.DefinitionRequest) {
-    let definition: typst.JsDefinition | App.Definition | undefined = compiler.definition(request.file, request.offset);
+    let definition: typst.Definition | undefined = compiler.definition(request.file, request.offset);
 
     if (definition) {
-        getUniLogger().info('worker/compiler', 'Definition found', definition.span().get_range(), definition.name_span().get_range());
-
-        definition = {
-            name: definition.name(),
-            span: {
-                range: [definition.span().get_range()[0], definition.span().get_range()[1]],
-            },
-            name_span: {
-                range: [definition.name_span().get_range()[0], definition.name_span().get_range()[1]],
-            },
-            kind: definition.kind().toString(),
-            docs: definition.value()?.docs(),
-            val_name: definition.value()?.name(),
-        } as App.Definition;
-
         getUniLogger().info('worker/compiler', 'Definition found', definition);
-        sendDefinitionResponse({
-            type: 'definition',
-            definition: definition,
-        });
+        sendDefinitionResponse(definition.to_json());
     } else {
         sendLoggerResponse('info', WASMSection, 'Definition not found');
     }
@@ -215,7 +168,7 @@ function sendError(message: string) {
     self.postMessage({ type: 'error', sub: 'default', error: message } as App.Compiler.DefaultErrorResponse);
 }
 
-function sendCompileError(errors: App.Compiler.CompileErrorType[]) {
+function sendCompileError(errors: typst.Diagnostics[]) {
     self.postMessage({ type: 'error', sub: 'compile', errors } as App.Compiler.CompileErrorResponse);
 }
 
@@ -223,12 +176,12 @@ function sendCompileResponse(svgs: string[]) {
     self.postMessage({ type: 'compile', svgs } as App.Compiler.CompileResponse);
 }
 
-function sendCompletionResponse(completions: App.Compiler.CompletionItemType[]) {
+function sendCompletionResponse(completions: typst.Completion[]) {
     self.postMessage({ type: 'completion', completions } as App.Compiler.CompletionResponse);
 }
 
-function sendDefinitionResponse(definition: App.Compiler.DefinitionResponse) {
-    self.postMessage(definition);
+function sendDefinitionResponse(definition: typst.Definition) {
+    self.postMessage({ type: 'definition', definition} as App.Compiler.DefinitionResponse);
 }
 
 function sendLoggerResponse(severity: 'error' | 'warn' | 'info', section: Sections, ...message: unknown[]) {
