@@ -16,25 +16,36 @@
 	import { getUniLogger, WorkerRendererSection } from '$lib/stores/logger.svelte';
 	import { convertRemToPixels } from '$lib/utils';
 	import { untrack } from 'svelte';
+	import { PlaygroundFileHandler } from '$lib/utils/playground';
+	import type monaco from '$lib/monaco/editor';
+	import { getController, type Controller } from '$lib/stores/controller.svelte';
 
 	// console.clear();
 
 	let { data }: { data: PageData } = $props();
-	const layoutStore = getLayoutStore(); // For Menu and things
-
-	let vfs = new VFS(data.initial_vfs);
+	//const layoutStore = getLayoutStore(); // For Menu and things
+	const controller: Controller = getController();
 
 	let compiler: CompilerWorkerBridge;
 	let renderer: PageRendererWorkerBridge;
 
 	let typstLanguage = new TypstLanguage();
 	let typstThemes = new TypstTheme();
-	let controller = $state({}) as App.Editor.Controller;
+	//let editor_controller = $state({}) as App.Editor.Controller;
 
 	let canvasContainer: HTMLDivElement;
 
 	let openPublishDialog = $state(false);
 	let previewScale = $state(1);
+	let initOk = false;
+	const waitForInit = new Promise<void>((resolve) => {
+		let interval = setInterval(() => {
+			if (initOk) {
+				clearInterval(interval);
+				resolve();
+			}
+		}, 100);
+	});
 
 	const projectState = initializePAS(data.project!.id, data.project_path);
 	const logger = getUniLogger();
@@ -60,6 +71,7 @@
 	});
 
 	function init() {
+		initOk = true;
 		initLayoutStore();
 		initRenderer();
 		initCompiler();
@@ -76,7 +88,7 @@
 		compiler.init('/main.typ');
 		compiler.addObserver({ onMessage: compilerCompileResult });
 		compiler.addObserver({ onMessage: compilerLogger });
-		vfs.entries.forEach((file) => {
+		controller.vfs.entries.forEach((file) => {
 			if (file.content === undefined) return;
 			compiler.add_file(file.path, file.content);
 		});
@@ -85,10 +97,10 @@
 	}
 
 	function initLayoutStore() {
-		layoutStore.setMenubarSnippet(menubar);
-		layoutStore.setSidebarActive('');
-		layoutStore.setSidebarPreview('');
-		layoutStore.setSidebarActions({
+		controller.setMenuSnippet(menubar);
+		controller.setActiveFile('');
+		controller.setPreviewFile('');
+		/* layoutStore.setSidebarActions({
 			onFileClick(file) {
 				openFile(file.path);
 			},
@@ -100,61 +112,23 @@
 				setPreview(file.path);
 			},
 			onFileDeleted(file) {
-				vfs.deleteFile(file.path);
-				controller.removeModel!(file.path);
+				vfs!.deleteFile(file.path);
+				editor_controller.removeModel!(file.path);
 				// TODO: Remove from compiler
-			},
-		});
+			}
+		}); */
 	}
-
-	$effect(() => untrack(() =>{
-		init();
-	}));
 
 	$effect(() => {
-		if (controller.addModel === undefined) return;
-		untrack(() => {
-			vfs.entries.forEach((file) => {
-				if (file.content === undefined) return;
-				controller.addModel!(file.content, file.path);
-			});
-
-			setPreview('/main.typ');
-			openFile('/main.typ');
-		})
-	});
-
-	function newFile(path: string, content: string) {
-		vfs.addFile(path, content);
-		controller.addModel!(content, path);
-		compiler.add_file(path, content);
-		compiler.compile();
-	}
-
-	function setPreview(path: string) {
-		layoutStore.setSidebarPreview(path);
-		compiler?.set_root(path);
-	}
-
-	function closeFile(path: string) {
-		let last = vfs.closeFile(path);
-		if (last) {
-			openFile(last);
-		} else {
-			controller.setModel!(null);
-			layoutStore.setSidebarActive('');
+		controller.registerLanguage(typstLanguage);
+		controller.registerTheme(typstThemes);
+		controller.eventListener.register('VFSInitialized', init);
+		return () => {
+			compiler?.dispose();
+			renderer?.dispose();
+			controller.eventListener.unregister('VFSInitialized', init);
 		}
-	}
-
-	function setActiveFile(path: string) {
-		controller.setModel!(path);
-		layoutStore.setSidebarActive(path);
-	}
-
-	function openFile(path: string) {
-		vfs.openFile(path);
-		setActiveFile(path);
-	}
+	});
 
 	function compilerLogger(message: App.Compiler.Response) {
 		if (message.type === 'error') {
@@ -214,7 +188,7 @@
 		}
 	}
 
-	function status(message: string, finished: boolean) {
+	/* function status(message: string, finished: boolean) {
 		if (finished) {
 			projectState.loadMessage = message;
 			projectState.loading = false;
@@ -222,7 +196,7 @@
 			projectState.loadMessage = message;
 			projectState.loading = true;
 		}
-	}
+	} */
 
 	function zoomPreview() {
 		canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
@@ -241,14 +215,21 @@
 
 	function canvasLoad(node: HTMLDivElement) {
 		$effect(() => {
-			node.style.gap = `${previewScale * convertRemToPixels(5)}px`;
-			node.style.padding = `${previewScale * convertRemToPixels(4)}px`;
-			
-			let styles = getComputedStyle(node);
+			async function init() {
+				await waitForInit;
+				node.style.gap = `${previewScale * convertRemToPixels(5)}px`;
+				node.style.padding = `${previewScale * convertRemToPixels(4)}px`;
 
-			let innerWidth = parseFloat(styles.width) - parseFloat(styles.paddingLeft) - parseFloat(styles.paddingRight);
+				let styles = getComputedStyle(node);
 
-			renderer?.update(-1, innerWidth);
+				let innerWidth =
+					parseFloat(styles.width) -
+					parseFloat(styles.paddingLeft) -
+					parseFloat(styles.paddingRight);
+
+				renderer?.update(-1, innerWidth);
+			}
+			init();
 
 			/* TODO: Provide option to lock size to window let resizeObserver = new ResizeObserver(() => {
 			});
@@ -258,7 +239,16 @@
 			return () => {
 				resizeObserver.disconnect();
 			}; */
-		})
+		});
+	}
+
+	function onDidChangeModelContent(
+		model: monaco.editor.ITextModel,
+		e: monaco.editor.IModelContentChangedEvent
+	) {
+		const content = model.getValue();
+		const path = model.uri.path;
+
 	}
 </script>
 
@@ -269,7 +259,7 @@
 		</div>
 		<h2 class="mb-4 text-center text-3xl font-bold">Oops! This Space Looks Empty</h2>
 		<p class="mb-8 max-w-md text-center text-muted-foreground">
-			Looks like your code took a break. Don't worry, <span class="italic underline">click</span> on
+			Looks like your code took a break. D on't worry, <span class="italic underline">click</span> on
 			a file on the left to get started or create a new file for all your
 			<span class="italic underline">amazing</span> ideas.
 		</p>
@@ -374,14 +364,14 @@
 	</Menubar.Root>
 {/snippet}
 
-{#if projectState.loading}
+{#if controller.loading.loading}
 	<div
 		class="absolute left-0 top-0 z-50 flex h-screen w-screen items-center justify-center bg-background"
 		transition:fade
 	>
 		<div class="flex flex-col items-center justify-center">
 			<LoaderCircle class="animate-spin" />
-			<p class="text-center">{projectState.loadMessage}...</p>
+			<p class="text-center">{controller.loading.message}...</p>
 			{#if projectState.flowerState.status === 'reconnecting'}
 				<p>Attempt {projectState.flowerState.reconnectingAttempts}</p>
 			{:else if projectState.flowerState.status === 'failed'}
@@ -401,41 +391,39 @@
 		class=""
 	>
 		<div class="flex h-full flex-col">
-			<div class={`flex ${vfs.openedFiles.length === 0 ? 'min-h-0' : 'min-h-10 border-b'}`}>
-				{#each vfs.openedFiles as file}
-					<Button
-						size="sm"
-						variant="outline"
-						class={`h-full rounded-none border-b-0 border-l-0 border-r text-sm ${controller.activeModelPath === file.path ? 'border-t-2 border-t-emerald-300 bg-accent' : ''}`}
-						onclick={() => {
-							let entry = vfs.entries.find((entry) => entry.path === file.path)!;
-							if (entry.open) {
-								setActiveFile(file.path);
-							}
-						}}
-					>
-						{file.display.name}
-						<span class="text-muted-foreground">
-							{#if file.display.prefix}
-								{file.display.prefix}
-							{/if}
-						</span>
-						<button
-							class="rounded-md p-0.5 hover:bg-slate-600"
+			<div class={`flex pl-2 ${controller.vfs.openedFiles.length === 0 ? 'min-h-0' : 'min-h-10 border-b'}`}>
+				{#if controller.vfs}
+					{#each controller.vfs.openedFiles as file}
+						<Button
+							size="sm"
+							variant="outline"
+							class={`h-full rounded-none border-b-0 border-l-0 border-r text-sm ${controller.editorModelUri === file.path ? 'border-t-2 border-t-emerald-300 bg-accent' : ''}`}
 							onclick={() => {
-								closeFile(file.path);
+								let entry = controller.vfs.entries.find((entry) => entry.path === file.path)!;
+								if (entry.open) {
+									controller.openFile(file.path);
+								}
 							}}
 						>
-							<X />
-						</button>
-					</Button>
-				{/each}
+							{file.display.name}
+							<span class="text-muted-foreground">
+								{#if file.display.prefix}
+									{file.display.prefix}
+								{/if}
+							</span>
+							<button
+								class="rounded-md p-0.5 hover:bg-slate-600"
+								onclick={() => {
+									controller.closeFile(file.path);
+								}}
+							>
+								<X />
+							</button>
+						</Button>
+					{/each}
+				{/if}
 			</div>
 			<Editor
-				languages={[typstLanguage]}
-				themes={[typstThemes]}
-				bind:editorController={controller}
-				{status}
 				children={emptyEditor}
 			/>
 		</div>

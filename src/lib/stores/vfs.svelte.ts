@@ -1,8 +1,10 @@
-class VFSEntry implements App.FileEntry {
+import { untrack } from "svelte";
+
+export class VFSEntry implements App.FileEntry {
 	path: string;
 	content: string;
 	open = $state(false);
-    mutated = $state(false);
+	mutated = $state(false);
 
 	constructor(path: string, content: string) {
 		this.path = path;
@@ -19,51 +21,59 @@ type OpenFileEntry = VFSEntry & {
 
 export class VFS {
 	entries: VFSEntry[] = $state([]);
-    openHistory: string[] = $state([]);
+	openHistory: string[] = $state([]);
+	fileSystem: App.VFS.FileSystem;
 
-	constructor(
-		initial_vfs?: {
-			filename: string;
-			content: string;
-		}[]
-	) {
-		initial_vfs?.forEach((file) => {
-			this.addFile(file.filename, file.content);
+	constructor(fileSystem: App.VFS.FileSystem) {
+		this.fileSystem = fileSystem;
+	}
+
+	async init() {
+		await this.fileSystem.init();
+		let files = await this.fileSystem.listFiles();
+		Object.entries(files).forEach(([path, content]) => {
+			this.addFile(path, content);
 		});
 	}
 
 	addFile(path: string, content: string) {
+		console.log('Adding file', path);
 		this.entries.push(new VFSEntry(path, content));
 	}
 
-    deleteFile(path: string) {
-        this.entries = this.entries.filter((entry) => entry.path !== path);
-    }
+	deleteFile(path: string) {
+		this.entries = this.entries.filter((entry) => entry.path !== path);
+	}
 
-    fileMutated(path: string) {
-        const entry = this.entries.find((entry) => entry.path === path);
-        if (entry === undefined) return;
-        entry.mutated = true;
-    }
+	fileMutated(path: string) {
+		const entry = this.entries.find((entry) => entry.path === path);
+		if (entry === undefined) return;
+		entry.mutated = true;
+	}
 
 	openFile(path: string) {
 		const entry = this.entries.find((entry) => entry.path === path);
 		if (entry === undefined) return;
 		entry.open = true;
-        this.openHistory = [path, ...this.openHistory.filter((p) => p !== path)];
+		this.openHistory = [path, ...this.openHistory.filter((p) => p !== path)];
 	}
 
-    closeFile(path: string) {
-        const entry = this.entries.find((entry) => entry.path === path);
-        if (entry === undefined) return;
-        entry.open = false;
-        this.openHistory = this.openHistory.filter((p) => p !== path);
-        return this.openHistory[0];
-    }
+	closeFile(path: string) {
+		const entry = this.entries.find((entry) => entry.path === path);
+		if (entry === undefined) return;
+		entry.open = false;
+		this.openHistory = this.openHistory.filter((p) => p !== path);
+		return this.openHistory[0];
+	}
+
+	getMainFile() {
+		return untrack(() => {
+			return this.entries.find((entry) => entry.path === '/main.typ') ?? (this.entries.find((entry) => entry.path === '/lib.typ') ?? this.entries.at(0));
+		})
+	}
 
 	get openedFiles() {
 		let openFiles: OpenFileEntry[] = [];
-        
 
 		// 1. Collect opened entries
 		const openedEntries = this.entries.filter((entry) => entry.open);

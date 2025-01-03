@@ -17,16 +17,22 @@
 	import { tick, untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import { flip } from 'svelte/animate';
+	import { getController } from '$lib/stores/controller.svelte';
+	import type { VFSEntry } from '$lib/stores/vfs.svelte';
+
+	function isFolder (node: SidebarNode): node is SidebarFolder {
+		return (node as SidebarFolder).isFolder;
+	}
 
 	class HoverQueue {
-		queue: { item: App.Sidebar.FileSystemNode; isDir: boolean }[] = $state([]);
-		freezedHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null);
+		queue: { item: SidebarNode; isDir: boolean }[] = $state([]);
+		freezedHovered: null | { item: SidebarNode; isDir: boolean } = $state(null);
 
-		add(item: App.Sidebar.FileSystemNode, isDir: boolean) {
+		add(item: SidebarNode, isDir: boolean) {
 			this.queue.push({ item, isDir });
 		}
 
-		remove(item: App.Sidebar.FileSystemNode) {
+		remove(item: SidebarNode) {
 			this.queue = this.queue.filter((i) => i.item !== item);
 		}
 
@@ -58,39 +64,17 @@
 		}
 	];
 
-	let {
-		pdata,
-		activeFile = $bindable(),
-		previewFile = $bindable(),
-		debug = false,
-		onFileClick = () => {},
-		onNodeMoved = () => {},
-		onNewFile = () => {},
-		onNewDir = () => {},
-		onFileDeleted = () => {},
-		onDirDeleted = () => {},
-		onPreviewFileChange = () => {}
-	}: {
-		pdata: any;
-		activeFile: string;
-		previewFile: string;
-		debug?: boolean;
-		onFileClick?: (file: App.Sidebar.FileMetadata) => void;
-		onNodeMoved?: (node: App.Sidebar.FileSystemNode, prev_path: string) => void;
-		onNewFile?: (file: App.Sidebar.FileMetadata) => void;
-		onNewDir?: (dir: App.Sidebar.FileSystemFolder) => void;
-		onFileDeleted?: (file: App.Sidebar.FileMetadata) => void;
-		onDirDeleted?: (dir: App.Sidebar.FileSystemFolder) => void;
-		onPreviewFileChange?: (file: App.Sidebar.FileMetadata) => void;
-	} = $props();
+	const controller = getController();
 
-	let data: { tree: App.Sidebar.FileSystemFolder } = $state({
-		tree: parsePageData(pdata)
-	});
+	type SidebarFolder = App.VFS.Sidebar.Folder;
+	type SidebarFile = App.VFS.Sidebar.File;
+	type SidebarNode = App.VFS.Sidebar.Node;
+
+	let data: { tree?: SidebarFolder, root?: string, name?: string } = $state({});
 
 	let dragState: {
-		dragged: App.Sidebar.FileSystemNode | null;
-		targets: SvelteSet<App.Sidebar.FileSystemFolder>;
+		dragged: SidebarNode | null;
+		targets: SvelteSet<SidebarFolder>;
 		hoverTimer: number;
 	} = $state({
 		dragged: null,
@@ -101,7 +85,7 @@
 	let dragTarget = $derived.by(() => {
 		// highest depth folder in dragState.targets
 		let maxDepth = -1;
-		let target: App.Sidebar.FileSystemFolder | null = null;
+		let target: SidebarFolder | null = null;
 		let targets = dragState.targets;
 
 		if (dragState.targets.size === 0) return null;
@@ -119,13 +103,13 @@
 		return dragState.dragged && dragTarget && validateDragTarget(dragState.dragged, dragTarget);
 	});
 
-	function validateDragTarget(dragged: App.Sidebar.FileSystemNode, target: App.Sidebar.FileSystemFolder): boolean {
+	function validateDragTarget(dragged: SidebarNode, target: SidebarNode): boolean {
 		// Prevent dragging into own children or self
-		return !(dragged.path === target.path && dragged.type === target.type);
+		return !(dragged.path === target.path && isFolder(dragged) === isFolder(target));
 	}
 
 	let projectAvatar = createAvatar(initials, {
-		seed: pdata.project.name,
+		seed: 'Playground', //Dynamic
 		radius: 5
 	}).toDataUri();
 
@@ -138,8 +122,8 @@
 	let hoverQueue = new HoverQueue();
 	let reloadedStaticHovered = $state(true);
 	let contextMenuVisibility = $state(false);
-	/* let currentHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null);
-	let staticHovered: null | { item: App.Sidebar.FileSystemNode; isDir: boolean } = $state(null); */
+	/* let currentHovered: null | { item: App.VFS.Sidebar.FileSystemNode; isDir: boolean } = $state(null);
+	let staticHovered: null | { item: App.VFS.Sidebar.FileSystemNode; isDir: boolean } = $state(null); */
 
 	/* $effect(() => {
 		if (!contextMenuVisibility) {
@@ -147,7 +131,7 @@
 		}
 	}); */
 
-	function fileSystemFileToFileMetadata(file: App.Sidebar.FileSystemFile): App.Sidebar.FileMetadata {
+	function fileSystemFileToFileMetadata(file: App.VFS.Sidebar.FileSystemFile): App.VFS.Sidebar.FileMetadata {
 		return {
 			filename: file.name,
 			mimetype: file.mimetype,
@@ -158,8 +142,89 @@
 		};
 	}
 
-	function parsePageData(data: { files: App.Sidebar.FileMetadata[]; project_path: string }) {
-		const root: App.Sidebar.FileSystemNode = {
+	function getFilename(entry: VFSEntry | SidebarFolder): string {
+		return entry.path.split('/').pop() || '';
+	}
+
+	function parseVFS(): SidebarFolder {
+		const root: SidebarFolder = {
+			name: '/',
+			isFolder: true,
+			children: [],
+			depth: 0,
+			open: true,
+			path: controller.root
+		};
+
+		const entries = controller.vfs.entries;
+		const filesByDirectory: Map<string, VFSEntry[]> = new Map();
+		entries.forEach((file) => {
+			const dirPath = file.path.split('/').slice(0, -1).join('/');
+			if (!filesByDirectory.has(dirPath)) {
+				filesByDirectory.set(dirPath, []);
+			}
+			filesByDirectory.get(dirPath)?.push(file);
+		});
+
+		const buildDirectoryTree = (basePath: string, parentNode: SidebarFolder) => {
+			if (!parentNode.isFolder) return;
+
+			controller.vfs.entries.filter(
+				(f) =>
+					f.path.startsWith(basePath) &&
+					f.path.split('/').filter((p) => p).length ===
+						basePath.split('/').filter((p) => p).length + 1
+			).forEach((file) => {
+				parentNode.children.push({...file, name: getFilename(file)});
+			});
+
+			// Find subdirectories
+			const subdirs = new Set(
+				controller.vfs.entries
+					.filter(
+						(f) =>
+							f.path.startsWith(basePath) &&
+							f.path !== basePath &&
+							f.path.split('/').filter((p) => p).length >
+								basePath.split('/').filter((p) => p).length + 1
+					)
+					.map(
+						(f) => f.path.split('/').filter((p) => p)[basePath.split('/').filter((p) => p).length]
+					)
+			);
+
+			subdirs.forEach((subdir) => {
+				const fullSubdirPath = `${basePath}/${subdir}`;
+				const dirNode: SidebarFolder = {
+					name: getFilename({ path: fullSubdirPath } as VFSEntry),
+					isFolder: true,
+					depth: parentNode.depth + 1,
+					children: [],
+					path: fullSubdirPath,
+					open: false
+				};
+				parentNode.children.push(dirNode);
+				buildDirectoryTree(fullSubdirPath, dirNode);
+			});
+
+			parentNode.children.sort((a, b) => {
+				const isADir = isFolder(a);
+				const isBDir = isFolder(b);
+
+				if (isADir && !isBDir) return -1;
+				if (!isADir && isBDir) return 1;
+
+				return a.path.localeCompare(b.path);
+			});
+		};
+
+		buildDirectoryTree(controller.root, root);
+
+		return root;
+	}
+
+	function parsePageData(data: { files: App.VFS.Sidebar.FileMetadata[]; project_path: string }) {
+		const root: App.VFS.Sidebar.FileSystemNode = {
 			name: data.project_path.split('/').pop() || '',
 			type: 'directory',
 			children: [],
@@ -168,7 +233,7 @@
 			path: data.project_path.substring(0, data.project_path.length)
 		};
 
-		const filesByDirectory: Map<string, App.Sidebar.FileMetadata[]> = new Map();
+		const filesByDirectory: Map<string, App.VFS.Sidebar.FileMetadata[]> = new Map();
 		data.files.forEach((file) => {
 			const dirPath = file.path.replace(file.filename, '').trim();
 			if (!filesByDirectory.has(dirPath)) {
@@ -177,7 +242,7 @@
 			filesByDirectory.get(dirPath)?.push(file);
 		});
 
-		const buildDirectoryTree = (basePath: string, parentNode: App.Sidebar.FileSystemNode) => {
+		const buildDirectoryTree = (basePath: string, parentNode: App.VFS.Sidebar.FileSystemNode) => {
 			if (parentNode.type === 'file') return;
 
 			const directFiles = data.files.filter(
@@ -188,7 +253,7 @@
 			);
 
 			directFiles.forEach((file) => {
-				const fileNode: App.Sidebar.FileSystemNode = {
+				const fileNode: App.VFS.Sidebar.FileSystemNode = {
 					name: file.filename,
 					type: 'file',
 					size: file.size,
@@ -217,7 +282,7 @@
 
 			subdirs.forEach((subdir) => {
 				const fullSubdirPath = `${basePath}/${subdir}`;
-				const dirNode: App.Sidebar.FileSystemNode = {
+				const dirNode: App.VFS.Sidebar.FileSystemNode = {
 					name: subdir,
 					type: 'directory',
 					depth: parentNode.depth + 1,
@@ -246,22 +311,21 @@
 	}
 
 	// Function to recursively find and remove the item
-	function findAndRemoveItem(tree: App.Sidebar.FileSystemNode, delitem: App.Sidebar.FileSystemNode): App.Sidebar.FileSystemNode | null {
-		let removedItem: App.Sidebar.FileSystemNode | null = null;
+	function findAndRemoveItem(tree: SidebarNode, delitem: SidebarNode): SidebarNode | null {
+		let removedItem: SidebarNode | null = null;
 		
-
-		if (tree.type === 'directory') {
+		if (isFolder(tree)) {
 			for (let i = 0; i < tree.children.length; i++) {
 				const item = tree.children[i];
 				
 
 				// If it's a file and matches the path and type, remove it
-				if (item.path === delitem.path && item.type === delitem.type) {
+				if (item.path === delitem.path && isFolder(item) === isFolder(delitem)) {
 					return tree.children.splice(i, 1)[0];
 				}
 
 				// If it's a directory, recursively search only if the path is a prefix
-				if (item.type === 'directory' && delitem.path.startsWith(item.path)) {
+				if (isFolder(item) && delitem.path.startsWith(item.path)) {
 					const removedItem = findAndRemoveItem(item, delitem);
 					/* if (item.children.length === 0) { If we want to remove empty dirs
 						tree.children.splice(i, 1);
@@ -275,7 +339,7 @@
 	}
 
 	// Function to insert item into the correct folder
-	function insertItemInFolder(tree: App.Sidebar.FileSystemNode, folder: App.Sidebar.FileSystemNode, item: App.Sidebar.FileSystemNode) {
+	function insertItemInFolder(tree: SidebarNode, folder: SidebarNode, item: SidebarNode) {
 		if (item.path === folder.path) {
 			console.error('Cannot insert item into itself');
 			return;
@@ -284,39 +348,41 @@
 		const parts = item.path.replace(tree.path, '').split('/').filter(Boolean);
 		let current = tree;
 
-		if (current.type === 'directory') {
+		if (isFolder(current)) {
 			for (const part of parts.slice(0, -1)) {
-				const dir: App.Sidebar.FileSystemNode | undefined = current.children.find(
-					(child) => child.name === part
+				current = current as SidebarFolder;
+				const dir: SidebarNode | undefined = current.children.find(
+					(child) => getFilename(child) === part
 				);
 
-				if (!dir || dir.type !== 'directory') {
+				if (!dir || !isFolder(dir)) {
 					console.error('Directory not found');
 					return;
 				}
 
 				current = dir;
 			}
+			current = current as SidebarFolder;
 
 			current.children.push(item);
 
 			// Sort the children
 			current.children.sort((a, b) => {
-				const isADir = a.type === 'directory';
-				const isBDir = b.type === 'directory';
+				const isADir = isFolder(a);
+				const isBDir = isFolder(b);
 
 				if (isADir && !isBDir) return -1;
 				if (!isADir && isBDir) return 1;
 
-				return a.name.localeCompare(b.name);
+				return a.path.localeCompare(b.path);
 			});
 		}
 	}
 
 	function moveItemInTree(
-		tree: App.Sidebar.FileSystemNode,
-		curFolder: App.Sidebar.FileSystemNode,
-		curDragged: App.Sidebar.FileSystemNode
+		tree: SidebarNode,
+		curFolder: SidebarNode,
+		curDragged: SidebarNode
 	) {
 		// Remove the item from its current location
 		const removedItem = findAndRemoveItem(tree, curDragged);
@@ -327,20 +393,20 @@
 		}
 
 		// Update the path of the dragged item
-		const newPath = `${curFolder.path}/${curDragged.name}`;
+		const newPath = `${curFolder.path}/${getFilename(curDragged)}`;
 		const prevPath = removedItem.path;
 		
-		if (previewFile === prevPath) {
-			previewFile = newPath;
+		if (controller.previewFile === prevPath) {
+			controller.previewFile = newPath;
 		}
 
-		if (activeFile === prevPath) {
-			activeFile = newPath;
+		if (controller.activeFile === prevPath) {
+			controller.activeFile = newPath;
 		}
 
 		removedItem.path = newPath;
 
-		onNodeMoved(removedItem, prevPath);
+		controller.eventListener.fire('sidebarNodeMoved', {node: removedItem, prev_path: prevPath});
 
 		// Insert the item into the new location
 		insertItemInFolder(tree, curFolder, removedItem);
@@ -354,16 +420,14 @@
 		if (hovered && hovered.isDir) {
 			const newFile = {
 				name: '',
-				type: 'file',
 				new: true,
-				mimetype: 'plain/text',
-				size: 0,
-				lastModified: new Date(),
-				etag: '',
+				mutated: false,
+				open: false,
+				content: '',
 				path: hovered.item.path + '...'
-			} as App.Sidebar.FileSystemNode;
+			} as SidebarFile;
 
-			insertItemInFolder(data.tree, hovered.item as App.Sidebar.FileSystemNode, newFile);
+			insertItemInFolder(data.tree!, hovered.item, newFile);
 			setTimeout(() => {
 				let newFileFocus = document.getElementById('newFileFocus');
 
@@ -374,16 +438,16 @@
 		}
 	}
 
-	function finalizeNewFile(e: FocusEvent | KeyboardEvent, item: App.Sidebar.FileSystemNode) {
+	function finalizeNewFile(e: FocusEvent | KeyboardEvent, item: SidebarNode) {
 		if (e.type === 'keypress' && (e as KeyboardEvent).key !== 'Enter' || !item.new) return;
 		if (item.name === '') {
-			findAndRemoveItem(data.tree, item);
+			findAndRemoveItem(data.tree!, item);
 		} else {
 			item.path = item.path.substring(0, item.path.length - 3) + item.name;
 			console.log('New file:', $state.snapshot(item));
 			
 			// TODO: New file callback
-			onNewFile(fileSystemFileToFileMetadata(item as App.Sidebar.FileSystemFile));
+			controller.eventListener.fire('sidebarNewFile', {file: item as SidebarFile});
 			item.new = false;
 		}
 	}
@@ -392,24 +456,23 @@
 		let hovered = hoverQueue.freezedHovered;
 
 		if (hovered && hovered.isDir) {
-			hovered.item = hovered.item as App.Sidebar.FileSystemNode;
 			console.log(hovered.item.path);
 
-			if (hovered.item.type === 'file') {
+			if (!isFolder(hovered.item)) {
 				console.error('Cannot create a directory inside a file');
 				return;
 			}
 
 			const newDir = {
 				name: '',
-				type: 'directory',
+				isFolder: true,
 				new: true,
 				children: [],
 				open: false,
 				depth: hovered.item.depth + 1,
 				path: hovered.item.path + '/...'
-			} as App.Sidebar.FileSystemFolder;
-			insertItemInFolder(data.tree, hovered.item, newDir);
+			} as SidebarFolder;
+			insertItemInFolder(data.tree!, hovered.item, newDir);
 
 			setTimeout(() => {
 				let newDirFocus = document.getElementById('newDirFocus');
@@ -421,20 +484,20 @@
 		}
 	}
 
-	function finalizeNewDir(e: FocusEvent | KeyboardEvent, item: App.Sidebar.FileSystemNode) {
+	function finalizeNewDir(e: FocusEvent | KeyboardEvent, item: SidebarNode) {
 		if (e.type === 'keypress' && (e as KeyboardEvent).key !== 'Enter') return;
 		if (item.name === '') {
-			findAndRemoveItem(data.tree, item);
+			findAndRemoveItem(data.tree!, item);
 		} else {
 			item.path = item.path.substring(0, item.path.length - 3) + item.name;
-			onNewDir(item as App.Sidebar.FileSystemFolder);
+			controller.eventListener.fire('sidebarNewDir', {dir: item as SidebarFolder});
 			item.new = false;
 		}
 	}
 
-	function forEachTreeNode(tree: App.Sidebar.FileSystemNode, callback: (node: App.Sidebar.FileSystemNode) => boolean) {
+	function forEachTreeNode(tree: SidebarNode, callback: (node: SidebarNode) => boolean) {
 		let terminate = false;
-		if (tree.type === 'directory') {
+		if (isFolder(tree)) {
 			tree.children.forEach((child) => {
 				terminate = callback(child);
 				if (!terminate) forEachTreeNode(child, callback);
@@ -461,7 +524,7 @@
 			}
 
 			// Move file (inside tree)
-			moveItemInTree(data.tree, dragTarget!, dragState.dragged!);
+			moveItemInTree(data.tree!, dragTarget!, dragState.dragged!);
 
 			// TODO: Move file callback
 
@@ -475,12 +538,12 @@
 		dragState.targets.clear();
 	}
 
-	function dragStart(e: DragEvent, item: App.Sidebar.FileSystemNode) {
+	function dragStart(e: DragEvent, item: SidebarNode) {
 		dragState.dragged = item;
 		e.dataTransfer?.setData('text/plain', item.path);
 	}
 
-	function dragOverFolder(e: DragEvent, folder: App.Sidebar.FileSystemFolder) {
+	function dragOverFolder(e: DragEvent, folder: SidebarFolder) {
 		e.preventDefault();
 		if (dragState.dragged) {
 			dragState.targets.add(folder);
@@ -492,15 +555,23 @@
 
 		if (hovered) {
 			const item = hovered.item;
-			const removedItem = findAndRemoveItem(data.tree, item);
+			const removedItem = findAndRemoveItem(data.tree!, item);
 
-			if (item.type === 'file') {
-				onFileDeleted(fileSystemFileToFileMetadata(removedItem as App.Sidebar.FileSystemFile));
+			if (!isFolder(item)) {
+				controller.eventListener.fire('sidebarFileDeleted', {file: removedItem as SidebarFile});
 			} else {
-				onDirDeleted(removedItem as App.Sidebar.FileSystemFolder);
+				controller.eventListener.fire('sidebarDirDeleted', {dir: removedItem as SidebarFolder});
 			}
 		}
 	}
+
+	$effect(() => {
+		data = {
+			name: controller.name,
+			root: controller.root,
+			tree: parseVFS()
+		}
+	})
 </script>
 
 <Sidebar.Root collapsible="icon">
@@ -514,7 +585,7 @@
 						class="size-8 rounded-md"
 					/>
 					<span class="text-lg font-bold"
-						>{pdata.project.name}</span
+						>{controller.name}</span
 					>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
@@ -535,17 +606,17 @@
 					<Sidebar.GroupContent class="h-full">
 						<Sidebar.Menu
 							onmouseenter={() => {
-								hoverQueue.add(data.tree, true);
+								hoverQueue.add(data.tree!, true);
 							}}
 							onmouseleave={() => {
-								hoverQueue.remove(data.tree);
+								hoverQueue.remove(data.tree!);
 							}}
-							ondragover={(e) => dragOverFolder(e, data.tree)}
+							ondragover={(e) => dragOverFolder(e, data.tree!)}
 							ondrop={drop}
 							ondragend={dragEnd}
-							class={`h-full gap-0 ${dragTarget?.path === pdata.project_path ? 'bg-sidebar-accent' : ''}`}
+							class={`h-full gap-0 ${dragTarget?.path === '/' ? 'bg-sidebar-accent' : ''}`}
 						>
-							{#if data.tree.children}
+							{#if data.tree?.children}
 								{#each data.tree.children as child, index (index)}
 									{@render Tree({ item: child })}
 								{/each}
@@ -561,25 +632,25 @@
 						{#if cur.isDir}
 							<ContextMenu.Item onclick={addFile}>New file...</ContextMenu.Item>
 							<ContextMenu.Item onclick={addDir}>New folder...</ContextMenu.Item>
-							{#if !cur.isDir || cur.item.path !== data.tree.path}
+							{#if !cur.isDir || cur.item.path !== data.tree!.path}
 								<ContextMenu.Separator />
 							{/if}
 						{/if}
-						{#if cur.item.path !== data.tree.path}
+						{#if cur.item.path !== data.tree!.path}
 							<ContextMenu.Item onclick={deleteNode}>Delete {!cur.isDir ? 'File' : 'Folder'}</ContextMenu.Item>
 						{/if}
 						{#if !cur.isDir && cur.item.path.endsWith('.typ')}
-							<ContextMenu.CheckboxItem checked={cur.item.path === previewFile} onCheckedChange={(checked) => {
+							<ContextMenu.CheckboxItem checked={cur.item.path === controller.previewFile} onCheckedChange={(checked) => {
 								if (checked) {
-									onPreviewFileChange(fileSystemFileToFileMetadata(cur.item as App.Sidebar.FileSystemFile));
-									previewFile = cur.item.path;
+									controller.eventListener.fire('sidebarPreviewFileChange', {file: cur.item as any});
+									controller.previewFile = cur.item.path;
 								}
 							}}>
 								Preview This File
 							</ContextMenu.CheckboxItem>
 						{/if}
 					{/if}
-					{#if debug}
+					{#if controller.debug}
 						<ContextMenu.Separator />
 						<ContextMenu.Item
 							onclick={() => {
@@ -617,11 +688,11 @@
 {/snippet}
 
 <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
-{#snippet Tree({ item }: { item: App.Sidebar.FileSystemNode })}
-	{#if item.type === 'file'}
+{#snippet Tree({ item }: { item: SidebarNode })}
+	{#if !isFolder(item)}
 		{#if item.new}
 			<Sidebar.MenuButton
-				isActive={item.path === activeFile}
+				isActive={item.path === controller.activeFile}
 				class="from-emerald-500/20 to-cyan-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:font-semibold"
 			>
 				<File />
@@ -635,7 +706,7 @@
 			</Sidebar.MenuButton>
 		{:else}
 			<Sidebar.MenuButton
-				isActive={item.path === activeFile}
+				isActive={item.path === controller.activeFile}
 				class="relative select-none rounded-none from-emerald-500/20 to-cyan-500/20 data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold"
 				style="-webkit-user-drag: element;"
 				onmouseenter={() => {
@@ -646,10 +717,12 @@
 				}}
 				draggable="true"
 				ondragstart={(e) => dragStart(e, item)}
-				onclick={() => onFileClick(fileSystemFileToFileMetadata(item as App.Sidebar.FileSystemFile))}
-				tooltipContent={item.path === previewFile ? previewing : undefined}
+				onclick={() => {
+					controller.eventListener.fire('sidebarFileClick', {file: item});
+					}}
+				tooltipContent={item.path === controller.previewFile ? previewing : undefined}
 			>
-				{#if item.path === previewFile}
+				{#if item.path === controller.previewFile}
 					<div class="absolute left-0 top-0 h-full w-1 bg-emerald-400"></div>
 				{/if}
 				<File />

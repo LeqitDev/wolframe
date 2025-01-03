@@ -31,6 +31,10 @@ export abstract class WorkerBridge<Req, Res> {
             callback(event.data);
         };
     }
+
+    dispose() {
+        this.worker.terminate();
+    }
 }
 
 export abstract class MessageHandler<Res> {

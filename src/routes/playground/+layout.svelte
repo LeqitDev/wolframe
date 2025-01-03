@@ -3,19 +3,28 @@
 	import AppSidebar from '$lib/components/project-sidebar.svelte';
 	import * as Menubar from '$lib/components/ui/menubar/index.js';
 	import type { PageData } from './$types';
-	import { createLayoutStore } from '$lib/stores/layoutStore.svelte';
+	import { initializeController, type Controller } from '$lib/stores/controller.svelte';
+	import { PlaygroundFileHandler } from '$lib/utils/playground';
 
 	let { children, data }: { children: any; data: PageData } = $props();
 
-	const store = createLayoutStore();
+	const store: Controller = initializeController(new PlaygroundFileHandler());
+	let storeLoaded = $state(false);
+
+	$effect(()=> {
+		store.init();
+		storeLoaded = true;
+	});
 </script>
 
 <Sidebar.Provider open={false}>
-	<AppSidebar {...store.sidebarActions} pdata={data} debug bind:previewFile={store.sidebarPreview} bind:activeFile={store.sidebarActive} />
+	<AppSidebar />
 	<main class="flex h-screen w-screen flex-col overflow-hidden">
 		<div class="flex gap-2 p-2">
-			{#if store.menubarSnippet}
-				{@render store.menubarSnippet()}
+			{#if storeLoaded}
+				{#if store.menuSnippet}
+					{@render store.menuSnippet()}
+				{/if}
 			{/if}
 		</div>
 		{@render children()}
