@@ -406,7 +406,7 @@
 
 		removedItem.path = newPath;
 
-		controller.eventListener.fire('sidebarNodeMoved', {node: removedItem, prev_path: prevPath});
+		controller.eventListener.fire('onSidebarNodeMoved', removedItem, prevPath);
 
 		// Insert the item into the new location
 		insertItemInFolder(tree, curFolder, removedItem);
@@ -447,7 +447,7 @@
 			console.log('New file:', $state.snapshot(item));
 			
 			// TODO: New file callback
-			controller.eventListener.fire('sidebarNewFile', {file: item as SidebarFile});
+			controller.eventListener.fire('onSidebarNewFile', item as SidebarFile);
 			item.new = false;
 		}
 	}
@@ -490,7 +490,7 @@
 			findAndRemoveItem(data.tree!, item);
 		} else {
 			item.path = item.path.substring(0, item.path.length - 3) + item.name;
-			controller.eventListener.fire('sidebarNewDir', {dir: item as SidebarFolder});
+			controller.eventListener.fire('onSidebarNewDir', item as SidebarFolder);
 			item.new = false;
 		}
 	}
@@ -558,9 +558,9 @@
 			const removedItem = findAndRemoveItem(data.tree!, item);
 
 			if (!isFolder(item)) {
-				controller.eventListener.fire('sidebarFileDeleted', {file: removedItem as SidebarFile});
+				controller.eventListener.fire('onSidebarFileDeleted', removedItem as SidebarFile);
 			} else {
-				controller.eventListener.fire('sidebarDirDeleted', {dir: removedItem as SidebarFolder});
+				controller.eventListener.fire('onSidebarDirDeleted', removedItem as SidebarFolder);
 			}
 		}
 	}
@@ -642,7 +642,7 @@
 						{#if !cur.isDir && cur.item.path.endsWith('.typ')}
 							<ContextMenu.CheckboxItem checked={cur.item.path === controller.previewFile} onCheckedChange={(checked) => {
 								if (checked) {
-									controller.eventListener.fire('sidebarPreviewFileChange', {file: cur.item as any});
+									controller.eventListener.fire('onSidebarPreviewFileChange', cur.item as SidebarFile);
 									controller.previewFile = cur.item.path;
 								}
 							}}>
@@ -718,7 +718,7 @@
 				draggable="true"
 				ondragstart={(e) => dragStart(e, item)}
 				onclick={() => {
-					controller.eventListener.fire('sidebarFileClick', {file: item});
+					controller.eventListener.fire('onSidebarFileClick', item);
 					}}
 				tooltipContent={item.path === controller.previewFile ? previewing : undefined}
 			>

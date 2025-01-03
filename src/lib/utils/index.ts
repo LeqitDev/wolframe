@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
+import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
 
 export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
@@ -29,42 +30,53 @@ export { PreviewDragger } from "./previewDragging";
 	sidebarDirDeleted(dir: App.VFS.Sidebar.FileSystemFolder) {}
 	sidebarPreviewFileChange(file: App.VFS.Sidebar.FileMetadata) {} */
 
+interface SidebarEvents {
+	"onSidebarFileClick": [file: App.VFS.Sidebar.File],
+	"onSidebarNodeMoved": [node: App.VFS.Sidebar.Node, prev_path: string],
+	"onSidebarNewFile": [file: App.VFS.Sidebar.File],
+	"onSidebarNewDir": [dir: App.VFS.Sidebar.Folder],
+	"onSidebarFileDeleted": [file: App.VFS.Sidebar.File],
+	"onSidebarDirDeleted": [dir: App.VFS.Sidebar.Folder],
+	"onSidebarPreviewFileChange": [file: App.VFS.Sidebar.File]
+};
 
-type onSidebarFileClick = {name: 'sidebarFileClick', args: {file: App.VFS.Sidebar.File}};
-type onSidebarNodeMoved = {name: 'sidebarNodeMoved', args: {node: App.VFS.Sidebar.Node, prev_path: string}};
-type onSidebarNewFile = {name: 'sidebarNewFile', args: {file: App.VFS.Sidebar.File}};
-type onSidebarNewDir = {name: 'sidebarNewDir', args: {dir: App.VFS.Sidebar.Folder}};
-type onSidebarFileDeleted = {name: 'sidebarFileDeleted', args: {file: App.VFS.Sidebar.File}};
-type onSidebarDirDeleted = {name: 'sidebarDirDeleted', args: {dir: App.VFS.Sidebar.Folder}};
-type onSidebarPreviewFileChange = {name: 'sidebarPreviewFileChange', args: {file: App.VFS.Sidebar.File}};
+interface EditorEvents {
+	"onMonacoInitialized": [];
+	"onEditorInitialized": [];
+	"onDidChangeModelContent": [
+		model: Monaco.editor.ITextModel,
+		e: Monaco.editor.IModelContentChangedEvent
+	];
+};
 
-type SidebarEvents = onSidebarFileClick | onSidebarNodeMoved | onSidebarNewFile | onSidebarNewDir | onSidebarFileDeleted | onSidebarDirDeleted | onSidebarPreviewFileChange;
-
-type onVFSInitialized = {name: 'VFSInitialized', args: {}};
-type onMonacoInitialized = {name: 'monacoInitialized', args: {}};
-type onEditorInitialized = {name: 'editorInitialized', args: {}};
-
-type ControllerEvents = SidebarEvents | onVFSInitialized | onMonacoInitialized | onEditorInitialized;
+type ControllerEvents = SidebarEvents & EditorEvents & {
+	"onVFSInitialized": [];
+};
 
 export class EventController {
-	private listeners: Map<string, Set<Function>> = new Map();
+    private listeners = new Map<keyof ControllerEvents, Set<(...args: any[]) => void>>();
 
-	constructor() {}
+    public register<E extends keyof ControllerEvents>(event: E, callback: (...args: ControllerEvents[E]) => void): void {
+        if (!this.listeners.has(event)) {
+            this.listeners.set(event, new Set());
+        }
+        this.listeners.get(event)!.add(callback);
+    }
 
-	register(event: ControllerEvents['name'], listener: (args: ControllerEvents['args']) => void) {
-		if (!this.listeners.has(event)) {
-			this.listeners.set(event, new Set());
-		}
-		this.listeners.get(event)!.add(listener);
-	}
+    public unregister<E extends keyof ControllerEvents>(event: E, callback: (...args: ControllerEvents[E]) => void): void {
+        if (this.listeners.has(event)) {
+            this.listeners.get(event)!.delete(callback);
+            if (this.listeners.get(event)!.size === 0) {
+                this.listeners.delete(event);
+            }
+        }
+    }
 
-	unregister(event: ControllerEvents['name'], listener: (args: ControllerEvents['args']) => void) {
-		if (!this.listeners.has(event)) return;
-		this.listeners.get(event)!.delete(listener);
-	}
-
-	fire(event: ControllerEvents['name'], args?: ControllerEvents['args']) {
-		if (!this.listeners.has(event)) return;
-		this.listeners.get(event)!.forEach((listener) => listener(args));
-	}
+    public fire<E extends keyof ControllerEvents>(event: E, ...args: ControllerEvents[E]): void {
+        if (this.listeners.has(event)) {
+            for (const callback of this.listeners.get(event)!) {
+                callback(...args);
+            }
+        }
+    }
 }

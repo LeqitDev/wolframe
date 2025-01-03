@@ -1,4 +1,4 @@
-import { getAllContexts, getContext, setContext, type Snippet } from 'svelte';
+import { getContext, setContext, type Snippet } from 'svelte';
 import { VFS } from './vfs.svelte';
 import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import { getUniLogger } from './logger.svelte';
@@ -16,14 +16,6 @@ class Controller {
 	setActiveFile(file: string) {
 		this.activeFile = file;
 	}
-
-	sidebarFileClick(file: App.VFS.Sidebar.FileMetadata) {}
-	sidebarNodeMoved(node: App.VFS.Sidebar.FileSystemNode, prev_path: string) {}
-	sidebarNewFile(file: App.VFS.Sidebar.FileMetadata) {}
-	sidebarNewDir(dir: App.VFS.Sidebar.FileSystemFolder) {}
-	sidebarFileDeleted(file: App.VFS.Sidebar.FileMetadata) {}
-	sidebarDirDeleted(dir: App.VFS.Sidebar.FileSystemFolder) {}
-	sidebarPreviewFileChange(file: App.VFS.Sidebar.FileMetadata) {}
 
 	// VFS
 	vfs: VFS;
@@ -93,13 +85,13 @@ class Controller {
         });
         this.status('Models loaded. Setting main file');
 
-        let mainFile = this.vfs.getMainFile();
+        const mainFile = this.vfs.getMainFile();
         if (mainFile) {
             this.openFile(mainFile.path);
         } else {
             this.setModel(null);
         }
-        this.eventListener.fire('editorInitialized');
+        this.eventListener.fire('onEditorInitialized');
         this.status('Initialization complete', true);
 	}
 
@@ -117,6 +109,7 @@ class Controller {
         const model = this.monaco.editor.createModel(value, language, monacoUri);
 
         model.onDidChangeContent((e) => {
+            this.eventListener.fire('onDidChangeModelContent', model, e);
             this.languages.forEach((language) => language.onDidChangeModelContent?.(model, e));
         });
     }
@@ -176,6 +169,7 @@ class Controller {
 	debug: boolean = $state(false);
     logger = getUniLogger();
     eventListener: EventController = new EventController();
+    monacoOk: boolean = false;
 
 	constructor(fs: App.VFS.FileSystem) {
         this.logger.info('controller/svelte/constructor', 'Initializing controller');
@@ -183,9 +177,8 @@ class Controller {
 	}
 
 	init() {
-        this.logger.info('controller/svelte/init', 'Initializing controller');
 		this.vfs.init().then(async () => {
-            this.eventListener.fire('VFSInitialized');
+            this.eventListener.fire('onVFSInitialized');
             this.status('VFS initialized');
 
             this.status('Loading Monaco');
@@ -194,7 +187,8 @@ class Controller {
 
 			this.initExternals();
             this.status('Externals initialized');
-            this.eventListener.fire('monacoInitialized');
+            this.eventListener.fire('onMonacoInitialized');
+            this.monacoOk = true;
 		});
 	}
 
@@ -210,7 +204,7 @@ class Controller {
     }
 
     closeFile(path: string) {
-        let last = this.vfs.closeFile(path);
+        const last = this.vfs.closeFile(path);
         if (last) {
             this.openFile(last);
         } else {

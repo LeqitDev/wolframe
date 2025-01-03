@@ -2,7 +2,7 @@
 	import { getController, type Controller } from '$lib/stores/controller.svelte';
 	import { getUniLogger } from '$lib/stores/logger.svelte';
 	import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
-	import type { Snippet } from 'svelte';
+	import { untrack, type Snippet } from 'svelte';
 
 	let {
 		children
@@ -13,11 +13,17 @@
 
 	const controller: Controller = getController();
 	let editorContainer: HTMLDivElement;
-	controller.eventListener.register('monacoInitialized', () => {
+	controller.eventListener.register('onMonacoInitialized', () => {
 		controller.createEditor(editorContainer);
 	});
 
 	$effect(() => {
+		untrack(() => {
+			controller.logger.info('editor/effect', 'Editor effect triggered', controller.monacoOk);
+			if (controller.monacoOk) { // for hot reloads
+				controller.createEditor(editorContainer);
+			}
+		});
 		return () => {
 			controller.disposeEditor();
 		};

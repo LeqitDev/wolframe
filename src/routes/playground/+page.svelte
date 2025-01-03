@@ -122,11 +122,18 @@
 	$effect(() => {
 		controller.registerLanguage(typstLanguage);
 		controller.registerTheme(typstThemes);
-		controller.eventListener.register('VFSInitialized', init);
+		controller.eventListener.register('onVFSInitialized', init);
+		controller.eventListener.register('onDidChangeModelContent', onDidChangeModelContent);
+		untrack(() => { // for hot reloads
+			if (controller.monacoOk) {
+				init();
+			}
+		})
+		// controller.eventListener.fire('onMonacoInitialized');
 		return () => {
 			compiler?.dispose();
 			renderer?.dispose();
-			controller.eventListener.unregister('VFSInitialized', init);
+			controller.eventListener.unregister('onVFSInitialized', init);
 		}
 	});
 
