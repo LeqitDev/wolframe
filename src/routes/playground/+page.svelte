@@ -124,6 +124,26 @@
 		controller.registerTheme(typstThemes);
 		controller.eventListener.register('onVFSInitialized', init);
 		controller.eventListener.register('onDidChangeModelContent', onDidChangeModelContent);
+		controller.eventListener.register('onSidebarFileClick', (file) => {
+			controller.openFile(file.path);
+		});
+		controller.eventListener.register('onSidebarNewFile', (file) => {
+			controller.vfs.fileSystem.writeFile(file.path, '');
+			controller.newFile(file.path, '');
+			controller.openFile(file.path);
+		});
+		controller.eventListener.register('onSidebarPreviewFileChange', (file) => {
+			controller.logger.info(WorkerRendererSection, 'Preview file changed', file.path);
+			compiler.set_root(file.path);
+			compiler.compile();
+			controller.setPreviewFile(file.path);
+		});
+		controller.eventListener.register('onSidebarFileDeleted', (file) => {
+			controller.vfs.fileSystem.deleteFile(file.path);
+			controller.closeFile(file.path);
+			controller.removeModel(file.path);
+			controller.vfs.deleteFile(file.path);
+		});
 		untrack(() => { // for hot reloads
 			if (controller.monacoOk) {
 				init();
@@ -195,16 +215,6 @@
 		}
 	}
 
-	/* function status(message: string, finished: boolean) {
-		if (finished) {
-			projectState.loadMessage = message;
-			projectState.loading = false;
-		} else {
-			projectState.loadMessage = message;
-			projectState.loading = true;
-		}
-	} */
-
 	function zoomPreview() {
 		canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
 		canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
@@ -256,6 +266,7 @@
 		const content = model.getValue();
 		const path = model.uri.path;
 
+		controller.vfs.fileSystem.writeFile(path, content);
 	}
 </script>
 

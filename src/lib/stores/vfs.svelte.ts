@@ -30,7 +30,7 @@ export class VFS {
 
 	async init() {
 		await this.fileSystem.init();
-		let files = await this.fileSystem.listFiles();
+		const files = await this.fileSystem.listFiles();
 		Object.entries(files).forEach(([path, content]) => {
 			this.addFile(path, content);
 		});
@@ -73,7 +73,7 @@ export class VFS {
 	}
 
 	get openedFiles() {
-		let openFiles: OpenFileEntry[] = [];
+		const openFiles: OpenFileEntry[] = [];
 
 		// 1. Collect opened entries
 		const openedEntries = this.entries.filter((entry) => entry.open);
@@ -102,7 +102,7 @@ export class VFS {
 				entries.forEach((entry) => {
 					const segments = entry.path.split('/');
 					const name = segments.pop()!;
-					let prefix =
+					const prefix =
 						(segments.length > 1 ? '.../' : '/') + (segments.pop() || '').replace('files', '');
 
 					openFiles.push({
