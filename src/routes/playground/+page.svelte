@@ -85,7 +85,9 @@
 		console.log('Initializing compiler', $effect.tracking());
 		compiler = new CompilerWorkerBridge(new CompilerWorker());
 		typstLanguage.setCompiler(compiler);
-		compiler.init('/main.typ');
+		const mainFile = controller.vfs.getMainFile();
+		compiler.init(mainFile?.path ?? '');
+		controller.previewFile = mainFile?.path ?? '';
 		compiler.addObserver({ onMessage: compilerCompileResult });
 		compiler.addObserver({ onMessage: compilerLogger });
 		controller.vfs.entries.forEach((file) => {
@@ -118,43 +120,65 @@
 			}
 		}); */
 	}
+	function handleSidebarFileClick(file: App.VFS.Sidebar.File) {
+		controller.openFile(file.path);
+	}
+
+	function handleSidebarNewFile(file: App.VFS.Sidebar.File) {
+		controller.vfs.fileSystem.writeFile(file.path, '');
+		controller.newFile(file.path, '');
+		controller.openFile(file.path);
+		compiler.add_file(file.path, '');
+	}
+
+	function handleSidebarPreviewFileChange(file: App.VFS.Sidebar.File) {
+		controller.logger.info(WorkerRendererSection, 'Preview file changed', file.path);
+		compiler.set_root(file.path);
+		compiler.compile();
+		controller.setPreviewFile(file.path);
+	}
+
+	function handleSidebarFileDeleted(file: App.VFS.Sidebar.File) {
+		controller.vfs.fileSystem.deleteFile(file.path);
+		controller.closeFile(file.path);
+		controller.removeModel(file.path);
+		controller.vfs.deleteFile(file.path);
+		// TODO: Remove from compiler
+	}
 
 	$effect(() => {
 		controller.registerLanguage(typstLanguage);
 		controller.registerTheme(typstThemes);
+		console.log('Registering language and theme');
 		controller.eventListener.register('onVFSInitialized', init);
 		controller.eventListener.register('onDidChangeModelContent', onDidChangeModelContent);
-		controller.eventListener.register('onSidebarFileClick', (file) => {
-			controller.openFile(file.path);
-		});
-		controller.eventListener.register('onSidebarNewFile', (file) => {
-			controller.vfs.fileSystem.writeFile(file.path, '');
-			controller.newFile(file.path, '');
-			controller.openFile(file.path);
-		});
-		controller.eventListener.register('onSidebarPreviewFileChange', (file) => {
-			controller.logger.info(WorkerRendererSection, 'Preview file changed', file.path);
-			compiler.set_root(file.path);
-			compiler.compile();
-			controller.setPreviewFile(file.path);
-		});
-		controller.eventListener.register('onSidebarFileDeleted', (file) => {
-			controller.vfs.fileSystem.deleteFile(file.path);
-			controller.closeFile(file.path);
-			controller.removeModel(file.path);
-			controller.vfs.deleteFile(file.path);
-		});
-		untrack(() => { // for hot reloads
+
+		controller.eventListener.register('onSidebarFileClick', handleSidebarFileClick);
+		controller.eventListener.register('onSidebarNewFile', handleSidebarNewFile);
+		controller.eventListener.register('onSidebarPreviewFileChange', handleSidebarPreviewFileChange);
+		controller.eventListener.register('onSidebarFileDeleted', handleSidebarFileDeleted);
+		untrack(() => {
+			// for hot reloads
 			if (controller.monacoOk) {
 				init();
+				controller.initExternals();
+				controller.postInitExternals();
 			}
-		})
-		// controller.eventListener.fire('onMonacoInitialized');
+		});
+
 		return () => {
 			compiler?.dispose();
 			renderer?.dispose();
 			controller.eventListener.unregister('onVFSInitialized', init);
-		}
+			controller.eventListener.unregister('onDidChangeModelContent', onDidChangeModelContent);
+			controller.eventListener.unregister('onSidebarFileClick', handleSidebarFileClick);
+			controller.eventListener.unregister('onSidebarNewFile', handleSidebarNewFile);
+			controller.eventListener.unregister(
+				'onSidebarPreviewFileChange',
+				handleSidebarPreviewFileChange
+			);
+			controller.eventListener.unregister('onSidebarFileDeleted', handleSidebarFileDeleted);
+		};
 	});
 
 	function compilerLogger(message: App.Compiler.Response) {
@@ -266,7 +290,7 @@
 		const content = model.getValue();
 		const path = model.uri.path;
 
-		controller.vfs.fileSystem.writeFile(path, content);
+		controller.vfs.writeFile(path, content);
 	}
 </script>
 
@@ -277,8 +301,8 @@
 		</div>
 		<h2 class="mb-4 text-center text-3xl font-bold">Oops! This Space Looks Empty</h2>
 		<p class="mb-8 max-w-md text-center text-muted-foreground">
-			Looks like your code took a break. D on't worry, <span class="italic underline">click</span> on
-			a file on the left to get started or create a new file for all your
+			Looks like your code took a break. D on't worry, <span class="italic underline">click</span>
+			on a file on the left to get started or create a new file for all your
 			<span class="italic underline">amazing</span> ideas.
 		</p>
 		<div class="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -409,41 +433,39 @@
 		class=""
 	>
 		<div class="flex h-full flex-col">
-			<div class={`flex pl-2 ${controller.vfs.openedFiles.length === 0 ? 'min-h-0' : 'min-h-10 border-b'}`}>
-				{#if controller.vfs}
-					{#each controller.vfs.openedFiles as file}
-						<Button
-							size="sm"
-							variant="outline"
-							class={`h-full rounded-none border-b-0 border-l-0 border-r text-sm ${controller.editorModelUri === file.path ? 'border-t-2 border-t-emerald-300 bg-accent' : ''}`}
+			<div
+				class={`flex pl-2 ${controller.vfs.currentlyOpen.length === 0 ? 'min-h-0' : 'min-h-10 border-b'}`}
+			>
+				{#each controller.vfs.currentlyOpen as file}
+					<Button
+						size="sm"
+						variant="outline"
+						class={`h-full rounded-none border-b-0 border-l-0 border-r text-sm ${!file.mutated ? 'italic' : ''} ${controller.editorModelUri === file.path ? 'border-t-2 border-t-emerald-300 bg-accent' : ''}`}
+						onclick={() => {
+							let entry = controller.vfs.entries.find((entry) => entry.path === file.path)!;
+							if (entry.open.isOpen) {
+								controller.openFile(file.path);
+							}
+						}}
+					>
+						{file.getName()}
+						<span class="text-muted-foreground">
+							{#if file.getParent() !== ''}
+								{file.getParent()}
+							{/if}
+						</span>
+						<button
+							class="rounded-md p-0.5 hover:bg-slate-600"
 							onclick={() => {
-								let entry = controller.vfs.entries.find((entry) => entry.path === file.path)!;
-								if (entry.open) {
-									controller.openFile(file.path);
-								}
+								controller.closeFile(file.path);
 							}}
 						>
-							{file.display.name}
-							<span class="text-muted-foreground">
-								{#if file.display.prefix}
-									{file.display.prefix}
-								{/if}
-							</span>
-							<button
-								class="rounded-md p-0.5 hover:bg-slate-600"
-								onclick={() => {
-									controller.closeFile(file.path);
-								}}
-							>
-								<X />
-							</button>
-						</Button>
-					{/each}
-				{/if}
+							<X />
+						</button>
+					</Button>
+				{/each}
 			</div>
-			<Editor
-				children={emptyEditor}
-			/>
+			<Editor children={emptyEditor} />
 		</div>
 	</Resizable.Pane>
 	<Resizable.Handle />

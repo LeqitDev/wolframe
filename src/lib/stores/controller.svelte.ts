@@ -44,13 +44,13 @@ class Controller {
 		this.themes.push(theme);
 	}
 
-	private initExternals() {
+	initExternals() {
 		if (!this.monaco) return;
 		this.languages.forEach((language) => language.init(this.monaco!));
 		this.themes.forEach((theme) => theme.init(this.monaco!));
 	}
 
-	private postInitExternals() {
+	postInitExternals() {
 		if (!this.monaco || !this.editor) return;
 		this.languages.forEach((language) => language.postInit?.(this.monaco!, this.editor!));
 		this.themes.forEach((theme) => theme.postInit?.(this.monaco!, this.editor!));
@@ -81,6 +81,7 @@ class Controller {
 
         this.status('Load models from VFS');
         this.vfs.entries.forEach((entry) => {
+            console.log('Adding model', entry.path);
             this.addModel(entry.content, entry.path);
         });
         this.status('Models loaded. Setting main file');
@@ -88,6 +89,7 @@ class Controller {
         const mainFile = this.vfs.getMainFile();
         if (mainFile) {
             this.openFile(mainFile.path);
+            this.vfs.fileMutated(mainFile.path);
         } else {
             this.setModel(null);
         }

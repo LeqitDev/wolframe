@@ -50,7 +50,7 @@ function completion(request: App.Compiler.CompletionRequest) {
 }
 
 function definition(request: App.Compiler.DefinitionRequest) {
-    let definition: typst.Definition | undefined = compiler.definition(request.file, request.offset);
+    const definition: typst.HoverProvider = compiler.definition(request.file, request.offset);
 
     if (definition) {
         getUniLogger().info('worker/compiler', 'Definition found', definition);
@@ -158,6 +158,9 @@ self.onmessage = async (event: MessageEvent<App.Compiler.Request>) => {
             case 'print-files':
                 sendLoggerResponse("info", WASMSection, compiler.get_files());
                 break;
+            case 'ast-tree':
+                sendLoggerResponse("info", WASMSection, compiler.get_ast().to_json());
+                break;
             default:
                 sendError('Unknown request type');
         }
@@ -180,7 +183,7 @@ function sendCompletionResponse(completions: typst.Completion[]) {
     self.postMessage({ type: 'completion', completions } as App.Compiler.CompletionResponse);
 }
 
-function sendDefinitionResponse(definition: typst.Definition) {
+function sendDefinitionResponse(definition: typst.HoverProvider) {
     self.postMessage({ type: 'definition', definition} as App.Compiler.DefinitionResponse);
 }
 

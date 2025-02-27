@@ -2,13 +2,29 @@ import { untrack } from "svelte";
 
 export class VFSEntry implements App.FileEntry {
 	path: string;
-	content: string;
-	open = $state(false);
+	content: string = '';
+	open = $state({
+		isOpen: false,
+		hasDuplicates: false
+	});
 	mutated = $state(false);
 
-	constructor(path: string, content: string) {
+	constructor(path: string) {
 		this.path = path;
-		this.content = content;
+	}
+
+	isDir() {
+		return this.path.endsWith('/');
+	}
+
+	getName() {
+		return this.path.split('/').pop() || '';
+	}
+
+	getParent() {
+		const segments = this.path.split('/');
+		segments.pop();
+		return segments.pop() || '';
 	}
 }
 
@@ -17,11 +33,15 @@ type OpenFileEntry = VFSEntry & {
 		name: string;
 		prefix: string;
 	};
+	isDir: () => boolean;
+	getName: () => string;
+	getParent: () => string;
 };
 
 export class VFS {
 	entries: VFSEntry[] = $state([]);
 	openHistory: string[] = $state([]);
+	currentlyOpen: VFSEntry[] = $state([]);
 	fileSystem: App.VFS.FileSystem;
 
 	constructor(fileSystem: App.VFS.FileSystem) {
@@ -36,9 +56,15 @@ export class VFS {
 		});
 	}
 
+	addDir(path: string) {
+		this.entries.push(new VFSEntry(path));
+	}
+
 	addFile(path: string, content: string) {
 		console.log('Adding file', path);
-		this.entries.push(new VFSEntry(path, content));
+		const file = new VFSEntry(path);
+		file.content = content;
+		this.entries.push(file);
 	}
 
 	deleteFile(path: string) {
@@ -54,15 +80,39 @@ export class VFS {
 	openFile(path: string) {
 		const entry = this.entries.find((entry) => entry.path === path);
 		if (entry === undefined) return;
-		entry.open = true;
+		const possibleDuplicates = this.currentlyOpen.filter((entry) => entry.getName() === entry.getName() && entry.path !== path);
+		if (possibleDuplicates.length > 0) {
+			possibleDuplicates.forEach((entry) => {
+				entry.open.hasDuplicates = true;
+			});
+			entry.open.hasDuplicates = true;
+		}
+		entry.open.isOpen = true;
 		this.openHistory = [path, ...this.openHistory.filter((p) => p !== path)];
+		if (this.currentlyOpen.findIndex((entry) => entry.path === path) === -1) {
+			if (!entry.mutated) {
+				for (const entry of this.entries.filter((entry) => entry.path !== path && entry.open.isOpen)) {
+					if (!entry.mutated) {
+						this.closeFile(entry.path);
+					}
+				}
+			}
+			this.currentlyOpen.push(entry)
+		}
 	}
 
 	closeFile(path: string) {
 		const entry = this.entries.find((entry) => entry.path === path);
 		if (entry === undefined) return;
-		entry.open = false;
+		if (entry.open.hasDuplicates) {
+			const duplicates = this.currentlyOpen.filter((entry) => entry.getName() === entry.getName());
+			if (duplicates.length === 1) {
+				duplicates[0].open.hasDuplicates = false;
+			}
+		}
+		entry.open.isOpen = false;
 		this.openHistory = this.openHistory.filter((p) => p !== path);
+		this.currentlyOpen = this.currentlyOpen.filter((entry) => entry.path !== path);
 		return this.openHistory[0];
 	}
 
@@ -70,6 +120,14 @@ export class VFS {
 		return untrack(() => {
 			return this.entries.find((entry) => entry.path === '/main.typ') ?? (this.entries.find((entry) => entry.path === '/lib.typ') ?? this.entries.at(0));
 		})
+	}
+
+	writeFile(path: string, content: string) {
+		const entry = this.entries.find((entry) => entry.path === path);
+		if (entry === undefined) return;
+		entry.content = content;
+		entry.mutated = true;
+		this.fileSystem.writeFile(path, content);
 	}
 
 	get openedFiles() {
@@ -95,7 +153,10 @@ export class VFS {
 					display: {
 						name: filename,
 						prefix: ''
-					}
+					},
+					isDir: entries[0].isDir,
+					getName: entries[0].getName,
+					getParent: entries[0].getParent
 				});
 			} else {
 				// Multiple files - need prefixes
@@ -110,7 +171,10 @@ export class VFS {
 						display: {
 							name,
 							prefix
-						}
+						},
+						isDir: entry.isDir,
+						getName: entry.getName,
+						getParent: entry.getParent
 					});
 				});
 			}

@@ -1,10 +1,10 @@
 import { getUniLogger } from '$lib/stores/logger.svelte';
-import type { Definition } from '$rust/typst_flow_wasm';
+import type { HoverProvider } from '$rust/typst_flow_wasm';
 import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
 
 function parseDocs(docs: string) {
     const lines = docs.replaceAll('```example', '```typst').split('\n');
-    let sections: { heading: string; content: string[] }[] = [];
+    const sections: { heading: string; content: string[] }[] = [];
     let currentHeading = '';
     let currentContent: string[] = [];
 
@@ -33,44 +33,57 @@ export class TypstHoverProvider implements Monaco.languages.HoverProvider {
     curModel: Monaco.editor.ITextModel | null = null;
     requestDefinition: (file: string, offset: number) => void;
     logger = getUniLogger();
+    range: Monaco.IRange | null = null;
 
     constructor(requestDefinition: (file: string, offset: number) => void) {
         this.requestDefinition = requestDefinition;
     }
 
-    setHover(definition: Definition) {
+    setHover(definition: HoverProvider) {
 
         this.logger.info('monaco/typst/hoverProvider', 'Hovering over', definition);
 
         if (!this.curModel) return;
 
-        const start = this.curModel.getPositionAt(definition.name_span.start_offset);
-        const end = this.curModel.getPositionAt(definition.name_span.end_offset);
-
         const contents: Monaco.IMarkdownString[] = [];
-        contents.push({ value: `**${definition.value?.name ?? definition.name}** *(${(definition.kind as string).toLowerCase()})*` });
-
-        if (definition.value && definition.value.docs) {
-            let sections = parseDocs(definition.value.docs);
-
-            contents.push({ value: '**DOCS**' });
-            contents.push({ value: sections[0].content.join('\n') });
-
-            sections = sections.slice(1);
-
-            sections.forEach((section) => {
-                contents.push({ value: `**${section.heading}**` });
-                contents.push({ value: section.content.join('\n') });
-            });
+        
+        if (definition.tooltip) {
+            if (definition.tooltip.code) {
+                contents.push({ value: '```\n' + definition.tooltip.code + '\n```' });
+            } else if (definition.tooltip.text) {
+                contents.push({ value: definition.tooltip.text });
+            }
         }
 
-        this.hover = {
-            range: {
+        if (definition.definition) {
+            const start = this.curModel.getPositionAt(definition.definition.name_span.start_offset);
+            const end = this.curModel.getPositionAt(definition.definition.name_span.end_offset);
+            this.range = {
                 startLineNumber: start.lineNumber,
                 startColumn: start.column,
                 endLineNumber: end.lineNumber,
-                endColumn: end.column
-            },
+                endColumn: end.column,
+            };
+
+            contents.push({ value: `**${definition.definition.value?.name ?? definition.definition.name}** *(${(definition.definition.kind as string).toLowerCase()})*` });
+
+            if (definition.definition.value && definition.definition.value.docs) {
+                let sections = parseDocs(definition.definition.value.docs);
+
+                contents.push({ value: '**DOCS**' });
+                contents.push({ value: sections[0].content.join('\n') });
+
+                sections = sections.slice(1);
+
+                sections.forEach((section) => {
+                    contents.push({ value: `**${section.heading}**` });
+                    contents.push({ value: section.content.join('\n') });
+                });
+            }
+        }
+
+        this.hover = {
+            range: this.range!,
             contents
         };
         this.hasHover = true;
@@ -80,12 +93,12 @@ export class TypstHoverProvider implements Monaco.languages.HoverProvider {
         this.curModel = model;
         this.hover = null;
 
-        console.log('Hovering over', model.getValueInRange({
+        this.range = {
             startLineNumber: position.lineNumber,
             startColumn: position.column,
             endLineNumber: position.lineNumber,
-            endColumn: position.column + 1
-        }));
+            endColumn: position.column,
+        };
 
         this.requestDefinition(model.uri.path, model.getOffsetAt(position));
 

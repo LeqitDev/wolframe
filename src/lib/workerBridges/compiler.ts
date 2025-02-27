@@ -60,6 +60,10 @@ export class CompilerWorkerBridge extends WorkerBridge<App.Compiler.Request, App
         super.postMessage({ type: 'print-files' } as App.Compiler.PrintFilesRequest);
     }
 
+    public ast_tree() {
+        super.postMessage({ type: 'ast-tree' } as App.Compiler.TreeRequest);
+    }
+
     public onMessage(callback: (message: App.Compiler.Response) => void): void {
         super.onMessageRaw(callback);
     }

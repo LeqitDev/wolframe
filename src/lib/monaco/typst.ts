@@ -2,7 +2,6 @@ import type * as Monaco from 'monaco-editor';
 import typstTheme from '$lib/assets/typstTokio.json';
 import type { CompilerWorkerBridge } from '$lib/workerBridges';
 import { TypstCompletionProvider } from './completionProvider';
-import { error } from '@sveltejs/kit';
 import { TypstHoverProvider } from './typst/hoverProvider';
 
 export class TypstLanguage implements App.Editor.Language {
@@ -68,6 +67,17 @@ export class TypstLanguage implements App.Editor.Language {
 		}
 	}
 
+	postInit(monaco: typeof Monaco, editor: Monaco.editor.IStandaloneCodeEditor) {
+		editor.addAction({
+			id: 'typst.ast.tree',
+			label: 'Print AST',
+			run: () => {
+				if (!this.compiler) return;
+				this.compiler.ast_tree();
+			}
+		});
+	}
+
 	private getDefinition(file: string, offset: number) {
 		if (!this.compiler) return;
 
@@ -92,7 +102,7 @@ export class TypstLanguage implements App.Editor.Language {
 				this.onDefinitionMessage(message);
 				break;
 			case 'compile':
-				this.onCompileSuccess(message);
+				this.onCompileSuccess();
 				break;
 		}
 	}
@@ -101,7 +111,7 @@ export class TypstLanguage implements App.Editor.Language {
 		this.hoverProvider!.setHover(message.definition)
 	}
 
-	private onCompileSuccess(message: App.Compiler.CompileResponse) {
+	private onCompileSuccess() {
 		// Clear markers
 		if (!this.monaco) return;
 
@@ -189,7 +199,7 @@ export class TypstTheme implements App.Editor.Theme {
         const TokensProviderCache = (await import('$lib/textmate')).TokensProviderCache;
         const cache = new TokensProviderCache(editor);
         cache.getTokensProvider('source.typst').then((tokensProvider) => {
-            let disposer = monaco.languages.setTokensProvider('typst', tokensProvider);
+            const disposer = monaco.languages.setTokensProvider('typst', tokensProvider);
 			this.disposables.push(disposer);
         });
     }

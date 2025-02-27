@@ -3,6 +3,7 @@ import { loadWASM, OnigScanner, OnigString } from 'vscode-oniguruma';
 import * as monaco from 'monaco-editor';
 import wasmURL from 'vscode-oniguruma/release/onig.wasm?url';
 import { type IColorTheme, TMToMonacoToken } from './tm-to-monaco-token';
+import tinymistLang from '../assets/typst.tinymist.tmLanguage.json?url';
 
 function deepMerge(target: any, source: any) {
 	for (const key in source) {
@@ -33,6 +34,8 @@ const wasmPromise = fetch(wasmURL)
 
 const scopeUrlMap: Record<string, string> = {
 	'source.typst':
+		//tinymistLang	
+	//'https://github.com/michidk/typst-grammar/blob/main/grammars/typst.tmLanguage.json'
 		'https://raw.githubusercontent.com/nvarner/typst-lsp/refs/heads/master/editors/vscode/typst.tmLanguage.json'
 };
 

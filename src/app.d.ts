@@ -1,7 +1,7 @@
 // See https://svelte.dev/docs/kit/types#app.d.ts
 
 import type { Sections } from '$lib/stores/logger.svelte';
-import type { Completion, Definition, Diagnostics } from '$rust/typst_flow_wasm';
+import type { Completion, Definition, Diagnostics, HoverProvider } from '$rust/typst_flow_wasm';
 import type * as Monaco from 'monaco-editor';
 import type { VFSEntry } from '$lib/stores/vfs.svelte';
 
@@ -198,6 +198,7 @@ declare global {
 			type AddFileRequest = { type: 'add-file'; file: string; content: string };
 			type SetRootRequest = { type: 'set-root'; root: string };
 			type PrintFilesRequest = { type: 'print-files' };
+			type TreeRequest = { type: 'ast-tree' };
 
 			type Request =
 				| CompileRequest
@@ -208,7 +209,8 @@ declare global {
 				| MoveRequest
 				| SetRootRequest
 				| PrintFilesRequest
-				| DefinitionRequest;
+				| DefinitionRequest
+				| TreeRequest;
 
 			interface CompileErrorSpan {
 				file: string;
@@ -238,7 +240,7 @@ declare global {
 
 			type CompileResponse = { type: 'compile'; svgs: string[] };
 			type CompletionResponse = { type: 'completion'; completions: Completion[] };
-			type DefinitionResponse = { type: 'definition'; definition: Definition };
+			type DefinitionResponse = { type: 'definition'; definition: HoverProvider };
 			type LoggerResponse = {
 				type: 'logger';
 				severity: 'error' | 'warn' | 'info';
