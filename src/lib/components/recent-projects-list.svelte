@@ -10,7 +10,7 @@
 </script>
 
 <div>
-    <h2 class="text-2xl font-semibold mb-4">Recent Projects</h2>
+    <h2 class="text-2xl font-semibold mb-4">Recently Edited</h2>
     <div class="grid gap-4 mb:grid-cols-2 lg:grid-cols-4">
         {#each projects as project}
             <a href={`/project/${project.projects.id}`}>
@@ -44,6 +44,8 @@
                     </Card.Content>
                 </Card.Root>
             </a>
+        {:else}
+            <p class="text-muted-foreground mt-4">No projects found!</p>
         {/each}
     </div>
 </div>

@@ -110,7 +110,9 @@
 
 	let projectAvatar = createAvatar(initials, {
 		seed: 'Playground', //Dynamic
-		radius: 5
+		radius: 5,
+		backgroundColor: ['d8b4fe'],
+		backgroundType: ['gradientLinear']
 	}).toDataUri();
 
 	$effect(() => {
@@ -571,6 +573,7 @@
 			root: controller.root,
 			tree: parseVFS()
 		}
+		console.log(controller);
 	})
 </script>
 
@@ -585,7 +588,7 @@
 						class="size-8 rounded-md"
 					/>
 					<span class="text-lg font-bold"
-						>{controller.name}</span
+						>{controller?.name ?? ''}</span
 					>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
@@ -723,7 +726,7 @@
 				tooltipContent={item.path === controller.previewFile ? previewing : undefined}
 			>
 				{#if item.path === controller.previewFile}
-					<div class="absolute left-0 top-0 h-full w-1 bg-emerald-400"></div>
+					<div class="absolute left-0 top-0 h-full w-1 bg-purple-300"></div>
 				{/if}
 				<File />
 				{item.name}
