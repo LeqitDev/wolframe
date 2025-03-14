@@ -18,7 +18,7 @@ export class MinioService {
 		this.client = new Minio.Client({
 			endPoint: env.MINIO_ENDPOINT,
 			port: parseInt(env.MINIO_PORT),
-			useSSL: true,
+			useSSL: parseInt(env.MINIO_PORT) == 443 ? true : false,
 			accessKey: env.MINIO_USER,
 			secretKey: env.MINIO_PW
 		});
