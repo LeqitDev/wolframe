@@ -8,9 +8,9 @@
 
     let { form }: { form: ActionData } = $props(); 
 </script>
-<Card.Root class="m-auto max-w-sm w-full bg-gradient-to-tr from-sky-800/70 to-fuchsia-700/70">
+<Card.Root class="m-auto max-w-sm w-full bg-gradient-to-tr from-amber-800/50 to-fuchsia-700/50">
     <Card.Header>
-        <Card.Title class="text-3xl text-white">Wolframe Login</Card.Title>
+        <Card.Title class="text-3xl text-white text-center" style="font-variant: small-caps;">Wolframe</Card.Title>
     </Card.Header>
     <Card.Content>
         <form method="post" action="?/login" use:enhance class="grid gap-4">

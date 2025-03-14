@@ -32,7 +32,7 @@
 			<h2 class="mb-4 text-2xl font-semibold">New Proejct</h2>
 			<div class="mb-8 grid grid-cols-4 gap-4">
 				<NewProjectDialog data={data.newProjectForm!} user={data.user!} isPackage={false}>
-					<Card.Root class="bg-card transition-colors hover:bg-accent">
+					<Card.Root class="h-full bg-card transition-colors hover:bg-accent">
 						<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
 							<Card.Title class="text-sm font-medium">New Document</Card.Title>
 							<FileText class="size-4 text-muted-foreground" />
@@ -43,7 +43,7 @@
 					</Card.Root>
 				</NewProjectDialog>
 				<NewProjectDialog data={data.newProjectForm!} user={data.user!} isPackage>
-					<Card.Root class="bg-card transition-colors hover:bg-accent">
+					<Card.Root class="h-full bg-card transition-colors hover:bg-accent">
 						<Card.Header class="flex flex-row items-center justify-between space-y-0 pb-2">
 							<Card.Title class="text-sm font-medium">New Package</Card.Title>
 							<Package class="size-4 text-muted-foreground" />

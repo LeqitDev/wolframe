@@ -20,7 +20,8 @@
 	import type monaco from '$lib/monaco/editor';
 	import { getController, type Controller } from '$lib/stores/controller.svelte';
 
-	// console.clear();
+	const ZOOM_OUT_LIMIT = 0.1;
+	const ZOOM_IN_LIMIT = 2;
 
 	let { data }: { data: PageData } = $props();
 	//const layoutStore = getLayoutStore(); // For Menu and things
@@ -255,9 +256,22 @@
 	}
 
 	function canvasLoad(node: HTMLDivElement) {
-		$effect(() => {
-			async function init() {
-				await waitForInit;
+		let isDown = false;
+		let startX: number;
+		let startY: number;
+		let scrollLeft: number;
+		let scrollTop: number;
+
+		function getScrollBarWidth() {
+			let el = document.createElement("div");
+			el.style.cssText = "overflow:scroll; visibility:hidden; position:absolute;";
+			document.body.appendChild(el);
+			let width = el.offsetWidth - el.clientWidth;
+			el.remove();
+			return width;
+		}
+
+		function updateCanvasSize(subtractScrollBar: boolean = false) {
 				node.style.gap = `${previewScale * convertRemToPixels(5)}px`;
 				node.style.padding = `${previewScale * convertRemToPixels(4)}px`;
 
@@ -267,19 +281,78 @@
 					parseFloat(styles.width) -
 					parseFloat(styles.paddingLeft) -
 					parseFloat(styles.paddingRight);
+				
+				if (node.scrollHeight > node.clientHeight && subtractScrollBar) {
+					innerWidth -= getScrollBarWidth();
+				}
 
 				renderer?.update(-1, innerWidth);
+		}
+
+		$effect(() => {
+			let resizeObserver = new ResizeObserver(async (entrys, observer) => { //TODO: Provide option to lock size to window
+				updateCanvasSize(true);
+			});
+
+			async function init() {
+				await waitForInit;
+				updateCanvasSize();
+
+				resizeObserver.observe(node);
 			}
 			init();
 
-			/* TODO: Provide option to lock size to window let resizeObserver = new ResizeObserver(() => {
+			node.addEventListener('wheel', (e) => {
+				if (e.ctrlKey) {
+					e.preventDefault();
+					
+					previewScale += e.deltaY > 0 ? -0.1 : 0.1;
+					if (previewScale < ZOOM_OUT_LIMIT) {
+						previewScale = ZOOM_OUT_LIMIT;
+					} else if (previewScale > ZOOM_IN_LIMIT) {
+						previewScale = ZOOM_IN_LIMIT;
+					} else {
+						zoomPreview();
+					}
+				}
 			});
 
-			resizeObserver.observe(node);
+			// drag scroll
+			node.addEventListener('mousedown', (e) => {
+				isDown = true;
+				startX = e.pageX - node.offsetLeft;
+				startY = e.pageY - node.offsetTop;
+				scrollLeft = node.scrollLeft;
+				scrollTop = node.scrollTop;
+			});
+
+			node.addEventListener('mouseleave', () => {
+				isDown = false;
+			});
+
+			node.addEventListener('mouseup', () => {
+				isDown = false;
+			});
+
+			node.addEventListener('mousemove', (e) => {
+				if (!isDown) return;
+				e.preventDefault();
+				const x = e.pageX - node.offsetLeft;
+				const y = e.pageY - node.offsetTop;
+				const walkX = (x - startX) * 2; //scroll-fast
+				const walkY = (y - startY) * 2; //scroll-fast
+				node.scrollLeft = scrollLeft - walkX;
+				node.scrollTop = scrollTop - walkY;
+			});
 
 			return () => {
+				node.removeEventListener('wheel', (e) => {});
+				node.removeEventListener('mousedown', (e) => {});
+				node.removeEventListener('mouseleave', () => {});
+				node.removeEventListener('mouseup', () => {});
+				node.removeEventListener('mousemove', (e) => {});
 				resizeObserver.disconnect();
-			}; */
+			};
 		});
 	}
 
@@ -375,7 +448,7 @@
 			<Menubar.Content>
 				<Menubar.Item
 					onclick={() => {
-						if (previewScale < 2) {
+						if (previewScale < ZOOM_IN_LIMIT) {
 							previewScale += 0.1;
 							zoomPreview();
 						}
@@ -385,7 +458,7 @@
 				</Menubar.Item>
 				<Menubar.Item
 					onclick={() => {
-						if (previewScale > 0.6) {
+						if (previewScale > ZOOM_OUT_LIMIT) {
 							previewScale -= 0.1;
 							zoomPreview();
 						}
@@ -440,7 +513,7 @@
 					<Button
 						size="sm"
 						variant="outline"
-						class={`h-full rounded-none border-b-0 border-l-0 border-r text-sm ${!file.mutated ? 'italic' : ''} ${controller.editorModelUri === file.path ? 'border-t-2 border-t-emerald-300 bg-accent' : ''}`}
+						class={`h-full rounded-none border-b-0 border-l-0 border-r text-sm ${!file.mutated ? 'italic' : ''} ${controller.editorModelUri === file.path ? 'border-t-2 border-t-purple-300 bg-accent' : ''}`}
 						onclick={() => {
 							let entry = controller.vfs.entries.find((entry) => entry.path === file.path)!;
 							if (entry.open.isOpen) {

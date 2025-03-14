@@ -25,7 +25,7 @@ import { Button } from "./ui/button";
 
 </script>
 
-<div class="w-64 border-r min-h-[calc(100vh-4rem-1px)] bg-card">
+<div class="w-64 min-h-[calc(100vh-4rem-1px)] bg-card/30">
     <div class="h-[calc(100vh-4rem-1px)]">
         <div class="space-y-4 py-4">
             <div class="px-3 py-2">
