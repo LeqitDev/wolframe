@@ -1,6 +1,11 @@
 import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
+import type {
+	ViewNode,
+	FileViewNode,
+	FolderViewNode,
+} from '$lib/fileview/index.svelte';
 
 export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
@@ -31,13 +36,13 @@ export { PreviewDragger } from "./previewDragging";
 	sidebarPreviewFileChange(file: App.VFS.Sidebar.FileMetadata) {} */
 
 interface SidebarEvents {
-	"onSidebarFileClick": [file: App.VFS.Sidebar.File],
-	"onSidebarNodeMoved": [node: App.VFS.Sidebar.Node, prev_path: string],
-	"onSidebarNewFile": [file: App.VFS.Sidebar.File],
-	"onSidebarNewDir": [dir: App.VFS.Sidebar.Folder],
-	"onSidebarFileDeleted": [file: App.VFS.Sidebar.File],
-	"onSidebarDirDeleted": [dir: App.VFS.Sidebar.Folder],
-	"onSidebarPreviewFileChange": [file: App.VFS.Sidebar.File]
+	"onSidebarFileClick": [file: FileViewNode],
+	"onSidebarNodeMoved": [node: ViewNode, prev_path: string],
+	"onSidebarNewFile": [file: FileViewNode],
+	"onSidebarNewDir": [dir: FolderViewNode],
+	"onSidebarFileDeleted": [file: FileViewNode],
+	"onSidebarDirDeleted": [dir: FolderViewNode],
+	"onSidebarPreviewFileChange": [file: FileViewNode]
 };
 
 interface EditorEvents {

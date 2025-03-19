@@ -319,11 +319,21 @@ export class TypstToCanvas {
     }
 
     private rawScaledRender(factor: number, ctx: SuitableCanvasContext) {
+        const startTime = performance.now();
+        let ctxClear = null;
         if (this.blankContext) {
             ctx.scale(factor, factor);
+            // Fill with white
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            ctxClear = performance.now();
+            console.log("Scaling", factor);
             this.blankContext = false;
         }
         this.root.render(ctx, this.glyphs);
+        const endTime = performance.now();
+        console.log("Rendering took", endTime - startTime, "ms", ctxClear ? `(${endTime - ctxClear}ms)` : '');
     }
 
     private async hasPageUpdate() {
@@ -342,5 +352,19 @@ export class TypstToCanvas {
         this.rawScaledRender(this.contextScale, ctx);
         await this.hasPageUpdate();
         requestAnimationFrame(() => this.rawRender(ctx));
+    }
+
+    getBlob(): Promise<Blob> {
+            return new Promise((resolve) => {
+                if (this.canvas instanceof HTMLCanvasElement) {
+                    this.canvas.toBlob((blob) => {
+                        resolve(blob!);
+                    });
+                } else {
+                    this.canvas.convertToBlob().then((blob) => {
+                        resolve(blob!);
+                    });
+                }
+            });
     }
 }

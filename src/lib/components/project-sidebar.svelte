@@ -19,20 +19,17 @@
 	import { flip } from 'svelte/animate';
 	import { getController } from '$lib/stores/controller.svelte';
 	import type { VFSEntry } from '$lib/stores/vfs.svelte';
-
-	function isFolder (node: SidebarNode): node is SidebarFolder {
-		return (node as SidebarFolder).isFolder;
-	}
+	import { ViewNode, FileViewNode, FolderViewNode } from '$lib/fileview/index.svelte';
 
 	class HoverQueue {
-		queue: { item: SidebarNode; isDir: boolean }[] = $state([]);
-		freezedHovered: null | { item: SidebarNode; isDir: boolean } = $state(null);
+		queue: { item: ViewNode; isDir: boolean }[] = $state([]);
+		freezedHovered: null | { item: ViewNode; isDir: boolean } = $state(null);
 
-		add(item: SidebarNode, isDir: boolean) {
+		add(item: ViewNode, isDir: boolean) {
 			this.queue.push({ item, isDir });
 		}
 
-		remove(item: SidebarNode) {
+		remove(item: ViewNode) {
 			this.queue = this.queue.filter((i) => i.item !== item);
 		}
 
@@ -66,15 +63,11 @@
 
 	const controller = getController();
 
-	type SidebarFolder = App.VFS.Sidebar.Folder;
-	type SidebarFile = App.VFS.Sidebar.File;
-	type SidebarNode = App.VFS.Sidebar.Node;
-
-	let data: { tree?: SidebarFolder, root?: string, name?: string } = $state({});
+	let data: { tree?: FolderViewNode; root?: string; name?: string } = $state({});
 
 	let dragState: {
-		dragged: SidebarNode | null;
-		targets: SvelteSet<SidebarFolder>;
+		dragged: ViewNode | null;
+		targets: SvelteSet<FolderViewNode>;
 		hoverTimer: number;
 	} = $state({
 		dragged: null,
@@ -85,7 +78,7 @@
 	let dragTarget = $derived.by(() => {
 		// highest depth folder in dragState.targets
 		let maxDepth = -1;
-		let target: SidebarFolder | null = null;
+		let target: FolderViewNode | null = null;
 		let targets = dragState.targets;
 
 		if (dragState.targets.size === 0) return null;
@@ -103,9 +96,9 @@
 		return dragState.dragged && dragTarget && validateDragTarget(dragState.dragged, dragTarget);
 	});
 
-	function validateDragTarget(dragged: SidebarNode, target: SidebarNode): boolean {
+	function validateDragTarget(dragged: ViewNode, target: ViewNode): boolean {
 		// Prevent dragging into own children or self
-		return !(dragged.path === target.path && isFolder(dragged) === isFolder(target));
+		return !(dragged.path === target.path && dragged.isFolder === target.isFolder);
 	}
 
 	let projectAvatar = createAvatar(initials, {
@@ -115,11 +108,11 @@
 		backgroundType: ['gradientLinear']
 	}).toDataUri();
 
-	$effect(() => {
+	/* $effect(() => {
 		if (dragTarget) {
 			forEachTreeNode;
 		}
-	});
+	}); */
 
 	let hoverQueue = new HoverQueue();
 	let reloadedStaticHovered = $state(true);
@@ -133,7 +126,9 @@
 		}
 	}); */
 
-	function fileSystemFileToFileMetadata(file: App.VFS.Sidebar.FileSystemFile): App.VFS.Sidebar.FileMetadata {
+	function fileSystemFileToFileMetadata(
+		file: App.VFS.Sidebar.FileSystemFile
+	): App.VFS.Sidebar.FileMetadata {
 		return {
 			filename: file.name,
 			mimetype: file.mimetype,
@@ -144,19 +139,12 @@
 		};
 	}
 
-	function getFilename(entry: VFSEntry | SidebarFolder): string {
+	function getFilename(entry: VFSEntry | FolderViewNode): string {
 		return entry.path.split('/').pop() || '';
 	}
 
-	function parseVFS(): SidebarFolder {
-		const root: SidebarFolder = {
-			name: '/',
-			isFolder: true,
-			children: [],
-			depth: 0,
-			open: true,
-			path: controller.root
-		};
+	function parseVFS(): FolderViewNode {
+		const root: FolderViewNode = new FolderViewNode('');
 
 		const entries = controller.vfs.entries;
 		const filesByDirectory: Map<string, VFSEntry[]> = new Map();
@@ -168,17 +156,19 @@
 			filesByDirectory.get(dirPath)?.push(file);
 		});
 
-		const buildDirectoryTree = (basePath: string, parentNode: SidebarFolder) => {
+		const buildDirectoryTree = (basePath: string, parentNode: FolderViewNode) => {
 			if (!parentNode.isFolder) return;
 
-			controller.vfs.entries.filter(
-				(f) =>
-					f.path.startsWith(basePath) &&
-					f.path.split('/').filter((p) => p).length ===
-						basePath.split('/').filter((p) => p).length + 1
-			).forEach((file) => {
-				parentNode.children.push({...file, name: getFilename(file)});
-			});
+			controller.vfs.entries
+				.filter(
+					(f) =>
+						f.path.startsWith(basePath) &&
+						f.path.split('/').filter((p) => p).length ===
+							basePath.split('/').filter((p) => p).length + 1
+				)
+				.forEach((file) => {
+					parentNode.children.push(new FileViewNode(getFilename(file), parentNode));
+				});
 
 			// Find subdirectories
 			const subdirs = new Set(
@@ -197,21 +187,14 @@
 
 			subdirs.forEach((subdir) => {
 				const fullSubdirPath = `${basePath}/${subdir}`;
-				const dirNode: SidebarFolder = {
-					name: getFilename({ path: fullSubdirPath } as VFSEntry),
-					isFolder: true,
-					depth: parentNode.depth + 1,
-					children: [],
-					path: fullSubdirPath,
-					open: false
-				};
+				const dirNode: FolderViewNode = new FolderViewNode(subdir, parentNode);
 				parentNode.children.push(dirNode);
 				buildDirectoryTree(fullSubdirPath, dirNode);
 			});
 
 			parentNode.children.sort((a, b) => {
-				const isADir = isFolder(a);
-				const isBDir = isFolder(b);
+				const isADir = a.isFolder;
+				const isBDir = b.isFolder;
 
 				if (isADir && !isBDir) return -1;
 				if (!isADir && isBDir) return 1;
@@ -220,7 +203,8 @@
 			});
 		};
 
-		buildDirectoryTree(controller.root, root);
+		buildDirectoryTree(root.path, root);
+		console.log($state.snapshot(root.children), filesByDirectory);
 
 		return root;
 	}
@@ -313,8 +297,8 @@
 	}
 
 	// Function to recursively find and remove the item
-	function findAndRemoveItem(tree: SidebarNode, delitem: SidebarNode): SidebarNode | null {
-		let removedItem: SidebarNode | null = null;
+	/* function findAndRemoveItem(tree: ViewNode, delitem: ViewNode): ViewNode | null {
+		let removedItem: ViewNode | null = null;
 		
 		if (isFolder(tree)) {
 			for (let i = 0; i < tree.children.length; i++) {
@@ -328,20 +312,20 @@
 
 				// If it's a directory, recursively search only if the path is a prefix
 				if (isFolder(item) && delitem.path.startsWith(item.path)) {
-					const removedItem = findAndRemoveItem(item, delitem);
-					/* if (item.children.length === 0) { If we want to remove empty dirs
+					const removedItem = findAndRemoveItem(item, delitem); */
+	/* if (item.children.length === 0) { If we want to remove empty dirs
 						tree.children.splice(i, 1);
 					} */
-					if (removedItem) return removedItem;
+	/* if (removedItem) return removedItem;
 				}
 			}
 		}
 
 		return removedItem;
-	}
+	} */
 
 	// Function to insert item into the correct folder
-	function insertItemInFolder(tree: SidebarNode, folder: SidebarNode, item: SidebarNode) {
+	/* function insertItemInFolder(tree: ViewNode, folder: ViewNode, item: ViewNode) {
 		if (item.path === folder.path) {
 			console.error('Cannot insert item into itself');
 			return;
@@ -352,8 +336,8 @@
 
 		if (isFolder(current)) {
 			for (const part of parts.slice(0, -1)) {
-				current = current as SidebarFolder;
-				const dir: SidebarNode | undefined = current.children.find(
+				current = current as FolderViewNode;
+				const dir: ViewNode | undefined = current.children.find(
 					(child) => getFilename(child) === part
 				);
 
@@ -364,7 +348,7 @@
 
 				current = dir;
 			}
-			current = current as SidebarFolder;
+			current = current as FolderViewNode;
 
 			current.children.push(item);
 
@@ -379,12 +363,12 @@
 				return a.path.localeCompare(b.path);
 			});
 		}
-	}
+	} */
 
-	function moveItemInTree(
-		tree: SidebarNode,
-		curFolder: SidebarNode,
-		curDragged: SidebarNode
+	/* function moveItemInTree(
+		tree: ViewNode,
+		curFolder: ViewNode,
+		curDragged: ViewNode
 	) {
 		// Remove the item from its current location
 		const removedItem = findAndRemoveItem(tree, curDragged);
@@ -414,22 +398,15 @@
 		insertItemInFolder(tree, curFolder, removedItem);
 
 		return tree;
-	}
+	} */
 
 	function addFile() {
 		let hovered = hoverQueue.freezedHovered;
 
-		if (hovered && hovered.isDir) {
-			const newFile = {
-				name: '',
-				new: true,
-				mutated: false,
-				open: false,
-				content: '',
-				path: hovered.item.path + '...'
-			} as SidebarFile;
+		if (hovered && hovered.item instanceof FolderViewNode) {
+			const newFile = new FileViewNode('{name}', hovered.item, true);
+			hovered.item.addChild(newFile);
 
-			insertItemInFolder(data.tree!, hovered.item, newFile);
 			setTimeout(() => {
 				let newFileFocus = document.getElementById('newFileFocus');
 
@@ -440,41 +417,31 @@
 		}
 	}
 
-	function finalizeNewFile(e: FocusEvent | KeyboardEvent, item: SidebarNode) {
-		if (e.type === 'keypress' && (e as KeyboardEvent).key !== 'Enter' || !item.new) return;
-		if (item.name === '') {
-			findAndRemoveItem(data.tree!, item);
+	function finalizeNewFile(e: FocusEvent | KeyboardEvent, item: ViewNode) {
+		if ((e.type === 'keypress' && (e as KeyboardEvent).key !== 'Enter') || !item.editing) return;
+		let value = (e.target as HTMLInputElement | null)?.value;
+		if (value === undefined || value === '') {
+			item.delete();
 		} else {
-			item.path = item.path.substring(0, item.path.length - 3) + item.name;
 			console.log('New file:', $state.snapshot(item));
-			
+
+			item.rename(value);
 			// TODO: New file callback
-			controller.eventListener.fire('onSidebarNewFile', item as SidebarFile);
-			item.new = false;
+			controller.eventListener.fire('onSidebarNewFile', item as FileViewNode);
+			item.editing = false;
+			console.log('New file:', $state.snapshot(item), $state.snapshot(item.parent?.children));
 		}
 	}
 
 	function addDir() {
 		let hovered = hoverQueue.freezedHovered;
 
-		if (hovered && hovered.isDir) {
+		if (hovered && hovered.item instanceof FolderViewNode) {
 			console.log(hovered.item.path);
 
-			if (!isFolder(hovered.item)) {
-				console.error('Cannot create a directory inside a file');
-				return;
-			}
-
-			const newDir = {
-				name: '',
-				isFolder: true,
-				new: true,
-				children: [],
-				open: false,
-				depth: hovered.item.depth + 1,
-				path: hovered.item.path + '/...'
-			} as SidebarFolder;
-			insertItemInFolder(data.tree!, hovered.item, newDir);
+			const newDir = new FolderViewNode('{name}', hovered.item, true);
+			hovered.item.addChild(newDir);
+			// insertItemInFolder(data.tree!, hovered.item, newDir);
 
 			setTimeout(() => {
 				let newDirFocus = document.getElementById('newDirFocus');
@@ -486,18 +453,19 @@
 		}
 	}
 
-	function finalizeNewDir(e: FocusEvent | KeyboardEvent, item: SidebarNode) {
+	function finalizeNewDir(e: FocusEvent | KeyboardEvent, item: ViewNode) {
 		if (e.type === 'keypress' && (e as KeyboardEvent).key !== 'Enter') return;
-		if (item.name === '') {
-			findAndRemoveItem(data.tree!, item);
+		let value = (e.target as HTMLInputElement | null)?.value;
+		if (value === undefined || value === '' || value === null) {
+			item.parent?.removeChild(item);
 		} else {
-			item.path = item.path.substring(0, item.path.length - 3) + item.name;
-			controller.eventListener.fire('onSidebarNewDir', item as SidebarFolder);
-			item.new = false;
+			item.rename(value);
+			controller.eventListener.fire('onSidebarNewDir', item as FolderViewNode);
+			item.editing = false;
 		}
 	}
 
-	function forEachTreeNode(tree: SidebarNode, callback: (node: SidebarNode) => boolean) {
+	/* function forEachTreeNode(tree: ViewNode, callback: (node: ViewNode) => boolean) {
 		let terminate = false;
 		if (isFolder(tree)) {
 			tree.children.forEach((child) => {
@@ -506,7 +474,7 @@
 			});
 			if (terminate) return;
 		}
-	}
+	} */
 
 	function drop(e: DragEvent) {
 		e.preventDefault();
@@ -514,19 +482,21 @@
 		if ($state.snapshot(validDrop)) {
 			console.log('OK');
 
-			if (dragState.dragged!.path === dragTarget!.path + '/' + dragState.dragged!.name) {
+			if (dragTarget!.path.startsWith(dragState.dragged!.path)) {
 				dragState.targets.clear();
 				return;
 			}
 
 			for (const target of dragState.targets) {
-				if (!target.open) {
-					target.open = true;
+				if (!target.isExpanded) {
+					target.isExpanded = true;
 				}
 			}
 
 			// Move file (inside tree)
-			moveItemInTree(data.tree!, dragTarget!, dragState.dragged!);
+			(dragState.dragged! as FileViewNode | FolderViewNode).move(dragTarget!);
+			// moveItemInTree(data.tree!, dragTarget!, dragState.dragged!);
+			controller.eventListener.fire('onSidebarNodeMoved', dragState.dragged!, dragTarget!.path);
 
 			// TODO: Move file callback
 
@@ -540,12 +510,12 @@
 		dragState.targets.clear();
 	}
 
-	function dragStart(e: DragEvent, item: SidebarNode) {
+	function dragStart(e: DragEvent, item: ViewNode) {
 		dragState.dragged = item;
 		e.dataTransfer?.setData('text/plain', item.path);
 	}
 
-	function dragOverFolder(e: DragEvent, folder: SidebarFolder) {
+	function dragOverFolder(e: DragEvent, folder: FolderViewNode) {
 		e.preventDefault();
 		if (dragState.dragged) {
 			dragState.targets.add(folder);
@@ -557,39 +527,52 @@
 
 		if (hovered) {
 			const item = hovered.item;
-			const removedItem = findAndRemoveItem(data.tree!, item);
+			item.delete();
 
-			if (!isFolder(item)) {
-				controller.eventListener.fire('onSidebarFileDeleted', removedItem as SidebarFile);
+			if (item instanceof FileViewNode) {
+				controller.eventListener.fire('onSidebarFileDeleted', item);
 			} else {
-				controller.eventListener.fire('onSidebarDirDeleted', removedItem as SidebarFolder);
+				controller.eventListener.fire('onSidebarDirDeleted', item as FolderViewNode);
 			}
 		}
 	}
 
-	$effect(() => {
+	function init() {
 		data = {
 			name: controller.name,
 			root: controller.root,
 			tree: parseVFS()
-		}
-		console.log(controller);
-	})
+		};
+		console.log(controller, $state.snapshot((data.tree?.children[0] as FolderViewNode).children));
+	}
+
+	$effect(() => {
+		controller.eventListener.register('onVFSInitialized', init);
+
+		untrack(() => {
+			// for hot reloads
+			if (controller.monacoOk) {
+				init();
+			}
+		});
+
+		return () => {
+			controller.eventListener.unregister('onVFSInitialized', init);
+		};
+	});
 </script>
 
 <Sidebar.Root collapsible="icon">
 	<Sidebar.Header>
 		<Sidebar.Menu>
 			<Sidebar.MenuItem>
-				<Sidebar.MenuButton size="lg" class="flex items-center aria-disabled:opacity-100" aria-disabled>
-					<img
-						src={projectAvatar}
-						alt="Avatar"
-						class="size-8 rounded-md"
-					/>
-					<span class="text-lg font-bold"
-						>{controller?.name ?? ''}</span
-					>
+				<Sidebar.MenuButton
+					size="lg"
+					class="flex items-center aria-disabled:opacity-100"
+					aria-disabled
+				>
+					<img src={projectAvatar} alt="Avatar" class="size-8 rounded-md" />
+					<span class="text-lg font-bold">{controller?.name ?? ''}</span>
 				</Sidebar.MenuButton>
 			</Sidebar.MenuItem>
 		</Sidebar.Menu>
@@ -640,15 +623,20 @@
 							{/if}
 						{/if}
 						{#if cur.item.path !== data.tree!.path}
-							<ContextMenu.Item onclick={deleteNode}>Delete {!cur.isDir ? 'File' : 'Folder'}</ContextMenu.Item>
+							<ContextMenu.Item onclick={deleteNode}
+								>Delete {!cur.isDir ? 'File' : 'Folder'}</ContextMenu.Item
+							>
 						{/if}
 						{#if !cur.isDir && cur.item.path.endsWith('.typ')}
-							<ContextMenu.CheckboxItem checked={cur.item.path === controller.previewFile} onCheckedChange={(checked) => {
-								if (checked) {
-									controller.eventListener.fire('onSidebarPreviewFileChange', cur.item as SidebarFile);
-									controller.previewFile = cur.item.path;
-								}
-							}}>
+							<ContextMenu.CheckboxItem
+								checked={cur.item.path === controller.previewFile}
+								onCheckedChange={(checked) => {
+									if (checked) {
+										controller.eventListener.fire('onSidebarPreviewFileChange', cur.item as FileViewNode);
+										controller.previewFile = cur.item.path;
+									}
+								}}
+							>
 								Preview This File
 							</ContextMenu.CheckboxItem>
 						{/if}
@@ -685,22 +673,21 @@
 </Sidebar.Root>
 
 {#snippet previewing()}
-<div class="bg-red w-20 h-8">
-	<p>Currently previewing this file.</p>
-</div>
+	<div class="bg-red h-8 w-20">
+		<p>Currently previewing this file.</p>
+	</div>
 {/snippet}
 
 <!-- eslint-disable-next-line @typescript-eslint/no-explicit-any -->
-{#snippet Tree({ item }: { item: SidebarNode })}
-	{#if !isFolder(item)}
-		{#if item.new}
+{#snippet Tree({ item }: { item: ViewNode })}
+	{#if item instanceof FileViewNode}
+		{#if item.editing}
 			<Sidebar.MenuButton
 				isActive={item.path === controller.activeFile}
 				class="from-emerald-500/20 to-cyan-500/20 data-[active=true]:bg-gradient-to-r data-[active=true]:font-semibold"
 			>
 				<File />
 				<Input
-					bind:value={item.name}
 					class="h-7 w-full rounded-none px-1 py-0.5 focus-visible:outline-0 focus-visible:ring-offset-1"
 					id="newFileFocus"
 					onblur={(e) => finalizeNewFile(e, item)}
@@ -722,7 +709,7 @@
 				ondragstart={(e) => dragStart(e, item)}
 				onclick={() => {
 					controller.eventListener.fire('onSidebarFileClick', item);
-					}}
+				}}
 				tooltipContent={item.path === controller.previewFile ? previewing : undefined}
 			>
 				{#if item.path === controller.previewFile}
@@ -733,67 +720,74 @@
 				<span class="h-full w-full"></span>
 			</Sidebar.MenuButton>
 		{/if}
-	{:else if item.new}
-		<Sidebar.MenuButton>
-			<Folder />
-			<Input
-				bind:value={item.name}
-				class="h-7 w-full rounded-none px-1 py-0.5 focus-visible:outline-0 focus-visible:ring-offset-1"
-				id="newDirFocus"
-				onblur={(e) => finalizeNewDir(e, item)}
-				onkeypress={(e) => finalizeNewDir(e, item)}
-			/>
-		</Sidebar.MenuButton>
-	{:else}
-		<Sidebar.MenuItem class={`rounded-none ${dragTarget?.path == item.path ? 'bg-sidebar-accent' : ''}`}>
-			<Collapsible.Root
-				class="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
-				open={item.name === 'lib' || item.name === 'components' || item.open}
-				onOpenChange={(open) => {
-					item.open = open;
-				}}
-				ondragenter={(e) => {
-					dragState.hoverTimer = Date.now();
-				}}
-				ondragover={(e) => {
-					if (!item.open && Date.now() - dragState.hoverTimer > 500 && dragState.dragged !== item) {
-						dragState.hoverTimer = Date.now();
-						item.open = true;
-					}
-					dragOverFolder(e, item);
-				}}
-				ondragleave={() => {
-					dragState.targets.delete(item);
-				}}
+	{:else if item instanceof FolderViewNode}
+		{#if item.editing}
+			<Sidebar.MenuButton>
+				<Folder />
+				<Input
+					class="h-7 w-full rounded-none px-1 py-0.5 focus-visible:outline-0 focus-visible:ring-offset-1"
+					id="newDirFocus"
+					onblur={(e) => finalizeNewDir(e, item)}
+					onkeypress={(e) => finalizeNewDir(e, item)}
+				/>
+			</Sidebar.MenuButton>
+		{:else}
+			<Sidebar.MenuItem
+				class={`rounded-none ${dragTarget?.path == item.path ? 'bg-sidebar-accent' : ''}`}
 			>
-				<Collapsible.Trigger draggable="true" ondragstart={(e) => dragStart(e, item)}>
-					{#snippet child({ props })}
-						<Sidebar.MenuButton
-							class="rounded-none"
-							{...props}
-							onmouseenter={() => {
-								hoverQueue.add(item, true);
-							}}
-							onmouseleave={() => {
-								hoverQueue.remove(item);
-							}}
-						>
-							<ChevronRight className="transition-transform" />
-							<Folder />
-							{item.name}
-						</Sidebar.MenuButton>
-					{/snippet}
-				</Collapsible.Trigger>
-				<Collapsible.Content>
-					<Sidebar.MenuSub class="mr-0 gap-0 pr-0">
-						{#if item.children}
-							{#each item.children as child, index (index)}
-								{@render Tree({ item: child })}
-							{/each}
-						{/if}
-					</Sidebar.MenuSub>
-				</Collapsible.Content>
-			</Collapsible.Root>
-		</Sidebar.MenuItem>
+				<Collapsible.Root
+					class="group/collapsible [&[data-state=open]>button>svg:first-child]:rotate-90"
+					open={item.name === 'lib' || item.name === 'components' || item.isExpanded}
+					onOpenChange={(open) => {
+						item.isExpanded = open;
+					}}
+					ondragenter={(e) => {
+						dragState.hoverTimer = Date.now();
+					}}
+					ondragover={(e) => {
+						if (
+							!item.isExpanded &&
+							Date.now() - dragState.hoverTimer > 500 &&
+							dragState.dragged !== item
+						) {
+							dragState.hoverTimer = Date.now();
+							item.isExpanded = true;
+						}
+						dragOverFolder(e, item);
+					}}
+					ondragleave={() => {
+						dragState.targets.delete(item);
+					}}
+				>
+					<Collapsible.Trigger draggable="true" ondragstart={(e) => dragStart(e, item)}>
+						{#snippet child({ props })}
+							<Sidebar.MenuButton
+								class="rounded-none"
+								{...props}
+								onmouseenter={() => {
+									hoverQueue.add(item, true);
+								}}
+								onmouseleave={() => {
+									hoverQueue.remove(item);
+								}}
+							>
+								<ChevronRight className="transition-transform" />
+								<Folder />
+								{item.name}
+							</Sidebar.MenuButton>
+						{/snippet}
+					</Collapsible.Trigger>
+					<Collapsible.Content>
+						<Sidebar.MenuSub class="mr-0 gap-0 pr-0">
+							{#if item.children}
+								{#each item.children as child, index (index)}
+									{@render Tree({ item: child })}
+								{/each}
+							{/if}
+						</Sidebar.MenuSub>
+					</Collapsible.Content>
+				</Collapsible.Root>
+			</Sidebar.MenuItem>
+		{/if}
 	{/if}
 {/snippet}

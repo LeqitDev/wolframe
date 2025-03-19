@@ -176,6 +176,7 @@ declare global {
 				type: 'render-success';
 				pageId: number;
 				dimensions: { width: number; height: number };
+				blob: Blob | null;
 			};
 			type SuccessResponse = { type: 'success'; pageId: number };
 

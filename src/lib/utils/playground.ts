@@ -42,8 +42,9 @@ export class PlaygroundFileHandler implements App.VFS.FileSystem {
     async fetchAllFiles() {
         const keys = await this.idb.getAllKeys();
         for (const key of keys) {
-            let content = await this.idb.get(key);
-            if (content === null) continue;
+            const data = JSON.parse(await this.idb.get(key) || '');
+            const content = data.content;
+            if (content === null || data.type === 'directory') continue;
             this.files[key] = content;
         }
         if (keys.length === 0) {
@@ -52,9 +53,13 @@ export class PlaygroundFileHandler implements App.VFS.FileSystem {
         return this.files;
     }
 
+    async addDirectory(path: string) {
+        await this.idb.set(path, JSON.stringify({content: "", type: 'directory'}));
+    }
+
     async writeFile(path: string, content: string) {
         this.files[path] = content;
-        await this.idb.set(path, content);
+        await this.idb.set(path, JSON.stringify({content: content, type: 'file'}));
     }
 
     async deleteFile(path: string) {

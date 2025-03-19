@@ -64,7 +64,9 @@ async function render(req: App.PageRenderer.RenderRequest) {
 			page.svg = req.svg;
 		}
 
-		send_render_success(req.pageId, page.canvg.dimension);
+		const blob = await page.canvg.getBlob();
+
+		send_render_success(req.pageId, page.canvg.dimension, blob);
 	} catch (e) {
 		send_error(e as string);
 		return;
@@ -124,11 +126,12 @@ self.onmessage = async (event: MessageEvent<App.PageRenderer.Request>) => {
 	}
 };
 
-function send_render_success(pageId: number, dimensions: { width: number; height: number }) {
+function send_render_success(pageId: number, dimensions: { width: number; height: number }, blob: Blob | null = null) {
 	post({
 		type: 'render-success',
 		pageId,
-		dimensions
+		dimensions,
+		blob,
 	});
 }
 

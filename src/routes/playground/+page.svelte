@@ -19,6 +19,11 @@
 	import { PlaygroundFileHandler } from '$lib/utils/playground';
 	import type monaco from '$lib/monaco/editor';
 	import { getController, type Controller } from '$lib/stores/controller.svelte';
+	import type {
+		ViewNode,
+		FileViewNode,
+		FolderViewNode,
+	} from '$lib/fileview/index.svelte';
 
 	const ZOOM_OUT_LIMIT = 0.1;
 	const ZOOM_IN_LIMIT = 2;
@@ -26,6 +31,8 @@
 	let { data }: { data: PageData } = $props();
 	//const layoutStore = getLayoutStore(); // For Menu and things
 	const controller: Controller = getController();
+	const backPanels = new Map<number, {target: HTMLDivElement, dim: {width: number, height: number}}>();
+	let maxWidth = 0;
 
 	let compiler: CompilerWorkerBridge;
 	let renderer: PageRendererWorkerBridge;
@@ -80,6 +87,7 @@
 
 	function initRenderer() {
 		renderer = new PageRendererWorkerBridge(new PageRendererWorker());
+		renderer.addObserver({ onMessage: rendererMessageHandler });
 	}
 
 	function initCompiler() {
@@ -121,25 +129,25 @@
 			}
 		}); */
 	}
-	function handleSidebarFileClick(file: App.VFS.Sidebar.File) {
+	function handleSidebarFileClick(file: FileViewNode) {
 		controller.openFile(file.path);
 	}
 
-	function handleSidebarNewFile(file: App.VFS.Sidebar.File) {
+	function handleSidebarNewFile(file: FileViewNode) {
 		controller.vfs.fileSystem.writeFile(file.path, '');
 		controller.newFile(file.path, '');
 		controller.openFile(file.path);
 		compiler.add_file(file.path, '');
 	}
 
-	function handleSidebarPreviewFileChange(file: App.VFS.Sidebar.File) {
+	function handleSidebarPreviewFileChange(file: FileViewNode) {
 		controller.logger.info(WorkerRendererSection, 'Preview file changed', file.path);
 		compiler.set_root(file.path);
 		compiler.compile();
 		controller.setPreviewFile(file.path);
 	}
 
-	function handleSidebarFileDeleted(file: App.VFS.Sidebar.File) {
+	function handleSidebarFileDeleted(file: FileViewNode) {
 		controller.vfs.fileSystem.deleteFile(file.path);
 		controller.closeFile(file.path);
 		controller.removeModel(file.path);
@@ -202,7 +210,20 @@
 			for (const [i, svg] of compiled.entries()) {
 				if (projectState.getPageCount() <= i) {
 					const canvas = document.createElement('canvas');
+					canvas.setAttribute('ttc-page-id', i.toString());
 					canvasContainer.appendChild(canvas);
+					const backPanel = document.createElement('div');
+					backPanel.style.backgroundColor = 'white';
+					backPanel.style.position = 'absolute';
+					backPanel.style.zIndex = '-1';
+
+					if (canvas) {
+						backPanel.style.top = `${canvas.offsetTop}px`;
+						backPanel.style.left = `${canvas.offsetLeft}px`;
+						canvas.parentElement?.insertBefore(backPanel, canvas);
+					}
+
+					backPanels.set(i, { target: backPanel, dim: { width: 0, height: 0} });
 					const offscreen = canvas.transferControlToOffscreen();
 
 					projectState.pages.push({
@@ -240,6 +261,33 @@
 		}
 	}
 
+	function rendererMessageHandler(message: App.PageRenderer.Response) {
+		if (message.type === 'render-success') {
+			const { type, pageId, dimensions } = message;
+			const canv = canvasContainer.querySelector(`[ttc-page-id="${pageId}"]`) as HTMLCanvasElement | null;
+			if (backPanels.has(pageId)) {
+				const backPanel = backPanels.get(pageId)!;
+				if (backPanel.dim.width !== dimensions.width || backPanel.dim.height !== dimensions.height) {
+					backPanel.dim = dimensions;
+					backPanel.target.style.width = `${dimensions.width}px`;
+					backPanel.target.style.height = `${dimensions.height}px`;
+				}
+			}
+		}
+	}
+
+	function resizeBackpanels() {
+		for (const [i, backPanel] of backPanels.entries()) {
+			const canvas = canvasContainer.children[i] as HTMLCanvasElement;
+			let { width: last_width, height: last_height } = backPanel.dim;
+			const factor = (maxWidth / last_width) * previewScale;
+			if (canvas) {
+				backPanel.target.style.width = `${last_width * factor}px`;
+				backPanel.target.style.height = `${last_height * factor}px`;
+			}
+		}
+	}
+
 	function zoomPreview() {
 		canvasContainer.style.gap = `${previewScale * convertRemToPixels(5)}px`;
 		canvasContainer.style.padding = `${previewScale * convertRemToPixels(4)}px`;
@@ -253,6 +301,7 @@
 		}
 
 		renderer?.resize(-1, previewScale);
+		resizeBackpanels();
 	}
 
 	function canvasLoad(node: HTMLDivElement) {
@@ -287,6 +336,8 @@
 				}
 
 				renderer?.update(-1, innerWidth);
+				maxWidth = innerWidth;
+				resizeBackpanels();
 		}
 
 		$effect(() => {
@@ -548,7 +599,7 @@
 			bind:this={canvasContainer}
 			use:canvasLoad
 			role="presentation"
-			class="flex h-full w-full flex-col items-start overflow-x-auto overflow-y-auto"
+			class="flex h-full w-full flex-col items-start overflow-x-auto overflow-y-auto relative"
 		></div>
 	</Resizable.Pane>
 </Resizable.PaneGroup>
