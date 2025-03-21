@@ -159,7 +159,7 @@ self.onmessage = async (event: MessageEvent<App.Compiler.Request>) => {
                 sendLoggerResponse("info", WASMSection, compiler.get_files());
                 break;
             case 'ast-tree':
-                sendLoggerResponse("info", WASMSection, compiler.get_ast().to_json());
+                sendLoggerResponse("info", WASMSection, compiler.get_ast(request.path).to_json());
                 break;
             default:
                 sendError('Unknown request type');

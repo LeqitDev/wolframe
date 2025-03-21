@@ -14,7 +14,7 @@
 	import { VFS } from '$lib/stores/vfs.svelte';
 	import { getLayoutStore } from '$lib/stores/layoutStore.svelte';
 	import { getUniLogger, WorkerRendererSection } from '$lib/stores/logger.svelte';
-	import { convertRemToPixels } from '$lib/utils';
+	import { convertRemToPixels, debounce } from '$lib/utils';
 	import { untrack } from 'svelte';
 	import { PlaygroundFileHandler } from '$lib/utils/playground';
 	import type monaco from '$lib/monaco/editor';
@@ -57,6 +57,10 @@
 
 	const projectState = initializePAS(data.project!.id, data.project_path);
 	const logger = getUniLogger();
+
+	const updateDebouncer = debounce(() => {
+		renderer?.update(-1, maxWidth);
+	}, 200);
 
 	let panes: {
 		editor: {
@@ -272,13 +276,20 @@
 					backPanel.target.style.width = `${dimensions.width}px`;
 					backPanel.target.style.height = `${dimensions.height}px`;
 				}
+				if (canv) {
+					setTimeout(() => {
+						canv.style.display = 'block';
+						backPanel.target.style.top = `${canv.offsetTop}px`;
+						backPanel.target.style.left = `${canv.offsetLeft}px`;
+					}, 100);
+				}
 			}
 		}
 	}
 
 	function resizeBackpanels() {
 		for (const [i, backPanel] of backPanels.entries()) {
-			const canvas = canvasContainer.children[i] as HTMLCanvasElement;
+			const canvas = canvasContainer.querySelector(`[ttc-page-id="${i}"]`) as HTMLCanvasElement | null;
 			let { width: last_width, height: last_height } = backPanel.dim;
 			const factor = (maxWidth / last_width) * previewScale;
 			if (canvas) {
@@ -335,8 +346,12 @@
 					innerWidth -= getScrollBarWidth();
 				}
 
-				renderer?.update(-1, innerWidth);
 				maxWidth = innerWidth;
+				canvasContainer.querySelectorAll(`canvas`).forEach((canvas) => {
+					canvas.style.display = 'none';
+				});
+				updateDebouncer();
+				// renderer?.update(-1, innerWidth);
 				resizeBackpanels();
 		}
 

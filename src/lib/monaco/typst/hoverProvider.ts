@@ -70,14 +70,16 @@ export class TypstHoverProvider implements Monaco.languages.HoverProvider {
             if (definition.definition.value && definition.definition.value.docs) {
                 let sections = parseDocs(definition.definition.value.docs);
 
-                contents.push({ value: '**DOCS**' });
-                contents.push({ value: sections[0].content.join('\n') });
+                console.log(sections);
+                
+
+                contents.push({ value: sections[0].content.join('\n'), supportHtml: true, isTrusted: true });
 
                 sections = sections.slice(1);
 
                 sections.forEach((section) => {
                     contents.push({ value: `**${section.heading}**` });
-                    contents.push({ value: section.content.join('\n') });
+                    contents.push({ value: section.content.join('\n'), supportHtml: true, isTrusted: true });
                 });
             }
         }

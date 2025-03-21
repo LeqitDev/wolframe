@@ -73,7 +73,8 @@ export class TypstLanguage implements App.Editor.Language {
 			label: 'Print AST',
 			run: () => {
 				if (!this.compiler) return;
-				this.compiler.ast_tree();
+				console.log('AST from', editor.getModel()!.uri.path);
+				this.compiler.ast_tree(editor.getModel()!.uri.path);
 			}
 		});
 	}

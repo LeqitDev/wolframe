@@ -199,7 +199,7 @@ declare global {
 			type AddFileRequest = { type: 'add-file'; file: string; content: string };
 			type SetRootRequest = { type: 'set-root'; root: string };
 			type PrintFilesRequest = { type: 'print-files' };
-			type TreeRequest = { type: 'ast-tree' };
+			type TreeRequest = { type: 'ast-tree', path: string };
 
 			type Request =
 				| CompileRequest

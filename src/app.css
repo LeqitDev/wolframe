@@ -68,6 +68,65 @@
     --vscode-editorHoverWidget-background: hsl(var(--card));
     --vscode-editorHoverWidget-border: hsl(var(--border));
   }
+
+  .monaco-editor .monaco-hover div[data-code="desc"] {
+    padding-right: 0.5rem;
+    min-width: 20rem;
+  }
+
+  .monaco-editor .monaco-hover div[data-code="desc"] div[data-code="h1"] {
+    padding-top: 0.5rem;
+    padding-bottom: 0.25rem;
+    font-weight: 600;
+    font-size: 1rem;
+  }
+
+  .monaco-editor .monaco-hover div[data-code="desc"] div[data-code="type"] {
+    display: inline-block;
+    background-color: #8e4bff88;
+    padding: 0.01rem 0.1rem;
+    border-radius: 0.2rem;
+  }
+
+  .monaco-editor .monaco-hover div[data-code="desc"] div[data-code="function"] {
+    padding-left: 0.5rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .monaco-editor .monaco-hover div[data-code="desc"] div[data-code="function"] div[data-code="name"] {
+    color: #7aa2f7;
+    display: inline-block;
+  }
+
+  .monaco-editor .monaco-hover div[data-code="desc"] div[data-code="function"] div[data-code="function-arg"] {
+    padding-left: 0.5rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .monaco-editor .monaco-hover div[data-code="desc"] div[data-code="arg"] {
+    padding-left: 0.5rem;
+    padding-bottom: 0.75rem;
+  }
+
+  .monaco-editor .monaco-hover div[data-code="desc"] div[data-code="arg"]:last-child {
+    padding-bottom: 0.25rem;
+  }
+
+  .monaco-editor .monaco-hover div[data-code="desc"] div[data-code="arg"] div[data-code="arg-heading"] {
+    padding-bottom: 0.2rem;
+  }
+  
+  .monaco-editor .monaco-hover div[data-code="desc"] div[data-code="arg"] div[data-code="arg-heading"] div[data-code="arg-name"] {
+    display: inline-block;
+    padding-right: 0.75rem;
+    font-weight: 600;
+    color: white;
+  }
+
+  .monaco-editor .monaco-hover div[data-code="desc"] div[data-code="arg"] div[data-code="arg-heading"] div[data-code="or"] {
+    display: inline-block;
+    color: hsl(var(--muted-foreground));
+  }
 }
 
 @layer base {
