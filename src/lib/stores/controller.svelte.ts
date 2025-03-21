@@ -76,6 +76,22 @@ class Controller {
 		});
         this.status('Editor created');
 
+        this.monaco.editor.registerEditorOpener({
+            openCodeEditor: (source, resource, selectionOrPosition) => {
+                console.log(source, resource, selectionOrPosition);
+                if (resource.path.startsWith('/')) {
+                    this.openFile(resource.path);
+
+                    if (this.monaco?.Range.isIRange(selectionOrPosition)) {
+                        this.editor?.setSelection(selectionOrPosition);
+                    }
+
+                    return true;
+                }
+                return false;
+            },
+        });
+
         this.postInitExternals();
         this.status('Externals post-initialized');
 

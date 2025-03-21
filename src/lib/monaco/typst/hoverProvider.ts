@@ -91,7 +91,7 @@ export class TypstHoverProvider implements Monaco.languages.HoverProvider {
         this.hasHover = true;
     }
 
-    provideHover(model: Monaco.editor.ITextModel, position: Monaco.Position, token: Monaco.CancellationToken, context?: Monaco.languages.HoverContext<Monaco.languages.Hover> | undefined): Monaco.languages.ProviderResult<Monaco.languages.Hover> {
+    provideHover(model: Monaco.editor.ITextModel, position: Monaco.Position): Monaco.languages.ProviderResult<Monaco.languages.Hover> {
         this.curModel = model;
         this.hover = null;
 

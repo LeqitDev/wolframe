@@ -3,11 +3,13 @@ import typstTheme from '$lib/assets/typstTokio.json';
 import type { CompilerWorkerBridge } from '$lib/workerBridges';
 import { TypstCompletionProvider } from './completionProvider';
 import { TypstHoverProvider } from './typst/hoverProvider';
+import { TypstDefinitionProvider } from './typst/definitionProvider';
 
 export class TypstLanguage implements App.Editor.Language {
 	private compiler?: CompilerWorkerBridge;
 	private completionProvider?: TypstCompletionProvider;
 	private hoverProvider?: TypstHoverProvider;
+	private definitionProvider?: TypstDefinitionProvider;
 	private disposables: Monaco.IDisposable[] = [];
 	private monaco?: typeof Monaco;
 
@@ -15,6 +17,7 @@ export class TypstLanguage implements App.Editor.Language {
 		this.compiler = compiler;
 		this.completionProvider = new TypstCompletionProvider((f, o) => this.getCompletions(f, o));
 		this.hoverProvider = new TypstHoverProvider((f, o) => this.getDefinition(f, o));
+		this.definitionProvider = new TypstDefinitionProvider((f, o) => this.getDefinition(f, o), (u) => this.retrieveModel(u));
 		this.compiler.addObserver({
 			onMessage: this.onCompilerMessage.bind(this)
 		})
@@ -65,6 +68,11 @@ export class TypstLanguage implements App.Editor.Language {
 			disposer = monaco.languages.registerHoverProvider('typst', this.hoverProvider);
 			this.disposables.push(disposer);
 		}
+
+		if (this.definitionProvider) {
+			disposer = monaco.languages.registerDefinitionProvider('typst', this.definitionProvider);
+			this.disposables.push(disposer);
+		}
 	}
 
 	postInit(monaco: typeof Monaco, editor: Monaco.editor.IStandaloneCodeEditor) {
@@ -77,6 +85,12 @@ export class TypstLanguage implements App.Editor.Language {
 				this.compiler.ast_tree(editor.getModel()!.uri.path);
 			}
 		});
+	}
+
+	private retrieveModel(uri: string) {
+		if (!this.monaco) return null;
+
+		return this.monaco.editor.getModel(this.monaco.Uri.file(uri));
 	}
 
 	private getDefinition(file: string, offset: number) {
@@ -110,6 +124,7 @@ export class TypstLanguage implements App.Editor.Language {
 
 	private onDefinitionMessage(message: App.Compiler.DefinitionResponse) {
 		this.hoverProvider!.setHover(message.definition)
+		this.definitionProvider!.setDefinition(message.definition);
 	}
 
 	private onCompileSuccess() {
