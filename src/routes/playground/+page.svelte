@@ -19,10 +19,10 @@
 	import { PlaygroundFileHandler } from '$lib/utils/playground';
 	import type monaco from '$lib/monaco/editor';
 	import { getController, type Controller } from '$lib/stores/controller.svelte';
-	import type {
-		ViewNode,
+	import {
+		type ViewNode,
 		FileViewNode,
-		FolderViewNode,
+		type FolderViewNode,
 	} from '$lib/fileview/index.svelte';
 
 	const ZOOM_OUT_LIMIT = 0.1;
@@ -155,10 +155,23 @@
 	}
 
 	function handleSidebarFileDeleted(file: FileViewNode) {
+		console.log('Deleting file', file.path);
 		controller.closeFile(file.path);
 		controller.removeModel(file.path);
 		controller.vfs.deleteFile(file.path);
 		// TODO: Remove from compiler
+	}
+
+	function handleSidebarDirDeleted(folder: FolderViewNode) {
+		console.log('Deleting folder', folder.path);
+		for (const file of folder.children) {
+			if (file instanceof FileViewNode) {
+				handleSidebarFileDeleted(file);
+			} else {
+				handleSidebarDirDeleted(file as FolderViewNode);
+			}
+		}
+		controller.vfs.deleteFile(folder.path);
 	}
 
 	$effect(() => {
@@ -173,6 +186,7 @@
 		controller.eventListener.register('onSidebarNewDir', handleSidebarNewDir);
 		controller.eventListener.register('onSidebarPreviewFileChange', handleSidebarPreviewFileChange);
 		controller.eventListener.register('onSidebarFileDeleted', handleSidebarFileDeleted);
+		controller.eventListener.register('onSidebarDirDeleted', handleSidebarDirDeleted);
 		untrack(() => {
 			// for hot reloads
 			if (controller.monacoOk) {
@@ -195,6 +209,7 @@
 				handleSidebarPreviewFileChange
 			);
 			controller.eventListener.unregister('onSidebarFileDeleted', handleSidebarFileDeleted);
+			controller.eventListener.unregister('onSidebarDirDeleted', handleSidebarDirDeleted);
 		};
 	});
 

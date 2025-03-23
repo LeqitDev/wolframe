@@ -61,6 +61,7 @@ export class VFS {
 	}
 
 	deleteFile(path: string) {
+		console.log('Deleting file', path);
 		this.fileSystem.deleteFile(path).then(() => {
 			this.entries = this.entries.filter((entry) => entry.file.path !== path);
 		});

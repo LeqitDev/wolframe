@@ -168,8 +168,9 @@ export class PlaygroundFileHandler implements IFileSystem {
         }
         const file = this.files.get(path)!;
         this.files.delete(path);
-        await this.idb.delete(fileStoreName, path);
-        await this.idb.delete(blobStoreName, file.id);
+        console.log('Deleting file', file);
+        await this.idb.delete(fileStoreName, file.id);
+        if (!file.isDir) await this.idb.delete(blobStoreName, file.id);
         return file;
     }
 
@@ -180,7 +181,7 @@ export class PlaygroundFileHandler implements IFileSystem {
         const oldFile = this.files.get(oldPath)!;
         this.files.set(newPath, oldFile);
         this.files.delete(oldPath);
-        await this.idb.delete(fileStoreName, oldPath);
+        await this.idb.delete(fileStoreName, oldFile.id);
 
         const newFile: FileStore = {
             id: oldFile.id,

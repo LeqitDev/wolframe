@@ -86,9 +86,11 @@ export class IndexedDBAccessor<T, K extends keyof T = keyof T> {
             const store = transaction.objectStore(storeName.toString());
             const request = store.delete(key);
             request.onerror = () => {
+                console.error("Error deleting", key, request.error);
                 reject(request.error);
             };
             request.onsuccess = () => {
+                console.log("Deleted", key);
                 resolve();
             };
         });
