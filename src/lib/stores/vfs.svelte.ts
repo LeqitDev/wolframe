@@ -1,31 +1,20 @@
 import { untrack } from "svelte";
-import type { IFileSystem } from "../../app.types";
+import type { IFileSystem, File } from "../../app.types";
 
-export class VFSEntry implements App.FileEntry {
-	path: string;
-	content: string = '';
+export class VFSEntry {
 	open = $state({
 		isOpen: false,
 		hasDuplicates: false
 	});
 	mutated = $state(false);
-	type: "file" | "dir" = "file";
+	file: File;
 
-	constructor(path: string, type?: "file" | "dir") {
-		this.path = path;
-		if (type) this.type = type;
+	constructor(file: File) {
+		this.file = file;
 	}
 
-	isDir() {
-		return this.type === 'dir';
-	}
-
-	getName() {
-		return this.path.split('/').pop() || '';
-	}
-
-	getParent() {
-		const segments = this.path.split('/');
+	getParentName() {
+		const segments = this.file.path.split('/');
 		segments.pop();
 		return segments.pop() || '';
 	}
@@ -36,16 +25,14 @@ type OpenFileEntry = VFSEntry & {
 		name: string;
 		prefix: string;
 	};
-	isDir: () => boolean;
-	getName: () => string;
-	getParent: () => string;
+	getParentName: () => string;
 };
 
 export class VFS {
 	entries: VFSEntry[] = $state([]);
 	openHistory: string[] = $state([]);
 	currentlyOpen: VFSEntry[] = $state([]);
-	fileSystem: IFileSystem;
+	private fileSystem: IFileSystem;
 
 	constructor(fileSystem: IFileSystem) {
 		this.fileSystem = fileSystem;
@@ -55,40 +42,40 @@ export class VFS {
 		await this.fileSystem.init();
 		const files = await this.fileSystem.listFiles();
 
-		files.forEach((file, path) => {
-			if (file.isDir) {
-				this.addDir(path);
-			} else {
-				this.addFile(path, file.content ?? "");
-			}
+		files.forEach((file) => {
+			this.entries.push(new VFSEntry(file));
 		});
 	}
 
 	addDir(path: string) {
-		this.entries.push(new VFSEntry(path, "dir"));
+		this.fileSystem.addDirectory(path).then((file) => {
+			this.entries.push(new VFSEntry(file));
+		})
 	}
 
 	addFile(path: string, content: string) {
 		console.log('Adding file', path);
-		const file = new VFSEntry(path);
-		file.content = content;
-		this.entries.push(file);
+		this.fileSystem.writeFile(path, content).then((file) => {
+			this.entries.push(new VFSEntry(file));
+		});
 	}
 
 	deleteFile(path: string) {
-		this.entries = this.entries.filter((entry) => entry.path !== path);
+		this.fileSystem.deleteFile(path).then(() => {
+			this.entries = this.entries.filter((entry) => entry.file.path !== path);
+		});
 	}
 
 	fileMutated(path: string) {
-		const entry = this.entries.find((entry) => entry.path === path);
+		const entry = this.entries.find((entry) => entry.file.path === path);
 		if (entry === undefined) return;
 		entry.mutated = true;
 	}
 
 	openFile(path: string) {
-		const entry = this.entries.find((entry) => entry.path === path);
+		const entry = this.entries.find((entry) => entry.file.path === path);
 		if (entry === undefined) return;
-		const possibleDuplicates = this.currentlyOpen.filter((entry) => entry.getName() === entry.getName() && entry.path !== path);
+		const possibleDuplicates = this.currentlyOpen.filter((entry) => entry.file.name === entry.file.name && entry.file.path !== path);
 		if (possibleDuplicates.length > 0) {
 			possibleDuplicates.forEach((entry) => {
 				entry.open.hasDuplicates = true;
@@ -97,11 +84,11 @@ export class VFS {
 		}
 		entry.open.isOpen = true;
 		this.openHistory = [path, ...this.openHistory.filter((p) => p !== path)];
-		if (this.currentlyOpen.findIndex((entry) => entry.path === path) === -1) {
+		if (this.currentlyOpen.findIndex((entry) => entry.file.path === path) === -1) {
 			if (!entry.mutated) {
-				for (const entry of this.entries.filter((entry) => entry.path !== path && entry.open.isOpen)) {
+				for (const entry of this.entries.filter((entry) => entry.file.path !== path && entry.open.isOpen)) {
 					if (!entry.mutated) {
-						this.closeFile(entry.path);
+						this.closeFile(entry.file.path);
 					}
 				}
 			}
@@ -110,30 +97,30 @@ export class VFS {
 	}
 
 	closeFile(path: string) {
-		const entry = this.entries.find((entry) => entry.path === path);
+		const entry = this.entries.find((entry) => entry.file.path === path);
 		if (entry === undefined) return;
 		if (entry.open.hasDuplicates) {
-			const duplicates = this.currentlyOpen.filter((entry) => entry.getName() === entry.getName());
+			const duplicates = this.currentlyOpen.filter((entry) => entry.file.name === entry.file.name);
 			if (duplicates.length === 1) {
 				duplicates[0].open.hasDuplicates = false;
 			}
 		}
 		entry.open.isOpen = false;
 		this.openHistory = this.openHistory.filter((p) => p !== path);
-		this.currentlyOpen = this.currentlyOpen.filter((entry) => entry.path !== path);
+		this.currentlyOpen = this.currentlyOpen.filter((entry) => entry.file.path !== path);
 		return this.openHistory[0];
 	}
 
 	getMainFile() {
 		return untrack(() => {
-			return this.entries.find((entry) => entry.path === '/main.typ') ?? (this.entries.find((entry) => entry.path === '/lib.typ') ?? this.entries.at(0));
+			return this.entries.find((entry) => entry.file.path === '/main.typ') ?? (this.entries.find((entry) => entry.file.path === '/lib.typ') ?? this.entries.at(0));
 		})
 	}
 
 	writeFile(path: string, content: string) {
-		const entry = this.entries.find((entry) => entry.path === path);
+		const entry = this.entries.find((entry) => entry.file.path === path);
 		if (entry === undefined) return;
-		entry.content = content;
+		entry.file.content = content;
 		entry.mutated = true;
 		this.fileSystem.writeFile(path, content);
 	}
@@ -147,7 +134,7 @@ export class VFS {
 		// 2. Group by filename
 		const groups = new Map<string, VFSEntry[]>();
 		openedEntries.forEach((entry) => {
-			const filename = entry.path.split('/').pop() || '';
+			const filename = entry.file.path.split('/').pop() || '';
 			if (!groups.has(filename)) groups.set(filename, []);
 			groups.get(filename)!.push(entry);
 		});
@@ -162,14 +149,12 @@ export class VFS {
 						name: filename,
 						prefix: ''
 					},
-					isDir: entries[0].isDir,
-					getName: entries[0].getName,
-					getParent: entries[0].getParent
+					getParentName: entries[0].getParentName
 				});
 			} else {
 				// Multiple files - need prefixes
 				entries.forEach((entry) => {
-					const segments = entry.path.split('/');
+					const segments = entry.file.path.split('/');
 					const name = segments.pop()!;
 					const prefix =
 						(segments.length > 1 ? '.../' : '/') + (segments.pop() || '').replace('files', '');
@@ -180,9 +165,7 @@ export class VFS {
 							name,
 							prefix
 						},
-						isDir: entry.isDir,
-						getName: entry.getName,
-						getParent: entry.getParent
+						getParentName: entries[0].getParentName
 					});
 				});
 			}

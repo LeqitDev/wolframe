@@ -99,13 +99,13 @@
 		compiler = new CompilerWorkerBridge(new CompilerWorker());
 		typstLanguage.setCompiler(compiler);
 		const mainFile = controller.vfs.getMainFile();
-		compiler.init(mainFile?.path ?? '');
-		controller.previewFile = mainFile?.path ?? '';
+		compiler.init(mainFile?.file.path ?? '');
+		controller.previewFile = mainFile?.file.path ?? '';
 		compiler.addObserver({ onMessage: compilerCompileResult });
 		compiler.addObserver({ onMessage: compilerLogger });
-		controller.vfs.entries.forEach((file) => {
-			if (file.content === undefined) return;
-			compiler.add_file(file.path, file.content);
+		controller.vfs.entries.forEach((entry) => {
+			if (entry.file.content === undefined) return;
+			compiler.add_file(entry.file.path, entry.file.content);
 		});
 
 		compiler.compile();
@@ -138,14 +138,12 @@
 	}
 
 	function handleSidebarNewFile(file: FileViewNode) {
-		controller.vfs.fileSystem.writeFile(file.path, '');
 		controller.newFile(file.path, '');
 		controller.openFile(file.path);
 		compiler.add_file(file.path, '');
 	}
 
 	function handleSidebarNewDir(folder: FolderViewNode) {
-		controller.vfs.fileSystem.addDirectory(folder.path);
 		controller.vfs.addDir(folder.path);
 	}
 
@@ -157,7 +155,6 @@
 	}
 
 	function handleSidebarFileDeleted(file: FileViewNode) {
-		controller.vfs.fileSystem.deleteFile(file.path);
 		controller.closeFile(file.path);
 		controller.removeModel(file.path);
 		controller.vfs.deleteFile(file.path);
@@ -435,6 +432,7 @@
 	) {
 		const content = model.getValue();
 		const path = model.uri.path;
+		console.log('Content changed', path);
 
 		controller.vfs.writeFile(path, content);
 	}
@@ -582,28 +580,28 @@
 			<div
 				class={`flex pl-2 ${controller.vfs.currentlyOpen.length === 0 ? 'min-h-0' : 'min-h-10 border-b'}`}
 			>
-				{#each controller.vfs.currentlyOpen as file}
+				{#each controller.vfs.currentlyOpen as entry}
 					<Button
 						size="sm"
 						variant="outline"
-						class={`h-full rounded-none border-b-0 border-l-0 border-r text-sm ${!file.mutated ? 'italic' : ''} ${controller.editorModelUri === file.path ? 'border-t-2 border-t-purple-300 bg-accent' : ''}`}
+						class={`h-full rounded-none border-b-0 border-l-0 border-r text-sm ${!entry.mutated ? 'italic' : ''} ${controller.editorModelUri === entry.file.path ? 'border-t-2 border-t-purple-300 bg-accent' : ''}`}
 						onclick={() => {
-							let entry = controller.vfs.entries.find((entry) => entry.path === file.path)!;
+							let entry = controller.vfs.entries.find((entry) => entry.file.path === entry.file.path)!;
 							if (entry.open.isOpen) {
-								controller.openFile(file.path);
+								controller.openFile(entry.file.path);
 							}
 						}}
 					>
-						{file.getName()}
+						{entry.file.name}
 						<span class="text-muted-foreground">
-							{#if file.getParent() !== ''}
-								{file.getParent()}
+							{#if entry.getParentName() !== ''}
+								{entry.getParentName()}
 							{/if}
 						</span>
 						<button
 							class="rounded-md p-0.5 hover:bg-slate-600"
 							onclick={() => {
-								controller.closeFile(file.path);
+								controller.closeFile(entry.file.path);
 							}}
 						>
 							<X />

@@ -21,11 +21,11 @@ export interface File extends FileMetadata {
 export interface IFileSystem {
     init: () => Promise<void>;
 
-    deleteFile: (path: string) => Promise<void>;
+    deleteFile: (path: string) => Promise<File>;
     readFile: (path: string) => Promise<string>;
-    writeFile: (path: string, content: string) => Promise<void>;
+    writeFile: (path: string, content: string) => Promise<File>;
     renameFile: (oldPath: string, newPath: string) => Promise<void>;
-    addDirectory: (path: string) => Promise<void>;
+    addDirectory: (path: string) => Promise<File>;
 
     listFiles: () => Promise<Map<string, File>>;
 }

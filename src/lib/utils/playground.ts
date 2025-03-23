@@ -116,7 +116,9 @@ export class PlaygroundFileHandler implements IFileSystem {
             updatedAt: new Date(),
             path
         }
+        this.files.set(path, file);
         await this.idb.set(fileStoreName, file);
+        return file;
     }
 
     async addFile(path: string, content: string) {
@@ -132,30 +134,43 @@ export class PlaygroundFileHandler implements IFileSystem {
             updatedAt: new Date(),
             path
         }
+        this.files.set(path, file);
         await this.idb.set(fileStoreName, file);
 
         const blob: Blob = new Blob([content], { type: "text/plain" });
         await this.idb.set(blobStoreName, { id: file.id, blob });
+        return {
+            ...file,
+            content
+        } as File;
     }
 
     async writeFile(path: string, content: string) {
         if (!this.files.has(path)) {
-            await this.addFile(path, content);
-            return;
+            const file = await this.addFile(path, content);
+            return file;
         }
         const file = this.files.get(path)!;
 
         const blobId = file.id;
         const blob: Blob = new Blob([content], { type: "text/plain" });
         await this.idb.set(blobStoreName, { id: blobId, blob });
+
+        file.updatedAt = new Date();
+        await this.idb.set(fileStoreName, file);
+        file.content = content;
+        return file;
     }
 
     async deleteFile(path: string) {
         if (!this.files.has(path)) {
             throw new Error("File not found");
         }
+        const file = this.files.get(path)!;
         this.files.delete(path);
         await this.idb.delete(fileStoreName, path);
+        await this.idb.delete(blobStoreName, file.id);
+        return file;
     }
 
     async renameFile(oldPath: string, newPath: string) {

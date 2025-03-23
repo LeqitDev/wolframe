@@ -98,16 +98,16 @@ class Controller {
 
         this.status('Load models from VFS');
         this.vfs.entries.forEach((entry) => {
-            if (entry.isDir()) return;
-            console.log('Adding model', entry.path);
-            this.addModel(entry.content, entry.path);
+            if (entry.file.isDir) return;
+            console.log('Adding model', entry.file.path);
+            this.addModel(entry.file.content ?? "", entry.file.path);
         });
         this.status('Models loaded. Setting main file');
 
         const mainFile = this.vfs.getMainFile();
         if (mainFile) {
-            this.openFile(mainFile.path);
-            this.vfs.fileMutated(mainFile.path);
+            this.openFile(mainFile.file.path);
+            this.vfs.fileMutated(mainFile.file.path);
         } else {
             this.setModel(null);
         }
@@ -213,6 +213,7 @@ class Controller {
 	}
 
     openFile(path: string) {
+        console.log('Opening file', path);
         this.vfs.openFile(path);
         this.setModel(path);
         this.setActiveFile(path);

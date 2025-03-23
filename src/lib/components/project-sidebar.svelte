@@ -139,11 +139,52 @@
 		};
 	}
 
-	function getFilename(entry: VFSEntry | FolderViewNode): string {
+	/* function getFilename(entry: VFSEntry | FolderViewNode): string {
 		return entry.path.split('/').pop() || '';
+	} */
+
+	function newParseVFS(): FolderViewNode {
+		const root: FolderViewNode = new FolderViewNode('');
+
+		const entries = controller.vfs.entries;
+		const files: Set<{node: FileViewNode, parentId?: string}> = new Set();
+		const dirs: Map<string, {node: FolderViewNode, parentId?: string}> = new Map();
+		for (const entry of entries) {
+			if (entry.file.isDir) {
+				dirs.set(entry.file.id, {node: new FolderViewNode(entry.file.name, root), parentId: entry.file.parentId});
+			} else {
+				files.add({node: new FileViewNode(entry.file.name, root), parentId: entry.file.parentId});
+			}
+		}
+
+		for (const {node, parentId} of files) {
+			if (parentId) {
+				const parent = dirs.get(parentId);
+				if (parent) {
+					parent.node.addChild(node);
+					node.parent = parent.node;
+					break;
+				}
+			}
+			root.addChild(node);
+		}
+
+		for (const {node, parentId} of dirs.values()) {
+			if (parentId) {
+				const parent = dirs.get(parentId);
+				if (parent) {
+					parent.node.addChild(node);
+					node.parent = parent.node;
+					break;
+				}
+			}
+			root.addChild(node);
+		}
+
+		return root;
 	}
 
-	function parseVFS(): FolderViewNode {
+	/* function parseVFS(): FolderViewNode {
 		const root: FolderViewNode = new FolderViewNode('');
 
 		const entries = controller.vfs.entries;
@@ -207,7 +248,7 @@
 		console.log($state.snapshot(root.children), filesByDirectory);
 
 		return root;
-	}
+	} */
 
 	function parsePageData(data: { files: App.VFS.Sidebar.FileMetadata[]; project_path: string }) {
 		const root: App.VFS.Sidebar.FileSystemNode = {
@@ -541,7 +582,7 @@
 		data = {
 			name: controller.name,
 			root: controller.root,
-			tree: parseVFS()
+			tree: newParseVFS()
 		};
 		console.log(controller, $state.snapshot((data.tree?.children[0] as FolderViewNode).children));
 	}

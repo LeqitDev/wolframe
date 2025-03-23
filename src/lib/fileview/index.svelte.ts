@@ -31,7 +31,11 @@ export abstract class ViewNode {
         return this._parent ? `${this._parent.path}/${this._name}` : this._name;
     }
 
-    get parent() {
+    set parent(value: FolderViewNode) {
+        this._parent = value;
+    }
+
+    get parent(): FolderViewNode | undefined {
         return this._parent;
     }
 
