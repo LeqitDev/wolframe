@@ -1,13 +1,18 @@
-export class IndexedDBAccessor<T> {
+
+type Builder = {
+    [version: number]: (db: IDBDatabase) => void;
+}
+
+export class IndexedDBAccessor<T, K extends keyof T = keyof T> {
     private db: IDBDatabase | null = null;
     private dbName: string;
     private dbVersion: number;
-    private storeName: string;
+    private builder: Builder;
 
-    constructor(dbName: string, dbVersion: number, storeName: string) {
+    constructor(dbName: string, dbVersion: number, builder: Builder) {
         this.dbName = dbName;
         this.dbVersion = dbVersion;
-        this.storeName = storeName;
+        this.builder = builder;
     }
 
     async open() {
@@ -20,14 +25,19 @@ export class IndexedDBAccessor<T> {
                 this.db = request.result;
                 resolve();
             };
-            request.onupgradeneeded = () => {
+            request.onupgradeneeded = (e) => {
                 const db = request.result;
-                db.createObjectStore(this.storeName);
+                const highestBuilderVersion = Math.max(...Object.keys(this.builder).map(Number));
+                console.log(`Upgrading database from version ${e.oldVersion} to version ${e.newVersion ?? highestBuilderVersion}`);
+                for (let i = e.oldVersion + 1; i <= (e.newVersion ?? highestBuilderVersion); i++) {
+                    console.log(`Running builder for version ${i}`);
+                    this.builder[i](db);
+                }
             };
         });
     }
 
-    async get(key: string): Promise<T | null> {
+    async get<K extends keyof T>(storeName: K, key: string): Promise<T[K] | null> {
         if (this.db === null) {
             await this.open();
         }
@@ -36,8 +46,8 @@ export class IndexedDBAccessor<T> {
                 reject(new Error("Database not open"));
                 return;
             }
-            const transaction = this.db.transaction(this.storeName, "readonly");
-            const store = transaction.objectStore(this.storeName);
+            const transaction = this.db.transaction(storeName.toString(), "readonly");
+            const store = transaction.objectStore(storeName.toString());
             const request = store.get(key);
             request.onerror = () => {
                 reject(request.error);
@@ -48,15 +58,15 @@ export class IndexedDBAccessor<T> {
         });
     }
 
-    async set(key: string, value: T) {
+    async set(storeName: K, value: T[K]) {
         return new Promise<void>((resolve, reject) => {
             if (this.db === null) {
                 reject(new Error("Database not open"));
                 return;
             }
-            const transaction = this.db.transaction(this.storeName, "readwrite");
-            const store = transaction.objectStore(this.storeName);
-            const request = store.put(value, key);
+            const transaction = this.db.transaction(storeName.toString(), "readwrite");
+            const store = transaction.objectStore(storeName.toString());
+            const request = store.put(value);
             request.onerror = () => {
                 reject(request.error);
             };
@@ -66,14 +76,14 @@ export class IndexedDBAccessor<T> {
         });
     }
 
-    async delete(key: string) {
+    async delete(storeName: K, key: string) {
         return new Promise<void>((resolve, reject) => {
             if (this.db === null) {
                 reject(new Error("Database not open"));
                 return;
             }
-            const transaction = this.db.transaction(this.storeName, "readwrite");
-            const store = transaction.objectStore(this.storeName);
+            const transaction = this.db.transaction(storeName.toString(), "readwrite");
+            const store = transaction.objectStore(storeName.toString());
             const request = store.delete(key);
             request.onerror = () => {
                 reject(request.error);
@@ -84,14 +94,14 @@ export class IndexedDBAccessor<T> {
         });
     }
 
-    async clear() {
+    async clear(storeName: K) {
         return new Promise<void>((resolve, reject) => {
             if (this.db === null) {
                 reject(new Error("Database not open"));
                 return;
             }
-            const transaction = this.db.transaction(this.storeName, "readwrite");
-            const store = transaction.objectStore(this.storeName);
+            const transaction = this.db.transaction(storeName.toString(), "readwrite");
+            const store = transaction.objectStore(storeName.toString());
             const request = store.clear();
             request.onerror = () => {
                 reject(request.error);
@@ -109,7 +119,7 @@ export class IndexedDBAccessor<T> {
         }
     }
 
-    async getAllKeys() {
+    async getAllKeys(storeName: K) {
         if (this.db === null) {
             await this.open();
         }
@@ -118,8 +128,8 @@ export class IndexedDBAccessor<T> {
                 reject(new Error("Database not open"));
                 return;
             }
-            const transaction = this.db.transaction(this.storeName, "readonly");
-            const store = transaction.objectStore(this.storeName);
+            const transaction = this.db.transaction(storeName.toString(), "readonly");
+            const store = transaction.objectStore(storeName.toString());
             const request = store.getAllKeys();
             request.onerror = () => {
                 reject(request.error);

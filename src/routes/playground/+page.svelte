@@ -144,6 +144,11 @@
 		compiler.add_file(file.path, '');
 	}
 
+	function handleSidebarNewDir(folder: FolderViewNode) {
+		controller.vfs.fileSystem.addDirectory(folder.path);
+		controller.vfs.addDir(folder.path);
+	}
+
 	function handleSidebarPreviewFileChange(file: FileViewNode) {
 		controller.logger.info(WorkerRendererSection, 'Preview file changed', file.path);
 		compiler.set_root(file.path);
@@ -168,6 +173,7 @@
 
 		controller.eventListener.register('onSidebarFileClick', handleSidebarFileClick);
 		controller.eventListener.register('onSidebarNewFile', handleSidebarNewFile);
+		controller.eventListener.register('onSidebarNewDir', handleSidebarNewDir);
 		controller.eventListener.register('onSidebarPreviewFileChange', handleSidebarPreviewFileChange);
 		controller.eventListener.register('onSidebarFileDeleted', handleSidebarFileDeleted);
 		untrack(() => {
@@ -186,6 +192,7 @@
 			controller.eventListener.unregister('onDidChangeModelContent', onDidChangeModelContent);
 			controller.eventListener.unregister('onSidebarFileClick', handleSidebarFileClick);
 			controller.eventListener.unregister('onSidebarNewFile', handleSidebarNewFile);
+			controller.eventListener.unregister('onSidebarNewDir', handleSidebarNewDir);
 			controller.eventListener.unregister(
 				'onSidebarPreviewFileChange',
 				handleSidebarPreviewFileChange

@@ -1,4 +1,5 @@
 import { untrack } from "svelte";
+import type { IFileSystem } from "../../app.types";
 
 export class VFSEntry implements App.FileEntry {
 	path: string;
@@ -8,13 +9,15 @@ export class VFSEntry implements App.FileEntry {
 		hasDuplicates: false
 	});
 	mutated = $state(false);
+	type: "file" | "dir" = "file";
 
-	constructor(path: string) {
+	constructor(path: string, type?: "file" | "dir") {
 		this.path = path;
+		if (type) this.type = type;
 	}
 
 	isDir() {
-		return this.path.endsWith('/');
+		return this.type === 'dir';
 	}
 
 	getName() {
@@ -42,22 +45,27 @@ export class VFS {
 	entries: VFSEntry[] = $state([]);
 	openHistory: string[] = $state([]);
 	currentlyOpen: VFSEntry[] = $state([]);
-	fileSystem: App.VFS.FileSystem;
+	fileSystem: IFileSystem;
 
-	constructor(fileSystem: App.VFS.FileSystem) {
+	constructor(fileSystem: IFileSystem) {
 		this.fileSystem = fileSystem;
 	}
 
 	async init() {
 		await this.fileSystem.init();
 		const files = await this.fileSystem.listFiles();
-		Object.entries(files).forEach(([path, content]) => {
-			this.addFile(path, content);
+
+		files.forEach((file, path) => {
+			if (file.isDir) {
+				this.addDir(path);
+			} else {
+				this.addFile(path, file.content ?? "");
+			}
 		});
 	}
 
 	addDir(path: string) {
-		this.entries.push(new VFSEntry(path));
+		this.entries.push(new VFSEntry(path, "dir"));
 	}
 
 	addFile(path: string, content: string) {

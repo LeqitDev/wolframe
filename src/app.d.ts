@@ -65,8 +65,10 @@ declare global {
 				readFile: (path: string) => Promise<string>;
 				writeFile: (path: string, content: string) => Promise<void>;
 				renameFile: (oldPath: string, newPath: string) => Promise<void>;
+				addDirectory: (path: string) => Promise<void>;
 
 				listFiles: () => Promise<Record<string, string>>;
+				listDirectories: () => Promise<Set<string>>;
 			}
 			namespace Sidebar {
 

@@ -1,22 +1,15 @@
 export abstract class ViewNode {
     protected _name: string;
-    protected _path: string;
     protected _parent?: FolderViewNode;
     protected _editing: boolean = $state(false);
 
     constructor(name: string, parent?: FolderViewNode, editing?: boolean) {
         this._name = name;
-        if (parent) {
-            this._path = `${parent.path}/${name}`;
-        } else {
-            this._path = name;
-        }
         this._parent = parent;
         this._editing = editing || false;
     }
 
     rename(newName: string) {
-        this._path = this._path.replace(this._name, newName);
         this._name = newName;
     }
 
@@ -34,8 +27,8 @@ export abstract class ViewNode {
         return this._name;
     }
 
-    get path() {
-        return this._path;
+    get path(): string {
+        return this._parent ? `${this._parent.path}/${this._name}` : this._name;
     }
 
     get parent() {
@@ -70,7 +63,6 @@ export class FileViewNode extends ViewNode {
         this._parent!.removeChild(this);
         newParent.addChild(this);
         this._parent = newParent;
-        this._path = `${newParent.path}/${this._name}`;
     }
 }
 
@@ -87,9 +79,9 @@ export class FolderViewNode extends ViewNode {
     }
 
     move(newParent: FolderViewNode) {
-        if (!this._parent ||
-            this._parent === newParent || 
-            newParent.path.startsWith(this.path)) return;
+        if (!this._parent || // Has no parent
+            this._parent === newParent || // Already in the new parent  
+            newParent.path.startsWith(this.path)) return; // New parent is a child of this folder
         this._parent.removeChild(this);
         newParent.addChild(this);
         this._parent = newParent;

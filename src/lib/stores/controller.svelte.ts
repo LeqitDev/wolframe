@@ -3,6 +3,7 @@ import { VFS } from './vfs.svelte';
 import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import { getUniLogger } from './logger.svelte';
 import { EventController } from '$lib/utils';
+import type { IFileSystem } from '../../app.types';
 
 class Controller {
 	// Sidebar
@@ -97,6 +98,7 @@ class Controller {
 
         this.status('Load models from VFS');
         this.vfs.entries.forEach((entry) => {
+            if (entry.isDir()) return;
             console.log('Adding model', entry.path);
             this.addModel(entry.content, entry.path);
         });
@@ -189,7 +191,7 @@ class Controller {
     eventListener: EventController = new EventController();
     monacoOk: boolean = false;
 
-	constructor(fs: App.VFS.FileSystem) {
+	constructor(fs: IFileSystem) {
         this.logger.info('controller/svelte/constructor', 'Initializing controller');
 		this.vfs = new VFS(fs);
 	}
@@ -239,7 +241,7 @@ class Controller {
 
 const label = Symbol('controller');
 
-export function initializeController(fs: App.VFS.FileSystem) {
+export function initializeController(fs: IFileSystem) {
 	console.log('Initializing controller');
 	return setContext(label, new Controller(fs));
 }
