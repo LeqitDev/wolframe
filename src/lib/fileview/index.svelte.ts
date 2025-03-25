@@ -91,6 +91,24 @@ export class FolderViewNode extends ViewNode {
         this._parent = newParent;
     }
 
+    sort() {
+        this._children.sort((a, b) => {
+            const isADir = a.isFolder;
+            const isBDir = b.isFolder;
+
+            if (isADir && !isBDir) return -1;
+            if (!isADir && isBDir) return 1;
+
+            return a.path.localeCompare(b.path);
+        });
+
+        this._children.forEach((child) => {
+            if (child.isFolder) {
+                (child as FolderViewNode).sort();
+            }
+        });
+    }
+
     get children() {
         return this._children;
     }

@@ -108,40 +108,9 @@
 		backgroundType: ['gradientLinear']
 	}).toDataUri();
 
-	/* $effect(() => {
-		if (dragTarget) {
-			forEachTreeNode;
-		}
-	}); */
-
 	let hoverQueue = new HoverQueue();
 	let reloadedStaticHovered = $state(true);
 	let contextMenuVisibility = $state(false);
-	/* let currentHovered: null | { item: App.VFS.Sidebar.FileSystemNode; isDir: boolean } = $state(null);
-	let staticHovered: null | { item: App.VFS.Sidebar.FileSystemNode; isDir: boolean } = $state(null); */
-
-	/* $effect(() => {
-		if (!contextMenuVisibility) {
-			staticHovered = currentHovered;
-		}
-	}); */
-
-	function fileSystemFileToFileMetadata(
-		file: App.VFS.Sidebar.FileSystemFile
-	): App.VFS.Sidebar.FileMetadata {
-		return {
-			filename: file.name,
-			mimetype: file.mimetype,
-			size: file.size,
-			lastModified: file.lastModified,
-			etag: file.etag,
-			path: file.path
-		};
-	}
-
-	/* function getFilename(entry: VFSEntry | FolderViewNode): string {
-		return entry.path.split('/').pop() || '';
-	} */
 
 	function newParseVFS(): FolderViewNode {
 		const root: FolderViewNode = new FolderViewNode('');
@@ -163,283 +132,28 @@
 				if (parent) {
 					parent.node.addChild(node);
 					node.parent = parent.node;
-					break;
+					continue;
 				}
 			}
 			root.addChild(node);
 		}
 
-		for (const {node, parentId} of dirs.values()) {
+		for (let {node, parentId} of dirs.values()) {
 			if (parentId) {
 				const parent = dirs.get(parentId);
 				if (parent) {
 					parent.node.addChild(node);
 					node.parent = parent.node;
-					break;
+					continue;
 				}
 			}
 			root.addChild(node);
 		}
 
-		return root;
-	}
-
-	/* function parseVFS(): FolderViewNode {
-		const root: FolderViewNode = new FolderViewNode('');
-
-		const entries = controller.vfs.entries;
-		const filesByDirectory: Map<string, VFSEntry[]> = new Map();
-		entries.forEach((file) => {
-			const dirPath = file.path.split('/').slice(0, -1).join('/');
-			if (!filesByDirectory.has(dirPath)) {
-				filesByDirectory.set(dirPath, []);
-			}
-			filesByDirectory.get(dirPath)?.push(file);
-		});
-
-		const buildDirectoryTree = (basePath: string, parentNode: FolderViewNode) => {
-			if (!parentNode.isFolder) return;
-
-			controller.vfs.entries
-				.filter(
-					(f) =>
-						f.path.startsWith(basePath) &&
-						f.path.split('/').filter((p) => p).length ===
-							basePath.split('/').filter((p) => p).length + 1
-				)
-				.forEach((file) => {
-					parentNode.children.push(new FileViewNode(getFilename(file), parentNode));
-				});
-
-			// Find subdirectories
-			const subdirs = new Set(
-				controller.vfs.entries
-					.filter(
-						(f) =>
-							f.path.startsWith(basePath) &&
-							f.path !== basePath &&
-							f.path.split('/').filter((p) => p).length >
-								basePath.split('/').filter((p) => p).length + 1
-					)
-					.map(
-						(f) => f.path.split('/').filter((p) => p)[basePath.split('/').filter((p) => p).length]
-					)
-			);
-
-			subdirs.forEach((subdir) => {
-				const fullSubdirPath = `${basePath}/${subdir}`;
-				const dirNode: FolderViewNode = new FolderViewNode(subdir, parentNode);
-				parentNode.children.push(dirNode);
-				buildDirectoryTree(fullSubdirPath, dirNode);
-			});
-
-			parentNode.children.sort((a, b) => {
-				const isADir = a.isFolder;
-				const isBDir = b.isFolder;
-
-				if (isADir && !isBDir) return -1;
-				if (!isADir && isBDir) return 1;
-
-				return a.path.localeCompare(b.path);
-			});
-		};
-
-		buildDirectoryTree(root.path, root);
-		console.log($state.snapshot(root.children), filesByDirectory);
-
-		return root;
-	} */
-
-	function parsePageData(data: { files: App.VFS.Sidebar.FileMetadata[]; project_path: string }) {
-		const root: App.VFS.Sidebar.FileSystemNode = {
-			name: data.project_path.split('/').pop() || '',
-			type: 'directory',
-			children: [],
-			depth: 0,
-			open: true,
-			path: data.project_path.substring(0, data.project_path.length)
-		};
-
-		const filesByDirectory: Map<string, App.VFS.Sidebar.FileMetadata[]> = new Map();
-		data.files.forEach((file) => {
-			const dirPath = file.path.replace(file.filename, '').trim();
-			if (!filesByDirectory.has(dirPath)) {
-				filesByDirectory.set(dirPath, []);
-			}
-			filesByDirectory.get(dirPath)?.push(file);
-		});
-
-		const buildDirectoryTree = (basePath: string, parentNode: App.VFS.Sidebar.FileSystemNode) => {
-			if (parentNode.type === 'file') return;
-
-			const directFiles = data.files.filter(
-				(f) =>
-					f.path.startsWith(basePath) &&
-					f.path.split('/').filter((p) => p).length ===
-						basePath.split('/').filter((p) => p).length + 1
-			);
-
-			directFiles.forEach((file) => {
-				const fileNode: App.VFS.Sidebar.FileSystemNode = {
-					name: file.filename,
-					type: 'file',
-					size: file.size,
-					mimetype: file.mimetype,
-					lastModified: file.lastModified,
-					etag: file.etag,
-					path: file.path
-				};
-				parentNode.children.push(fileNode);
-			});
-
-			// Find subdirectories
-			const subdirs = new Set(
-				data.files
-					.filter(
-						(f) =>
-							f.path.startsWith(basePath) &&
-							f.path !== basePath &&
-							f.path.split('/').filter((p) => p).length >
-								basePath.split('/').filter((p) => p).length + 1
-					)
-					.map(
-						(f) => f.path.split('/').filter((p) => p)[basePath.split('/').filter((p) => p).length]
-					)
-			);
-
-			subdirs.forEach((subdir) => {
-				const fullSubdirPath = `${basePath}/${subdir}`;
-				const dirNode: App.VFS.Sidebar.FileSystemNode = {
-					name: subdir,
-					type: 'directory',
-					depth: parentNode.depth + 1,
-					children: [],
-					path: fullSubdirPath,
-					open: false
-				};
-				parentNode.children.push(dirNode);
-				buildDirectoryTree(fullSubdirPath, dirNode);
-			});
-
-			parentNode.children.sort((a, b) => {
-				const isADir = a.type === 'directory';
-				const isBDir = b.type === 'directory';
-
-				if (isADir && !isBDir) return -1;
-				if (!isADir && isBDir) return 1;
-
-				return a.name.localeCompare(b.name);
-			});
-		};
-
-		buildDirectoryTree(data.project_path, root);
+		root.sort();
 
 		return root;
 	}
-
-	// Function to recursively find and remove the item
-	/* function findAndRemoveItem(tree: ViewNode, delitem: ViewNode): ViewNode | null {
-		let removedItem: ViewNode | null = null;
-		
-		if (isFolder(tree)) {
-			for (let i = 0; i < tree.children.length; i++) {
-				const item = tree.children[i];
-				
-
-				// If it's a file and matches the path and type, remove it
-				if (item.path === delitem.path && isFolder(item) === isFolder(delitem)) {
-					return tree.children.splice(i, 1)[0];
-				}
-
-				// If it's a directory, recursively search only if the path is a prefix
-				if (isFolder(item) && delitem.path.startsWith(item.path)) {
-					const removedItem = findAndRemoveItem(item, delitem); */
-	/* if (item.children.length === 0) { If we want to remove empty dirs
-						tree.children.splice(i, 1);
-					} */
-	/* if (removedItem) return removedItem;
-				}
-			}
-		}
-
-		return removedItem;
-	} */
-
-	// Function to insert item into the correct folder
-	/* function insertItemInFolder(tree: ViewNode, folder: ViewNode, item: ViewNode) {
-		if (item.path === folder.path) {
-			console.error('Cannot insert item into itself');
-			return;
-		}
-
-		const parts = item.path.replace(tree.path, '').split('/').filter(Boolean);
-		let current = tree;
-
-		if (isFolder(current)) {
-			for (const part of parts.slice(0, -1)) {
-				current = current as FolderViewNode;
-				const dir: ViewNode | undefined = current.children.find(
-					(child) => getFilename(child) === part
-				);
-
-				if (!dir || !isFolder(dir)) {
-					console.error('Directory not found');
-					return;
-				}
-
-				current = dir;
-			}
-			current = current as FolderViewNode;
-
-			current.children.push(item);
-
-			// Sort the children
-			current.children.sort((a, b) => {
-				const isADir = isFolder(a);
-				const isBDir = isFolder(b);
-
-				if (isADir && !isBDir) return -1;
-				if (!isADir && isBDir) return 1;
-
-				return a.path.localeCompare(b.path);
-			});
-		}
-	} */
-
-	/* function moveItemInTree(
-		tree: ViewNode,
-		curFolder: ViewNode,
-		curDragged: ViewNode
-	) {
-		// Remove the item from its current location
-		const removedItem = findAndRemoveItem(tree, curDragged);
-
-		if (!removedItem) {
-			console.error('Item not found in the tree');
-			return tree;
-		}
-
-		// Update the path of the dragged item
-		const newPath = `${curFolder.path}/${getFilename(curDragged)}`;
-		const prevPath = removedItem.path;
-		
-		if (controller.previewFile === prevPath) {
-			controller.previewFile = newPath;
-		}
-
-		if (controller.activeFile === prevPath) {
-			controller.activeFile = newPath;
-		}
-
-		removedItem.path = newPath;
-
-		controller.eventListener.fire('onSidebarNodeMoved', removedItem, prevPath);
-
-		// Insert the item into the new location
-		insertItemInFolder(tree, curFolder, removedItem);
-
-		return tree;
-	} */
 
 	function addFile() {
 		let hovered = hoverQueue.freezedHovered;
@@ -506,17 +220,6 @@
 		}
 	}
 
-	/* function forEachTreeNode(tree: ViewNode, callback: (node: ViewNode) => boolean) {
-		let terminate = false;
-		if (isFolder(tree)) {
-			tree.children.forEach((child) => {
-				terminate = callback(child);
-				if (!terminate) forEachTreeNode(child, callback);
-			});
-			if (terminate) return;
-		}
-	} */
-
 	function drop(e: DragEvent) {
 		e.preventDefault();
 		console.log('Drop', $state.snapshot(dragState), $state.snapshot(dragTarget));
@@ -534,10 +237,10 @@
 				}
 			}
 
-			// Move file (inside tree)
-			(dragState.dragged! as FileViewNode | FolderViewNode).move(dragTarget!);
 			// moveItemInTree(data.tree!, dragTarget!, dragState.dragged!);
 			controller.eventListener.fire('onSidebarNodeMoved', dragState.dragged!, dragTarget!.path);
+			// Move file (inside tree)
+			(dragState.dragged! as FileViewNode | FolderViewNode).move(dragTarget!);
 
 			// TODO: Move file callback
 

@@ -165,6 +165,12 @@ class Controller {
         model.dispose();
     }
 
+    private getModel(uri: string) {
+        if (!this.monaco) return;
+        const monacoUri = this.monacoUri(uri);
+        return this.monaco.editor.getModel(monacoUri);
+    }
+
     disposeEditor() {
         this.logger.info('editor/svelte/disposeEditor', 'Disposing editor');
         this.languages.forEach((language) => language.dispose?.());
@@ -217,6 +223,14 @@ class Controller {
         this.vfs.openFile(path);
         this.setModel(path);
         this.setActiveFile(path);
+    }
+
+    moveFile(oldPath: string, newPath: string) {
+        this.vfs.moveFile(oldPath, newPath);
+        const model = this.getModel(oldPath);
+        if (!model) throw new Error('Model not found');
+        this.addModel(model.getValue(), newPath);
+        this.removeModel(oldPath);
     }
 
     newFile(path: string, content: string) {

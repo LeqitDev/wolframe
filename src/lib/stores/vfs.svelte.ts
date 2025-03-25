@@ -94,7 +94,15 @@ export class VFS {
 				}
 			}
 			this.currentlyOpen.push(entry)
+			console.log('Pushing opening file', path, $state.snapshot(this.currentlyOpen));
 		}
+	}
+
+	moveFile(path: string, newPath: string) {
+		const entry = this.entries.find((entry) => entry.file.path === path);
+		if (entry === undefined) throw new Error('File not found');
+		entry.file.path = newPath;
+		this.fileSystem.moveFile(path, newPath);
 	}
 
 	closeFile(path: string) {
@@ -135,13 +143,14 @@ export class VFS {
 		// 2. Group by filename
 		const groups = new Map<string, VFSEntry[]>();
 		openedEntries.forEach((entry) => {
-			const filename = entry.file.path.split('/').pop() || '';
+			const filename = entry.file.name;
 			if (!groups.has(filename)) groups.set(filename, []);
 			groups.get(filename)!.push(entry);
 		});
 
 		// 3. Process each group
 		groups.forEach((entries, filename) => {
+			console.log('Processing group', filename, entries);
 			if (entries.length === 1) {
 				// Single file - use simple display
 				openFiles.push({

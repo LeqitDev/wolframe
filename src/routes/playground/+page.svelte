@@ -139,6 +139,7 @@
 
 	function handleSidebarNewFile(file: FileViewNode) {
 		controller.newFile(file.path, '');
+		console.log('Creating new file', file.path);
 		controller.openFile(file.path);
 		compiler.add_file(file.path, '');
 	}
@@ -174,6 +175,26 @@
 		controller.vfs.deleteFile(folder.path);
 	}
 
+	function handleSidebarNodeMoved(node: ViewNode, newPath: string, root: boolean = true) {
+		newPath = newPath + '/' + node.name;
+		console.log('Moving node', node.path, 'to', newPath);
+		if (node instanceof FileViewNode) {
+			controller.moveFile(node.path, newPath);
+			compiler.move(node.path, newPath);
+		} else {
+			const folder = node as FolderViewNode;
+			controller.vfs.moveFile(folder.path, newPath);
+			for (const file of folder.children) {
+				if (file instanceof FileViewNode) {
+					handleSidebarNodeMoved(file, newPath, false);
+				} else {
+					handleSidebarNodeMoved(file as FolderViewNode, newPath, false);
+				}
+			}
+		}
+		if (root) compiler.compile();
+	}
+
 	$effect(() => {
 		controller.registerLanguage(typstLanguage);
 		controller.registerTheme(typstThemes);
@@ -187,6 +208,7 @@
 		controller.eventListener.register('onSidebarPreviewFileChange', handleSidebarPreviewFileChange);
 		controller.eventListener.register('onSidebarFileDeleted', handleSidebarFileDeleted);
 		controller.eventListener.register('onSidebarDirDeleted', handleSidebarDirDeleted);
+		controller.eventListener.register('onSidebarNodeMoved', handleSidebarNodeMoved);
 		untrack(() => {
 			// for hot reloads
 			if (controller.monacoOk) {
@@ -210,6 +232,7 @@
 			);
 			controller.eventListener.unregister('onSidebarFileDeleted', handleSidebarFileDeleted);
 			controller.eventListener.unregister('onSidebarDirDeleted', handleSidebarDirDeleted);
+			controller.eventListener.unregister('onSidebarNodeMoved', handleSidebarNodeMoved);
 		};
 	});
 
@@ -601,7 +624,6 @@
 						variant="outline"
 						class={`h-full rounded-none border-b-0 border-l-0 border-r text-sm ${!entry.mutated ? 'italic' : ''} ${controller.editorModelUri === entry.file.path ? 'border-t-2 border-t-purple-300 bg-accent' : ''}`}
 						onclick={() => {
-							let entry = controller.vfs.entries.find((entry) => entry.file.path === entry.file.path)!;
 							if (entry.open.isOpen) {
 								controller.openFile(entry.file.path);
 							}

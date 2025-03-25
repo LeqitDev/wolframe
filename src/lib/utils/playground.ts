@@ -157,7 +157,7 @@ export class PlaygroundFileHandler implements IFileSystem {
         await this.idb.set(blobStoreName, { id: blobId, blob });
 
         file.updatedAt = new Date();
-        await this.idb.set(fileStoreName, file);
+        await this.idb.set(fileStoreName, file as FileStore);
         file.content = content;
         return file;
     }
@@ -174,7 +174,7 @@ export class PlaygroundFileHandler implements IFileSystem {
         return file;
     }
 
-    async renameFile(oldPath: string, newPath: string) {
+    async moveFile(oldPath: string, newPath: string) {
         if (!this.files.has(oldPath)) {
             throw new Error("File not found");
         }
@@ -183,10 +183,14 @@ export class PlaygroundFileHandler implements IFileSystem {
         this.files.delete(oldPath);
         await this.idb.delete(fileStoreName, oldFile.id);
 
+        
+        const parentPath = newPath.split('/').slice(0, -1).join('/');
+        const parentId = this.files.get(parentPath)?.id;
+
         const newFile: FileStore = {
             id: oldFile.id,
             name: newPath.split('/').pop()!,
-            parentId: oldFile.parentId,
+            parentId: parentId,
             isDir: oldFile.isDir,
             createdAt: oldFile.createdAt,
             updatedAt: new Date(),

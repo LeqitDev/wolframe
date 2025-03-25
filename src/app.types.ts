@@ -24,7 +24,7 @@ export interface IFileSystem {
     deleteFile: (path: string) => Promise<File>;
     readFile: (path: string) => Promise<string>;
     writeFile: (path: string, content: string) => Promise<File>;
-    renameFile: (oldPath: string, newPath: string) => Promise<void>;
+    moveFile: (oldPath: string, newPath: string) => Promise<void>;
     addDirectory: (path: string) => Promise<File>;
 
     listFiles: () => Promise<Map<string, File>>;
