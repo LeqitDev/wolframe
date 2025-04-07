@@ -61,7 +61,7 @@ export class IndexedDBAccessor<T, K extends keyof T = keyof T> {
     async set(storeName: K, value: T[K]) {
         return new Promise<void>((resolve, reject) => {
             if (this.db === null) {
-                reject(new Error("Database not open"));
+                reject(new Error(`Database not open`));
                 return;
             }
             const transaction = this.db.transaction(storeName.toString(), "readwrite");

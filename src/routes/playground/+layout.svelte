@@ -4,11 +4,11 @@
 	import * as Menubar from '$lib/components/ui/menubar/index.js';
 	import type { PageData } from './$types';
 	import { initializeController, type Controller } from '$lib/stores/controller.svelte';
-	import { PlaygroundFileHandler } from '$lib/utils/playground';
+	import { IndexedDBFileSystem } from '$lib/utils/playground';
 
 	let { children, data }: { children: any; data: PageData } = $props();
 
-	const store: Controller = initializeController(new PlaygroundFileHandler());
+	const store: Controller = initializeController(new IndexedDBFileSystem());
 	let storeLoaded = $state(false);
 
 	$effect(()=> {

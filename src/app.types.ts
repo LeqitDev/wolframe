@@ -1,31 +1,35 @@
-interface MetadataExtension<T> {
-    name: string;
-    value: T;
+export enum FileType {
+    File = "file",
+    Directory = "directory"
 }
 
-interface FileMetadata {
+type MetadataExtension<T> = Record<string, T>;
+
+interface FileEntry {
     id: string;
     name: string;
     parentId?: string;
-    isDir: boolean;
+    type: FileType;
     createdAt: Date;
     updatedAt: Date;
     path: string;
     metadata?: MetadataExtension<unknown>[];
 }
 
-export interface File extends FileMetadata {
+export interface File extends FileEntry {
     content?: string;
 }
 
 export interface IFileSystem {
     init: () => Promise<void>;
 
-    deleteFile: (path: string) => Promise<File>;
-    readFile: (path: string) => Promise<string>;
-    writeFile: (path: string, content: string) => Promise<File>;
-    moveFile: (oldPath: string, newPath: string) => Promise<void>;
-    addDirectory: (path: string) => Promise<File>;
+    deleteFile: (id: string) => Promise<File>;
+    readFile: (id: string) => Promise<string>;
+    writeFile: (path: string, content: string | null) => Promise<File>;
+    renameFile: (id: string, newName: string) => Promise<File>;
+    moveFile: (id: string, newPath: string) => Promise<File>;
 
-    listFiles: () => Promise<Map<string, File>>;
+    listEntries: () => Promise<File[]>;
+
+    close: () => Promise<void>;
 }

@@ -13,10 +13,18 @@ export default defineConfig({
 			]
 		}
 	},
-	resolve: {
-		alias: {
-			"$rust": path.resolve(__dirname, 'typst-flow-wasm/pkg'),
-		}
+	resolve: process.env.VITEST
+		? {
+				conditions: ['browser']
+			}
+		: {
+				alias: {
+					$rust: path.resolve(__dirname, 'typst-flow-wasm/pkg')
+				}
+			},
+	test: {
+		environment: 'jsdom',
+		setupFiles: ["./setup/idbSetup.ts"],
 	},
 	define: {
 		global: {}

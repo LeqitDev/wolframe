@@ -16,7 +16,7 @@
 	import { getUniLogger, WorkerRendererSection } from '$lib/stores/logger.svelte';
 	import { convertRemToPixels, debounce } from '$lib/utils';
 	import { untrack } from 'svelte';
-	import { PlaygroundFileHandler } from '$lib/utils/playground';
+	import { IndexedDBFileSystem } from '$lib/utils/playground';
 	import type monaco from '$lib/monaco/editor';
 	import { getController, type Controller } from '$lib/stores/controller.svelte';
 	import {

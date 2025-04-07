@@ -40,43 +40,47 @@ export class VFS {
 
 	async init() {
 		await this.fileSystem.init();
-		const files = await this.fileSystem.listFiles();
+		const files = await this.fileSystem.listEntries();
 
 		files.forEach((file) => {
 			this.entries.push(new VFSEntry(file));
 		});
 	}
 
-	addDir(path: string) {
-		this.fileSystem.addDirectory(path).then((file) => {
-			this.entries.push(new VFSEntry(file));
-		})
+	async addDir(path: string) {
+		const dir = await this.fileSystem.writeFile(path, null);
+		const entry = new VFSEntry(dir);
+		this.entries.push(entry);
+		return entry;
 	}
 
-	addFile(path: string, content: string) {
+	async addFile(path: string, content: string) {
 		console.log('Adding file', path);
-		this.fileSystem.writeFile(path, content).then((file) => {
-			this.entries.push(new VFSEntry(file));
-		});
+		const file = await this.fileSystem.writeFile(path, content);
+		const entry = new VFSEntry(file);
+		this.entries.push(entry);
+		return entry;
 	}
 
-	deleteFile(path: string) {
-		console.log('Deleting file', path);
-		this.fileSystem.deleteFile(path).then(() => {
-			this.entries = this.entries.filter((entry) => entry.file.path !== path);
-		});
+	async deleteFile(id: string) {
+		console.log('Deleting file', id);
+		await this.fileSystem.deleteFile(id);
+		const entry = this.entries.find((entry) => entry.file.id === id);
+		if (entry === undefined) return;
+		this.entries = this.entries.filter((entry) => entry.file.id !== id);
+		return entry;
 	}
 
-	fileMutated(path: string) {
-		const entry = this.entries.find((entry) => entry.file.path === path);
+	fileMutated(id: string) {
+		const entry = this.entries.find((entry) => entry.file.id === id);
 		if (entry === undefined) return;
 		entry.mutated = true;
 	}
 
-	openFile(path: string) {
-		const entry = this.entries.find((entry) => entry.file.path === path);
+	openFile(id: string) {
+		const entry = this.entries.find((entry) => entry.file.id === id);
 		if (entry === undefined) return;
-		const possibleDuplicates = this.currentlyOpen.filter((entry) => entry.file.name === entry.file.name && entry.file.path !== path);
+		const possibleDuplicates = this.currentlyOpen.filter((entry) => entry.file.name === entry.file.name && entry.file.path !== id);
 		if (possibleDuplicates.length > 0) {
 			possibleDuplicates.forEach((entry) => {
 				entry.open.hasDuplicates = true;
@@ -84,29 +88,38 @@ export class VFS {
 			entry.open.hasDuplicates = true;
 		}
 		entry.open.isOpen = true;
-		this.openHistory = [path, ...this.openHistory.filter((p) => p !== path)];
-		if (this.currentlyOpen.findIndex((entry) => entry.file.path === path) === -1) {
+		this.openHistory = [id, ...this.openHistory.filter((p) => p !== id)];
+		if (this.currentlyOpen.findIndex((entry) => entry.file.id === id) === -1) {
 			if (!entry.mutated) {
-				for (const entry of this.entries.filter((entry) => entry.file.path !== path && entry.open.isOpen)) {
+				for (const entry of this.entries.filter((entry) => entry.file.id !== id && entry.open.isOpen)) {
 					if (!entry.mutated) {
-						this.closeFile(entry.file.path);
+						this.closeFile(entry.file.id);
 					}
 				}
 			}
 			this.currentlyOpen.push(entry)
-			console.log('Pushing opening file', path, $state.snapshot(this.currentlyOpen));
+			console.log('Pushing opening file', id, $state.snapshot(this.currentlyOpen));
 		}
 	}
 
-	moveFile(path: string, newPath: string) {
-		const entry = this.entries.find((entry) => entry.file.path === path);
+	renameFile(id: string, newName: string) {
+		const entry = this.entries.find((entry) => entry.file.id === id);
 		if (entry === undefined) throw new Error('File not found');
-		entry.file.path = newPath;
-		this.fileSystem.moveFile(path, newPath);
+		entry.file.name = newName;
+		this.fileSystem.renameFile(id, newName);
+		return entry;
 	}
 
-	closeFile(path: string) {
-		const entry = this.entries.find((entry) => entry.file.path === path);
+	moveFile(id: string, newPath: string) {
+		const entry = this.entries.find((entry) => entry.file.id === id);
+		if (entry === undefined) throw new Error('File not found');
+		entry.file.path = newPath;
+		this.fileSystem.moveFile(id, newPath);
+		return entry;
+	}
+
+	closeFile(id: string) {
+		const entry = this.entries.find((entry) => entry.file.id === id);
 		if (entry === undefined) return;
 		if (entry.open.hasDuplicates) {
 			const duplicates = this.currentlyOpen.filter((entry) => entry.file.name === entry.file.name);
@@ -115,8 +128,8 @@ export class VFS {
 			}
 		}
 		entry.open.isOpen = false;
-		this.openHistory = this.openHistory.filter((p) => p !== path);
-		this.currentlyOpen = this.currentlyOpen.filter((entry) => entry.file.path !== path);
+		this.openHistory = this.openHistory.filter((i) => i !== id);
+		this.currentlyOpen = this.currentlyOpen.filter((entry) => entry.file.id !== id);
 		return this.openHistory[0];
 	}
 

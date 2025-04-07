@@ -115,15 +115,15 @@ class Controller {
         this.status('Initialization complete', true);
 	}
 
-    monacoUri(uri: string) {
-        return this.monaco!.Uri.parse(uri);
+    monacoUri(id: string) {
+        return this.monaco!.Uri.parse(`fileid:id/${id}`);
     }
 
-    addModel(value: string, uri: string, language?: string) {
+    addModel(value: string, id: string, language?: string) {
         if (!this.monaco) return;
-        const monacoUri = this.monacoUri(uri);
+        const monacoUri = this.monacoUri(id);
         if (this.monaco.editor.getModel(monacoUri)) {
-			this.logger.warn('editor/svelte/addModel', 'Model already exists', { uri });
+			this.logger.warn('editor/svelte/addModel', 'Model already exists', { uri: id });
             return;
         }
         const model = this.monaco.editor.createModel(value, language, monacoUri);
@@ -134,40 +134,40 @@ class Controller {
         });
     }
 
-    setModel(uri: string | null) {
+    setModel(id: string | null) {
         if (!this.monaco || !this.editor) return;
-        if (uri === null) {
+        if (id === null) {
             this.editor.setModel(null);
             this.isEditorEmpty = true;
             this.editorModelUri = null;
             return;
         }
-        const monacoUri = this.monacoUri(uri);
+        const monacoUri = this.monacoUri(id);
         const model = this.monaco.editor.getModel(monacoUri);
         if (!model) {
-            this.logger.warn('editor/svelte/setModel', 'Model does not exist', { uri });
+            this.logger.warn('editor/svelte/setModel', 'Model does not exist', { uri: id });
             return;
         }
         this.editor.setModel(model);
         this.isEditorEmpty = false;
-        this.editorModelUri = uri;
+        this.editorModelUri = id;
     }
 
-    removeModel(uri: string) {
+    removeModel(id: string) {
         if (!this.monaco) return;
-        const monacoUri = this.monacoUri(uri);
+        const monacoUri = this.monacoUri(id);
         const model = this.monaco.editor.getModel(monacoUri);
         if (!model) {
-            this.logger.warn('editor/svelte/removeModel', 'Model does not exist', { uri });
+            this.logger.warn('editor/svelte/removeModel', 'Model does not exist', { uri: id });
             return;
         }
         // TODO: Check if model is currently in use
         model.dispose();
     }
 
-    private getModel(uri: string) {
+    private getModel(id: string) {
         if (!this.monaco) return;
-        const monacoUri = this.monacoUri(uri);
+        const monacoUri = this.monacoUri(id);
         return this.monaco.editor.getModel(monacoUri);
     }
 
@@ -225,17 +225,14 @@ class Controller {
         this.setActiveFile(path);
     }
 
-    moveFile(oldPath: string, newPath: string) {
-        this.vfs.moveFile(oldPath, newPath);
-        const model = this.getModel(oldPath);
-        if (!model) throw new Error('Model not found');
-        this.addModel(model.getValue(), newPath);
-        this.removeModel(oldPath);
+    moveFile(id: string, newPath: string) {
+        this.vfs.moveFile(id, newPath);
     }
 
     newFile(path: string, content: string) {
-        this.vfs.addFile(path, content);
-        this.addModel(content, path);
+        this.vfs.addFile(path, content).then((entry) => {
+            this.addModel(content, entry.file.id);
+        })
     }
 
     closeFile(path: string) {
