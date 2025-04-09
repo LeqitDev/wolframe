@@ -1,1 +1,0 @@
-export { TypstCompletionProvider } from './completionProvider';

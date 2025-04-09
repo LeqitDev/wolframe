@@ -1,6 +1,0 @@
-[submodule "typst-flow-wasm"]
-	path = typst-flow-wasm
-	url = https://github.com/LeqitDev/typst-flow-wasm
-[submodule "typst-flower"]
-	path = typst-flower
-	url = https://github.com/LeqitDev/typst-flower
