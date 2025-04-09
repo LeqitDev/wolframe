@@ -20,6 +20,8 @@
 	import { getController } from '$lib/stores/controller.svelte';
 	import type { VFSEntry } from '$lib/stores/vfs.svelte';
 	import { ViewNode, FileViewNode, FolderViewNode } from '$lib/fileview/index.svelte';
+	import { FileType } from '../../app.types';
+	import eventController from '$lib/utils';
 
 	class HoverQueue {
 		queue: { item: ViewNode; isDir: boolean }[] = $state([]);
@@ -113,16 +115,16 @@
 	let contextMenuVisibility = $state(false);
 
 	function newParseVFS(): FolderViewNode {
-		const root: FolderViewNode = new FolderViewNode('');
+		const root: FolderViewNode = new FolderViewNode('', '');
 
 		const entries = controller.vfs.entries;
 		const files: Set<{node: FileViewNode, parentId?: string}> = new Set();
 		const dirs: Map<string, {node: FolderViewNode, parentId?: string}> = new Map();
 		for (const entry of entries) {
-			if (entry.file.isDir) {
-				dirs.set(entry.file.id, {node: new FolderViewNode(entry.file.name, root), parentId: entry.file.parentId});
+			if (entry.file.type === FileType.Directory) {
+				dirs.set(entry.file.id, {node: new FolderViewNode(entry.file.name, entry.file.id, root), parentId: entry.file.parentId});
 			} else {
-				files.add({node: new FileViewNode(entry.file.name, root), parentId: entry.file.parentId});
+				files.add({node: new FileViewNode(entry.file.name, entry.file.id, root), parentId: entry.file.parentId});
 			}
 		}
 
@@ -159,7 +161,7 @@
 		let hovered = hoverQueue.freezedHovered;
 
 		if (hovered && hovered.item instanceof FolderViewNode) {
-			const newFile = new FileViewNode('{name}', hovered.item, true);
+			const newFile = new FileViewNode('{name}', '-1', hovered.item, true);
 			hovered.item.addChild(newFile);
 
 			setTimeout(() => {
@@ -182,7 +184,7 @@
 
 			item.rename(value);
 			// TODO: New file callback
-			controller.eventListener.fire('onSidebarNewFile', item as FileViewNode);
+			eventController.fire('onSidebarNewFile', item as FileViewNode);
 			item.editing = false;
 			console.log('New file:', $state.snapshot(item), $state.snapshot(item.parent?.children));
 		}
@@ -194,7 +196,7 @@
 		if (hovered && hovered.item instanceof FolderViewNode) {
 			console.log(hovered.item.path);
 
-			const newDir = new FolderViewNode('{name}', hovered.item, true);
+			const newDir = new FolderViewNode('{name}', '-2', hovered.item, true);
 			hovered.item.addChild(newDir);
 			// insertItemInFolder(data.tree!, hovered.item, newDir);
 
@@ -215,7 +217,7 @@
 			item.parent?.removeChild(item);
 		} else {
 			item.rename(value);
-			controller.eventListener.fire('onSidebarNewDir', item as FolderViewNode);
+			eventController.fire('onSidebarNewDir', item as FolderViewNode);
 			item.editing = false;
 		}
 	}
@@ -238,7 +240,7 @@
 			}
 
 			// moveItemInTree(data.tree!, dragTarget!, dragState.dragged!);
-			controller.eventListener.fire('onSidebarNodeMoved', dragState.dragged!, dragTarget!.path);
+			eventController.fire('onSidebarNodeMoved', dragState.dragged!, dragTarget!.path);
 			// Move file (inside tree)
 			(dragState.dragged! as FileViewNode | FolderViewNode).move(dragTarget!);
 
@@ -274,9 +276,9 @@
 			item.delete();
 
 			if (item instanceof FileViewNode) {
-				controller.eventListener.fire('onSidebarFileDeleted', item);
+				eventController.fire('onSidebarFileDeleted', item);
 			} else {
-				controller.eventListener.fire('onSidebarDirDeleted', item as FolderViewNode);
+				eventController.fire('onSidebarDirDeleted', item as FolderViewNode);
 			}
 		}
 	}
@@ -291,7 +293,7 @@
 	}
 
 	$effect(() => {
-		controller.eventListener.register('onVFSInitialized', init);
+		eventController.register('onVFSInitialized', init);
 
 		untrack(() => {
 			// for hot reloads
@@ -301,7 +303,7 @@
 		});
 
 		return () => {
-			controller.eventListener.unregister('onVFSInitialized', init);
+			eventController.unregister('onVFSInitialized', init);
 		};
 	});
 </script>
@@ -376,7 +378,7 @@
 								checked={cur.item.path === controller.previewFile}
 								onCheckedChange={(checked) => {
 									if (checked) {
-										controller.eventListener.fire('onSidebarPreviewFileChange', cur.item as FileViewNode);
+										eventController.fire('onSidebarPreviewFileChange', cur.item as FileViewNode);
 										controller.previewFile = cur.item.path;
 									}
 								}}
@@ -452,7 +454,7 @@
 				draggable="true"
 				ondragstart={(e) => dragStart(e, item)}
 				onclick={() => {
-					controller.eventListener.fire('onSidebarFileClick', item);
+					eventController.fire('onSidebarFileClick', item);
 				}}
 				tooltipContent={item.path === controller.previewFile ? previewing : undefined}
 			>

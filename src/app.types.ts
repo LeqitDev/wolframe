@@ -32,4 +32,5 @@ export interface IFileSystem {
     listEntries: () => Promise<File[]>;
 
     close: () => Promise<void>;
+    getPath: (id: string) => string;
 }

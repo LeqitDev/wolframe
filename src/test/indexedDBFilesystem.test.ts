@@ -1,4 +1,4 @@
-import { IndexedDBFileSystem } from '$lib/utils/playground';
+import { IndexedDBFileSystem } from '$lib/utils/indexedDBFileSystem';
 import { afterEach, beforeEach, describe, expect, it, test, vi } from 'vitest';
 import { FileType, type IFileSystem } from '../app.types';
 import * as idbMod from '$lib/utils/indexedDB';

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getController, type Controller } from '$lib/stores/controller.svelte';
 	import { getUniLogger } from '$lib/stores/logger.svelte';
+	import eventController from '$lib/utils';
 	import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
 	import { untrack, type Snippet } from 'svelte';
 
@@ -13,7 +14,7 @@
 
 	const controller: Controller = getController();
 	let editorContainer: HTMLDivElement;
-	controller.eventListener.register('onMonacoInitialized', () => {
+	eventController.register('onMonacoInitialized', () => {
 		controller.createEditor(editorContainer);
 	});
 

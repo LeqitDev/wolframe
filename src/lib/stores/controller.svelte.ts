@@ -2,8 +2,8 @@ import { getContext, setContext, type Snippet } from 'svelte';
 import { VFS } from './vfs.svelte';
 import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
 import { getUniLogger } from './logger.svelte';
-import { EventController } from '$lib/utils';
-import type { IFileSystem } from '../../app.types';
+import { FileType, type IFileSystem } from '../../app.types';
+import eventController from '$lib/utils';
 
 class Controller {
 	// Sidebar
@@ -98,28 +98,28 @@ class Controller {
 
         this.status('Load models from VFS');
         this.vfs.entries.forEach((entry) => {
-            if (entry.file.isDir) return;
+            if (entry.file.type === FileType.Directory) return;
             console.log('Adding model', entry.file.path);
-            this.addModel(entry.file.content ?? "", entry.file.path);
+            this.addModel(entry.file.content ?? "", entry.file.id);
         });
         this.status('Models loaded. Setting main file');
 
         const mainFile = this.vfs.getMainFile();
         if (mainFile) {
-            this.openFile(mainFile.file.path);
+            this.openFile(mainFile.file.id);
             this.vfs.fileMutated(mainFile.file.path);
         } else {
             this.setModel(null);
         }
-        this.eventListener.fire('onEditorInitialized');
+        eventController.fire('onEditorInitialized');
         this.status('Initialization complete', true);
 	}
 
     monacoUri(id: string) {
-        return this.monaco!.Uri.parse(`fileid:id/${id}`);
+        return this.monaco!.Uri.parse(`fileid:${id}`);
     }
 
-    addModel(value: string, id: string, language?: string) {
+    addModel(value: string, id: string, language: string = 'typst') {
         if (!this.monaco) return;
         const monacoUri = this.monacoUri(id);
         if (this.monaco.editor.getModel(monacoUri)) {
@@ -129,7 +129,7 @@ class Controller {
         const model = this.monaco.editor.createModel(value, language, monacoUri);
 
         model.onDidChangeContent((e) => {
-            this.eventListener.fire('onDidChangeModelContent', model, e);
+            eventController.fire('onDidChangeModelContent', model, e);
             this.languages.forEach((language) => language.onDidChangeModelContent?.(model, e));
         });
     }
@@ -194,7 +194,6 @@ class Controller {
 	// General
 	debug: boolean = $state(false);
     logger = getUniLogger();
-    eventListener: EventController = new EventController();
     monacoOk: boolean = false;
 
 	constructor(fs: IFileSystem) {
@@ -204,7 +203,7 @@ class Controller {
 
 	init() {
 		this.vfs.init().then(async () => {
-            this.eventListener.fire('onVFSInitialized');
+            eventController.fire('onVFSInitialized');
             this.status('VFS initialized');
 
             this.status('Loading Monaco');
@@ -213,16 +212,16 @@ class Controller {
 
 			this.initExternals();
             this.status('Externals initialized');
-            this.eventListener.fire('onMonacoInitialized');
+            eventController.fire('onMonacoInitialized');
             this.monacoOk = true;
 		});
 	}
 
-    openFile(path: string) {
-        console.log('Opening file', path);
-        this.vfs.openFile(path);
-        this.setModel(path);
-        this.setActiveFile(path);
+    openFile(id: string) {
+        console.log('Opening file', id);
+        this.vfs.openFile(id);
+        this.setModel(id);
+        this.setActiveFile(id);
     }
 
     moveFile(id: string, newPath: string) {
@@ -235,8 +234,8 @@ class Controller {
         })
     }
 
-    closeFile(path: string) {
-        const last = this.vfs.closeFile(path);
+    closeFile(id: string) {
+        const last = this.vfs.closeFile(id);
         if (last) {
             this.openFile(last);
         } else {

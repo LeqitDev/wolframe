@@ -1,5 +1,5 @@
 import { VFS } from '$lib/stores/vfs.svelte';
-import { IndexedDBFileSystem } from '$lib/utils/playground';
+import { IndexedDBFileSystem } from '$lib/utils/indexedDBFileSystem';
 import { afterEach, beforeEach, describe, expect, test, vi } from 'vitest';
 
 const test_logs: string[] = [];

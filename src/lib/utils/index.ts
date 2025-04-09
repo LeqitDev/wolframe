@@ -6,6 +6,7 @@ import type {
 	FileViewNode,
 	FolderViewNode,
 } from '$lib/fileview/index.svelte';
+import type { VFSEntry } from "$lib/stores/vfs.svelte";
 
 export function cn(...inputs: ClassValue[]) {
 	return twMerge(clsx(inputs));
@@ -62,9 +63,11 @@ interface EditorEvents {
 
 type ControllerEvents = SidebarEvents & EditorEvents & {
 	"onVFSInitialized": [];
+	"onVFSFilesUpdated": [updatedEntries: VFSEntry[]];
+	"onRetrievePath": [id: string, callback: (path: string) => void];
 };
 
-export class EventController {
+class EventController {
     private listeners = new Map<keyof ControllerEvents, Set<(...args: any[]) => void>>();
 
     public register<E extends keyof ControllerEvents>(event: E, callback: (...args: ControllerEvents[E]) => void): void {
@@ -91,3 +94,7 @@ export class EventController {
         }
     }
 }
+
+const eventController = new EventController();
+
+export default eventController;

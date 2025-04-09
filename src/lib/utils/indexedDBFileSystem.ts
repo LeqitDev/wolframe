@@ -292,6 +292,16 @@ export class IndexedDBFileSystem implements IFileSystem {
 	}
 
 	/*
+	 * Gets the Path of a file by its id.
+	 * @param id The ID of the file.
+	 * @returns The path of the file.
+	 * @throws Error if the file is not found.
+	 */
+	getPath(id: string) {
+		return this.files.get(id)?.path;
+	}
+
+	/*
 	 * Fetches all files from the IndexedDB and populates the files map.
 	 * @returns A map of file IDs to file objects.
 	 */

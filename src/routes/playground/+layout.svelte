@@ -4,7 +4,7 @@
 	import * as Menubar from '$lib/components/ui/menubar/index.js';
 	import type { PageData } from './$types';
 	import { initializeController, type Controller } from '$lib/stores/controller.svelte';
-	import { IndexedDBFileSystem } from '$lib/utils/playground';
+	import { IndexedDBFileSystem } from '$lib/utils/indexedDBFileSystem';
 
 	let { children, data }: { children: any; data: PageData } = $props();
 

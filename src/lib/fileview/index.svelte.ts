@@ -2,9 +2,11 @@ export abstract class ViewNode {
     protected _name: string;
     protected _parent?: FolderViewNode;
     protected _editing: boolean = $state(false);
+    protected _id: string;
 
-    constructor(name: string, parent?: FolderViewNode, editing?: boolean) {
+    constructor(name: string, id: string, parent?: FolderViewNode, editing?: boolean) {
         this._name = name;
+        this._id = id;
         this._parent = parent;
         this._editing = editing || false;
     }
@@ -25,6 +27,10 @@ export abstract class ViewNode {
 
     get name() {
         return this._name;
+    }
+
+    get id() {
+        return this._id;
     }
 
     get path(): string {
@@ -54,8 +60,8 @@ export class FileViewNode extends ViewNode {
     protected _etag: string;
     protected _lastModified: Date;
 
-    constructor(name: string, parent: FolderViewNode, editing?: boolean, size?: number, mimetype?: string, etag?: string, lastModified?: Date) {
-        super(name, parent, editing);
+    constructor(name: string, id: string, parent: FolderViewNode, editing?: boolean, size?: number, mimetype?: string, etag?: string, lastModified?: Date) {
+        super(name, id, parent, editing);
         this._size = size || 0;
         this._mimetype = mimetype || '';
         this._etag = etag || '';

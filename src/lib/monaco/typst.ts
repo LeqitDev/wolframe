@@ -4,6 +4,7 @@ import type { CompilerWorkerBridge } from '$lib/workerBridges';
 import { TypstCompletionProvider } from './completionProvider';
 import { TypstHoverProvider } from './typst/hoverProvider';
 import { TypstDefinitionProvider } from './typst/definitionProvider';
+import eventController from '$lib/utils';
 
 export class TypstLanguage implements App.Editor.Language {
 	private compiler?: CompilerWorkerBridge;
@@ -188,14 +189,20 @@ export class TypstLanguage implements App.Editor.Language {
 	}
 
     onDidChangeModelContent(model: Monaco.editor.ITextModel, e: Monaco.editor.IModelContentChangedEvent) {
-		if (!this.compiler) return;
+		eventController.fire(
+			'onRetrievePath',
+			model.uri.path.replace('id/', ''),
+			(path) => {
+				if (!this.compiler) return;
 
-		e.changes.sort((a, b) => b.rangeOffset - a.rangeOffset);
-		e.changes.forEach(change => {
-			this.compiler!.edit(model.uri.path, change.text, change.rangeOffset, change.rangeOffset + change.rangeLength);
-		});
+				e.changes.sort((a, b) => b.rangeOffset - a.rangeOffset);
+				e.changes.forEach(change => {
+					this.compiler!.edit(path, change.text, change.rangeOffset, change.rangeOffset + change.rangeLength);
+				});
 
-		this.compiler!.compile();
+				this.compiler!.compile();
+			}
+		);
     }
 
 	dispose() {

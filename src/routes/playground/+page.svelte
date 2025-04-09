@@ -14,9 +14,8 @@
 	import { VFS } from '$lib/stores/vfs.svelte';
 	import { getLayoutStore } from '$lib/stores/layoutStore.svelte';
 	import { getUniLogger, WorkerRendererSection } from '$lib/stores/logger.svelte';
-	import { convertRemToPixels, debounce } from '$lib/utils';
+	import eventController, { convertRemToPixels, debounce } from '$lib/utils';
 	import { untrack } from 'svelte';
-	import { IndexedDBFileSystem } from '$lib/utils/playground';
 	import type monaco from '$lib/monaco/editor';
 	import { getController, type Controller } from '$lib/stores/controller.svelte';
 	import {
@@ -105,7 +104,8 @@
 		compiler.addObserver({ onMessage: compilerLogger });
 		controller.vfs.entries.forEach((entry) => {
 			if (entry.file.content === undefined) return;
-			compiler.add_file(entry.file.path, entry.file.content);
+			console.log('Adding file to compiler', entry.file.path);
+			compiler.add_file(entry.file.id, entry.file.content);
 		});
 
 		compiler.compile();
@@ -115,32 +115,15 @@
 		controller.setMenuSnippet(menubar);
 		controller.setActiveFile('');
 		controller.setPreviewFile('');
-		/* layoutStore.setSidebarActions({
-			onFileClick(file) {
-				openFile(file.path);
-			},
-			onNewFile(file) {
-				newFile(file.path, '');
-				openFile(file.path);
-			},
-			onPreviewFileChange(file) {
-				setPreview(file.path);
-			},
-			onFileDeleted(file) {
-				vfs!.deleteFile(file.path);
-				editor_controller.removeModel!(file.path);
-				// TODO: Remove from compiler
-			}
-		}); */
 	}
 	function handleSidebarFileClick(file: FileViewNode) {
-		controller.openFile(file.path);
+		controller.openFile(file.id);
 	}
 
 	function handleSidebarNewFile(file: FileViewNode) {
 		controller.newFile(file.path, '');
 		console.log('Creating new file', file.path);
-		controller.openFile(file.path);
+		controller.openFile(file.id);
 		compiler.add_file(file.path, '');
 	}
 
@@ -172,18 +155,18 @@
 				handleSidebarDirDeleted(file as FolderViewNode);
 			}
 		}
-		controller.vfs.deleteFile(folder.path);
+		controller.vfs.deleteFile(folder.id);
 	}
 
 	function handleSidebarNodeMoved(node: ViewNode, newPath: string, root: boolean = true) {
 		newPath = newPath + '/' + node.name;
 		console.log('Moving node', node.path, 'to', newPath);
 		if (node instanceof FileViewNode) {
-			controller.moveFile(node.path, newPath);
+			controller.moveFile(node.id, newPath);
 			compiler.move(node.path, newPath);
 		} else {
 			const folder = node as FolderViewNode;
-			controller.vfs.moveFile(folder.path, newPath);
+			controller.vfs.moveFile(folder.id, newPath);
 			for (const file of folder.children) {
 				if (file instanceof FileViewNode) {
 					handleSidebarNodeMoved(file, newPath, false);
@@ -195,20 +178,30 @@
 		if (root) compiler.compile();
 	}
 
+	function handleRetrievePath(id: string, callback: (path: string) => void) {
+		const entry = controller.vfs.entries.find((entry) => entry.file.id === id);
+		if (entry) {
+			callback(entry.file.path);
+		} else {
+			controller.logger.error(WorkerRendererSection, 'File not found', id);
+		}
+	}
+
 	$effect(() => {
 		controller.registerLanguage(typstLanguage);
 		controller.registerTheme(typstThemes);
 		console.log('Registering language and theme');
-		controller.eventListener.register('onVFSInitialized', init);
-		controller.eventListener.register('onDidChangeModelContent', onDidChangeModelContent);
+		eventController.register('onVFSInitialized', init);
+		eventController.register('onDidChangeModelContent', onDidChangeModelContent);
 
-		controller.eventListener.register('onSidebarFileClick', handleSidebarFileClick);
-		controller.eventListener.register('onSidebarNewFile', handleSidebarNewFile);
-		controller.eventListener.register('onSidebarNewDir', handleSidebarNewDir);
-		controller.eventListener.register('onSidebarPreviewFileChange', handleSidebarPreviewFileChange);
-		controller.eventListener.register('onSidebarFileDeleted', handleSidebarFileDeleted);
-		controller.eventListener.register('onSidebarDirDeleted', handleSidebarDirDeleted);
-		controller.eventListener.register('onSidebarNodeMoved', handleSidebarNodeMoved);
+		eventController.register('onSidebarFileClick', handleSidebarFileClick);
+		eventController.register('onSidebarNewFile', handleSidebarNewFile);
+		eventController.register('onSidebarNewDir', handleSidebarNewDir);
+		eventController.register('onSidebarPreviewFileChange', handleSidebarPreviewFileChange);
+		eventController.register('onSidebarFileDeleted', handleSidebarFileDeleted);
+		eventController.register('onSidebarDirDeleted', handleSidebarDirDeleted);
+		eventController.register('onSidebarNodeMoved', handleSidebarNodeMoved);
+		eventController.register('onRetrievePath', handleRetrievePath);
 		untrack(() => {
 			// for hot reloads
 			if (controller.monacoOk) {
@@ -221,18 +214,19 @@
 		return () => {
 			compiler?.dispose();
 			renderer?.dispose();
-			controller.eventListener.unregister('onVFSInitialized', init);
-			controller.eventListener.unregister('onDidChangeModelContent', onDidChangeModelContent);
-			controller.eventListener.unregister('onSidebarFileClick', handleSidebarFileClick);
-			controller.eventListener.unregister('onSidebarNewFile', handleSidebarNewFile);
-			controller.eventListener.unregister('onSidebarNewDir', handleSidebarNewDir);
-			controller.eventListener.unregister(
+			eventController.unregister('onVFSInitialized', init);
+			eventController.unregister('onDidChangeModelContent', onDidChangeModelContent);
+			eventController.unregister('onSidebarFileClick', handleSidebarFileClick);
+			eventController.unregister('onSidebarNewFile', handleSidebarNewFile);
+			eventController.unregister('onSidebarNewDir', handleSidebarNewDir);
+			eventController.unregister(
 				'onSidebarPreviewFileChange',
 				handleSidebarPreviewFileChange
 			);
-			controller.eventListener.unregister('onSidebarFileDeleted', handleSidebarFileDeleted);
-			controller.eventListener.unregister('onSidebarDirDeleted', handleSidebarDirDeleted);
-			controller.eventListener.unregister('onSidebarNodeMoved', handleSidebarNodeMoved);
+			eventController.unregister('onSidebarFileDeleted', handleSidebarFileDeleted);
+			eventController.unregister('onSidebarDirDeleted', handleSidebarDirDeleted);
+			eventController.unregister('onSidebarNodeMoved', handleSidebarNodeMoved);
+			eventController.unregister('onRetrievePath', handleRetrievePath);
 		};
 	});
 
@@ -469,10 +463,12 @@
 		e: monaco.editor.IModelContentChangedEvent
 	) {
 		const content = model.getValue();
-		const path = model.uri.path;
-		console.log('Content changed', path);
 
-		controller.vfs.writeFile(path, content);
+		const entry = controller.vfs.entries.find((entry) => entry.file.id === model.uri.path.replace('id/', ''));
+		if (!entry) return;
+		console.log('Content changed', entry.file.path);
+
+		controller.vfs.writeFile(entry.file.path, content);
 	}
 </script>
 
@@ -622,10 +618,10 @@
 					<Button
 						size="sm"
 						variant="outline"
-						class={`h-full rounded-none border-b-0 border-l-0 border-r text-sm ${!entry.mutated ? 'italic' : ''} ${controller.editorModelUri === entry.file.path ? 'border-t-2 border-t-purple-300 bg-accent' : ''}`}
+						class={`h-full rounded-none border-b-0 border-l-0 border-r text-sm ${!entry.mutated ? 'italic' : ''} ${controller.editorModelUri?.replace('id/', '') === entry.file.id ? 'border-t-2 border-t-purple-300 bg-accent' : ''}`}
 						onclick={() => {
 							if (entry.open.isOpen) {
-								controller.openFile(entry.file.path);
+								controller.openFile(entry.file.id);
 							}
 						}}
 					>
@@ -638,7 +634,7 @@
 						<button
 							class="rounded-md p-0.5 hover:bg-slate-600"
 							onclick={() => {
-								controller.closeFile(entry.file.path);
+								controller.closeFile(entry.file.id);
 							}}
 						>
 							<X />
