@@ -92,9 +92,7 @@ export class Path {
     }
 }
 
-// @ts-expect-error import.meta.vitest is not defined in the current context
 if (import.meta.vitest) {
-    // @ts-expect-error import.meta.vitest is not defined in the current context
     const { test, expect } = import.meta.vitest;
 
     test('Path: constructor', () => {
