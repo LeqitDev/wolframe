@@ -1,1 +1,22 @@
 @import 'tailwindcss';
+@plugin 'daisyui' {
+    themes: dark, dim, dracula, black;
+}
+
+@utility input {
+    &:focus {
+        @apply outline-0;
+    }
+}
+
+:root {
+    .btn-black {
+        --btn-color: var(--color-black);
+        --btn-fg: var(--color-white);
+    }
+
+    .btn-discord {
+        --btn-color: var(--color-indigo-500);
+        --btn-fg: var(--color-white);
+    }
+}
