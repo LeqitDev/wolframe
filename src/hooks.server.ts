@@ -2,7 +2,7 @@ import { auth } from '$lib/auth'; // path to your auth file
 import { instanceSettings } from '$lib/instance-settings';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 
-const publicPaths = ['/auth', '/api/login'];
+const publicPaths = ['/auth', '/api/login', '/api/auth/callback/github', '/api/auth/callback/discord', '/api/auth/sign-in/social', '/api/auth/error', '/favicon.ico'];
 
 const playgroundPath = '/playground';
 
@@ -16,6 +16,8 @@ export async function handle({ event, resolve }) {
 	const isPlaygroundPath = url.pathname.startsWith(playgroundPath);
 	const isGatekeepingEnabled = instanceSettings.gatekeeping;
 	const usePlayground = instanceSettings.playground;
+
+	console.log('requested url:', url.href);
 
 	if (!isAuthenticated) {
 		if (!isGatekeepingEnabled && usePlayground && isPlaygroundPath) {
