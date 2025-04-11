@@ -4,8 +4,6 @@ import { db } from './server/db';
 import { instanceSettings } from './instance-settings';
 import { env } from '$env/dynamic/private';
 
-console.log('Auth methods:', instanceSettings.authMethods, env.DISCORD_CLIENT_ID, env.DISCORD_CLIENT_SECRET, env.GITHUB_CLIENT_ID, env.GITHUB_CLIENT_SECRET);
-
 export const auth = betterAuth({
     database: drizzleAdapter(db, {
         provider: 'pg',
