@@ -59,7 +59,8 @@
         try {
             await authClient.signIn.social({
                 provider: "github",
-                errorCallbackURL: "/error",
+                callbackURL: "/callbacks/auth/social/success",
+                errorCallbackURL: "/auth",
             });
         } catch (error) {
             console.error("Error during Discord sign-in:", error);
@@ -70,6 +71,8 @@
         try {
             await authClient.signIn.social({
                 provider: "discord",
+                callbackURL: "/callbacks/auth/social/success",
+                errorCallbackURL: "/callbacks/auth/social/error",
             });
         } catch (error) {
             console.error("Error during Discord sign-in:", error);

@@ -1,12 +1,27 @@
 import { auth } from '$lib/auth'; // path to your auth file
 import { instanceSettings } from '$lib/instance-settings';
+import type { Handle } from '@sveltejs/kit';
+import { sequence } from '@sveltejs/kit/hooks';
 import { svelteKitHandler } from 'better-auth/svelte-kit';
 
-const publicPaths = ['/auth', '/api/login', '/api/auth/callback/github', '/api/auth/callback/discord', '/api/auth/sign-in/social', '/api/auth/error', '/favicon.ico'];
+const publicPaths = [
+	'/auth',
+	'/api/login',
+	'/api/auth/callback/github',
+	'/api/auth/callback/discord',
+	'/api/auth/sign-in/social',
+	'/api/auth/error',
+	'/callbacks/auth/social/error',
+	'/favicon.ico'
+];
 
 const playgroundPath = '/playground';
 
-export async function handle({ event, resolve }) {
+const better_auth: Handle = async ({ event, resolve }) => {
+	return svelteKitHandler({ event, resolve, auth });
+};
+
+const gatekeeper: Handle = async ({ event, resolve }) => {
 	const { request, url } = event;
 	const isPublicPath = publicPaths.some((path) => url.pathname.startsWith(path));
 	const isAuthenticated = await auth.api.getSession({
@@ -17,20 +32,20 @@ export async function handle({ event, resolve }) {
 	const isGatekeepingEnabled = instanceSettings.gatekeeping;
 	const usePlayground = instanceSettings.playground;
 
-	console.log('requested url:', url.href);
-
 	if (!isAuthenticated) {
 		if (!isGatekeepingEnabled && usePlayground && isPlaygroundPath) {
-			return svelteKitHandler({ event, resolve, auth });
+			return resolve(event);
 		}
 		if (isPublicPath) {
-			return svelteKitHandler({ event, resolve, auth });
+			return resolve(event);
 		}
 		return Response.redirect(new URL('/auth', url));
 	} else {
 		if (url.pathname.startsWith('/auth')) {
 			return Response.redirect(new URL('/', url));
 		}
-		return svelteKitHandler({ event, resolve, auth });
+		return resolve(event);
 	}
-}
+};
+
+export const handle = sequence(better_auth, gatekeeper);

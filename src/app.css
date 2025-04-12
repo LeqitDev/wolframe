@@ -9,6 +9,12 @@
     }
 }
 
+@utility toast {
+    & > * {
+        animation: none;
+    }
+}
+
 :root {
     .btn-black {
         --btn-color: var(--color-black);
