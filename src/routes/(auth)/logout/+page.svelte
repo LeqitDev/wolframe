@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from "$app/navigation";
 	import { authClient } from "$lib/auth-client";
-    import logo from "$lib/assets/logo.png";
+    import logo from "$lib/assets/wolframe-icon.svg";
 
     $effect(() => {
         (async () => {

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { superForm } from "sveltekit-superforms";
-    import logo from "$lib/assets/logo.png";
+    import logo from "$lib/assets/wolframe-icon.svg";
 	import type { PageProps } from "./$types";
 	import { instanceSettings } from "$lib/instance-settings";
 	import { zod } from "sveltekit-superforms/adapters";
@@ -156,7 +156,7 @@
 <div class="flex flex-col items-center justify-center h-screen">
     <div class="card card-side bg-base-100 shadow-sm shadow-primary/50 min-h-[51%]">
         <div class="flex flex-col items-center justify-center bg-base-300 px-8 gap-2">
-            <img src={logo} alt="Logo" class="rounded-sm size-12 mb-6 -mt-12 shadow-lg shadow-primary/50" />
+            <img src={logo} alt="Logo" class="rounded-sm size-14 mb-6 -mt-12 shadow-lg shadow-primary/50 bg-white" />
             <div>
                 <h1 class="text-2xl font-bold">Welcome to Wolframe</h1>
                 {#if instanceSettings.instanceName !== "Default Instance"}<p class="text-sm text-center">{instanceSettings.instanceName} Instance</p>{/if}

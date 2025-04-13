@@ -52,6 +52,7 @@
 		"@paralleldrive/cuid2": "^2.2.2",
 		"better-auth": "^1.2.5",
 		"drizzle-orm": "^0.40.0",
+		"hotkeys-js": "^3.13.9",
 		"postgres": "^3.4.5"
 	}
 }

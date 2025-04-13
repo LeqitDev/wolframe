@@ -4,7 +4,7 @@
 }
 
 @utility input {
-    &:focus {
+    &:focus, &:focus-within {
         @apply outline-0;
     }
 }

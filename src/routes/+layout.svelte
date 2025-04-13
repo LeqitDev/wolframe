@@ -1,10 +1,8 @@
 <script lang="ts">
 	import { FlashMessage, setFlashManager } from '$lib/backend/stores/flash.svelte';
-	import { untrack } from 'svelte';
 	import '../app.css';
 	import type { LayoutProps } from './$types';
 	import FlashCard from '$lib/frontend/components/FlashCard.svelte';
-	import { createId } from '@paralleldrive/cuid2';
 
 	let { data, children }: LayoutProps = $props();
 
