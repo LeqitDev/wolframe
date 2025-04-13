@@ -1,8 +1,12 @@
 <script lang="ts">
 	import logo from '$lib/assets/wolframe-icon.svg';
+	import { authClient } from '$lib/auth-client';
+	import { instanceSettings } from '$lib/instance-settings';
     import hotkeys from 'hotkeys-js';
 	import { elasticOut } from 'svelte/easing';
 	import { fade, scale, slide } from 'svelte/transition';
+
+    const session = authClient.useSession();
 
     let search_field: HTMLInputElement;
     let search_field_focused = $state(false);
@@ -65,6 +69,9 @@
 		<ul class="menu menu-horizontal gap-2">
 			<li><a href="/proejcts">Projects</a></li>
 			<li><a href="/teams">Teams</a></li>
+            {#if instanceSettings.playground}
+                <li><a href="/playground">Playground</a></li>
+            {/if}
 		</ul>
 	</div>
 
@@ -92,11 +99,11 @@
 
     <div class="navbar-end">
         <div class="dropdown dropdown-end">
-            <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar shadow-sm shadow-primary">
-                <div class="w-10 rounded-full">
+            <div tabindex="0" role="button" class="btn btn-ghost btn-circle avatar shadow-sm shadow-primary size-9">
+                <div class="w-full rounded-full">
                     <img
-                        alt="Tailwind CSS Navbar component"
-                        src="https://img.daisyui.com/images/stock/photo-1534528741775-53994a69daeb.webp"
+                        alt="Avatar"
+                        src={$session.data?.user.image ?? "https://api.dicebear.com/9.x/identicon/svg?backgroundColor=15191e,ffffff&seed=" + $session.data?.user.name}
                     />
                 </div>
             </div>
@@ -107,8 +114,8 @@
             >
                 <div class="card card-sm">
                     <div class="card-body">
-                        <h2 class="card-title">Markus Hamacher</h2>
-                        <p class="text-xs">markus.hamacher@email.com</p>
+                        <h2 class="card-title">{$session.data?.user.name}</h2>
+                        <p class="text-xs">{$session.data?.user.email}</p>
                     </div>
                 </div>
                 <ul class="menu menu-sm w-full gap-2">
