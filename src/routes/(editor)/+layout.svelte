@@ -20,7 +20,7 @@
                 <p>File Explorer</p>
             </Pane>
             <Pane class="border-l border-primary/50">
-                <ul class="menu menu-horizontal bg-base-200 rounded-box m-2">
+                <ul class="menu menu-horizontal bg-base-100 rounded-box m-2">
                     <li>
                         <DropdownMenuItem name="File">
                             <li><a href="/">New File</a></li>
