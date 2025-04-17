@@ -18,7 +18,6 @@ interface FileMetadata {
 	type: FileType;
 	createdAt: number;
 	updatedAt: number;
-	path: string;
 	metadata?: MetadataExtension<unknown>[];
 }
 

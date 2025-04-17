@@ -100,5 +100,12 @@ details[open].outside-close {
                 opacity: 0.5;
             }
         }
+        &.splitpanes__splitter__active {
+            &:not(:active) {
+                background-color: var(--color-base-300);
+                margin-top: 0px;
+                height: 2px;
+            }
+        }
 	}
 }

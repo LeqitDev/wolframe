@@ -90,6 +90,20 @@ export class Path {
         }
         return true;
     }
+
+    /* 
+     * Append a part to the path.
+     * @param part - The part to append.
+     * @returns A new Path instance with the appended part.
+     */
+    append(part: string): Path {
+        if (part.length === 0) {
+            return this;
+        }
+        const path = new Path(part);
+        const newParts = [...this.parts, ...path.parts];
+        return new Path(newParts.join(PATH_SEPARATOR));
+    }
 }
 
 if (import.meta.vitest) {
