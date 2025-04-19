@@ -33,7 +33,7 @@ export class TreeNode extends VirtualFile {
     }
 
     get isRoot(): boolean {
-        return this.parent === null;
+        return this.parent === null && this.file.id === "root";
     }
 
     get isFile(): boolean {
@@ -191,6 +191,14 @@ class VirtualFileSystem {
             return Result.err(fileResult.error);
         }
         const fileNode = fileResult.unwrap();
+        if (fileNode.isRoot) {
+            return Result.err(new Error("Cannot delete root node"));
+        }
+        if (!fileNode.isFile) {
+            for (const child of fileNode.getChildren()) {
+                this.removeFile(child.file.id);
+            }
+        }
         fileNode.delete();
         this.files.delete(id);
         return Result.ok(fileNode);
