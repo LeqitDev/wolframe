@@ -90,26 +90,32 @@
 	}
 
 	function finalizeRenaming(el: HTMLInputElement, entry: TreeNode) {
-        const name = el.value;
-        if (name === '') {
-            entry.renaming = false;
-            entry.input = false;
-            return;
-        }
+		const name = el.value;
+		if (name === '') {
+			entry.renaming = false;
+			entry.input = false;
+			return;
+		}
 
-        try {
-            const path = new Path(name).rootless();
-            const parts = path.split('/');
-            
-            if (parts.length > 1) return;
+		try {
+			const path = new Path(name).rootless();
+			const parts = path.split('/');
 
-            vfs.renameFile(entry.file.id, name);
-            entry.renaming = false;
-            entry.input = false;
-        } catch (e) {
-            console.error(e);
-            return;
-        }
+			if (parts.length > 1) return;
+
+			vfs.renameFile(entry.file.id, name);
+			entry.renaming = false;
+			entry.input = false;
+		} catch (e) {
+			console.error(e);
+			return;
+		}
+	}
+
+    function moveFile(newParent: TreeNode, moved: TreeNode) {
+        console.log('moveFile', newParent.file.name, moved.file.name);
+        const result = vfs.moveFile(moved.file.id, newParent.file.id);
+        console.log(result);
     }
 
 	$effect(() =>
@@ -328,6 +334,12 @@
 			ondragstart={() => {
 				addAllParents(entry.parent!);
 			}}
+			ondragend={() => {
+				const dropzone = dragStore.getDragOverItem();
+				const item = dragStore.getDragItem();
+
+                moveFile(dropzone!, item!);
+			}}
 		>
 			<File class="h-4 w-4" strokeWidth="2" />
 			{entry.file.name}
@@ -365,6 +377,12 @@
 				use:dragAction={{ dragStore, item: entry }}
 				ondragstart={() => {
 					addAllParents(entry.parent!);
+				}}
+				ondragend={() => {
+					const dropzone = dragStore.getDragOverItem();
+					const item = dragStore.getDragItem();
+
+                    moveFile(dropzone!, item!);
 				}}
 			>
 				{#if entry.open}

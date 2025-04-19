@@ -85,14 +85,16 @@ export const dragActionBuilder = <T>(): Action<HTMLElement, { dragStore: DragSto
         document.removeEventListener("mousemove", drag);
         document.removeEventListener("mouseup", dragEnd);
 
-        node.dispatchEvent(new CustomEvent("dragend"));
-        params.dragStore.clearDragItem();
-        params.dragStore.clearDragOverItems();
+        if (moved_amount > MOVED_THRESHOLD) {
+            node.dispatchEvent(new CustomEvent("dragend"));
+            params.dragStore.clearDragItem();
+            params.dragStore.clearDragOverItems();
 
-        tray.style.display = "none";
+            tray.style.display = "none";
 
-        tray.removeChild(tray.firstChild as Node);
-        document.body.removeChild(tray);
+            tray.removeChild(tray.firstChild as Node);
+            document.body.removeChild(tray);
+        }
     }
 
     $effect(() => {

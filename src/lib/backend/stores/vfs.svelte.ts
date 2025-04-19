@@ -232,6 +232,51 @@ class VirtualFileSystem {
         return Result.ok(fileNode);
     }
 
+    moveFile(id: string, newParentId: string): Result<TreeNode> {
+        const fileResult = this.getFileById(id);
+        if (!fileResult.ok) {
+            return Result.err(fileResult.error);
+        }
+        const fileNode = fileResult.unwrap();
+        if (fileNode.isRoot) {
+            return Result.err(new Error("Cannot move root node"));
+        }
+        let newParentNode: TreeNode;
+
+        if (newParentId && newParentId !== "root") {
+            const newParentResult = this.getFileById(newParentId);
+            if (!newParentResult.ok) {
+                return Result.err(newParentResult.error);
+            }
+            newParentNode = newParentResult.unwrap();
+        } else {
+            newParentNode = this.root;
+        }
+
+        if (newParentNode.isFile) {
+            return Result.err(new Error("Cannot move to a file"));
+        }
+
+        if (newParentNode.file.id === fileNode.parent!.file.id) {
+            return Result.ok(fileNode);
+        }
+
+        const parentNode = fileNode.parent!;
+        parentNode.removeChild(fileNode);
+
+        const result = newParentNode.addChild(fileNode);
+        if (!result.ok) {
+            let error = result.error;
+            if (error.cause instanceof TreeNode) {
+                return Result.ok(error.cause);
+            }
+            return Result.err(error);
+        }
+        fileNode.parent = newParentNode;
+        fileNode.file.updatedAt = Date.now();
+        return Result.ok(fileNode);
+    }
+
 
     getTree(): TreeNode {
         return this.root;
