@@ -3,7 +3,13 @@
 	import { setVirtualFileSystem, TreeNode } from '@/lib/backend/stores/vfs.svelte';
 	import DropdownMenuItem from '@/lib/frontend/components/DropdownMenuItem.svelte';
 	import { Pane, Splitpanes } from 'svelte-splitpanes';
-    import { contextmenu } from '@/lib/frontend/actions/ContextMenu';
+	import { contextMenuAction } from '@/lib/frontend/actions/ContextMenu.svelte';
+	import { HoverQueue } from '@/lib/frontend/stores/HoverQueue.svelte';
+	import { hoverQueueActionBuilder } from '@/lib/frontend/actions/HoverQueue.svelte';
+	import { portalAction } from '@/lib/frontend/actions/Portal.svelte';
+	import { fade } from 'svelte/transition';
+	import { dragActionBuilder, dragOverActionBuilder } from '@/lib/frontend/actions/Drag.svelte';
+	import { DragStore } from '@/lib/frontend/stores/DragStore.svelte';
 
 	let { children } = $props();
 
@@ -13,39 +19,73 @@
 	let showConsole = $state(15);
 	let detailsElement: HTMLDetailsElement;
 
-    let contextmenutarget: HTMLElement;
+	let contextMenuVisible = $state(false);
+	let contextMenuPosition = $state({ x: 0, y: 0 });
+
+	const hoverQueue = new HoverQueue<TreeNode>();
+	const hoverQueueAction = hoverQueueActionBuilder<TreeNode>();
+
+	const dragStore = new DragStore<TreeNode>();
+	const dragAction = dragActionBuilder<TreeNode>();
+	const dragOverAction = dragOverActionBuilder<TreeNode>();
 </script>
 
-<ul class="absolute max-w-60 w-full bg-base-300 rounded-box menu menu-sm shadow-lg z-10 p-0" bind:this={contextmenutarget}>
-    <li class="mx-1 first:mt-2 last:mb-2"><button>New File</button></li>
-    <li class="mx-1 first:mt-2 last:mb-2"><button>New Folder</button></li>
-    <div class="divider m-0 after:h-[1px] before:h-[1px]"></div>
-    <li class="mx-1 first:mt-2 last:mb-2"><button>Preview File</button></li>
-    <li class="mx-1 first:mt-2 last:mb-2"><button>Delete File/Folder</button></li>
-    <div class="divider m-0 after:h-[1px] before:h-[1px]"></div>
-    <li class="mx-1 first:mt-2 last:mb-2"><button>Rename File/Folder</button></li>
-</ul>
+{#if contextMenuVisible}
+	<ul
+		class="bg-base-300 rounded-box menu menu-sm absolute z-10 w-full max-w-60 p-0 shadow-lg"
+		style="top: {contextMenuPosition.y}px; left: {contextMenuPosition.x}px;"
+		use:portalAction={{}}
+	>
+		{#if hoverQueue.item?.isFile}
+			<li class="mx-1 first:mt-2 last:mb-2"><button>Preview File</button></li>
+		{:else}
+			<li class="mx-1 first:mt-2 last:mb-2"><button>New File</button></li>
+			<li class="mx-1 first:mt-2 last:mb-2"><button>New Folder</button></li>
+			<div class="divider m-0 before:h-[1px] after:h-[1px]"></div>
+		{/if}
+		<li class="mx-1 first:mt-2 last:mb-2">
+			<button>Delete {hoverQueue.item?.isFile ? 'File' : 'Folder'}</button>
+		</li>
+		<div class="divider m-0 before:h-[1px] after:h-[1px]"></div>
+		<li class="mx-1 first:mt-2 last:mb-2">
+			<button>Rename {hoverQueue.item?.isFile ? 'File' : 'Folder'}</button>
+		</li>
+	</ul>
+{/if}
+
 {#await awaitLoad}
 	<p>{editorManager.loading.message}</p>
 {:then}
 	<div class="flex h-screen w-screen">
 		<Splitpanes theme="wolframe-theme">
 			<Pane size={18} snapSize={8} maxSize={70} class="bg-base-200">
-				<h2 class="p-2 pl-4">File Explorer</h2>
-                <ul class="menu menu-xs w-full h-full border-t border-base-100">
-                    {#each vfs.getTree().getChildren() as child}
-                        {#if child.isFile}
-                            {@render file(child)}
-                        {:else}
-                            {@render folder(child)}
-                        {/if}
-                    {/each}
-                    <div class="w-20 h-20 bg-accent" use:contextmenu={{target: contextmenutarget}}>
-                        ha
-                    </div>
-                </ul>
+				<h2 class="p-2 pl-4">File Explorer "{dragStore.getDragOverItem()}"</h2>
+				<ul
+					use:hoverQueueAction={{ queue: hoverQueue, item: vfs.getTree() }}
+					use:contextMenuAction={{}}
+					onshowmenu={(e) => {
+						contextMenuVisible = false;
+						contextMenuPosition = e.detail;
+						setTimeout(() => {
+							contextMenuVisible = true;
+						}, 0);
+					}}
+					onhidemenu={() => (contextMenuVisible = false)}
+					use:dragOverAction={{ dragStore, item: vfs.getTree() }}
+					ondragover={() => console.log('dragover root')}
+					class={[
+						dragStore.getDragOverItem() === vfs.getTree() && dragStore.isDragging()
+							? 'bg-base-100'
+							: '',
+						'menu menu-sm border-base-100 h-full w-full border-t'
+					]}
+				>
+					{#each vfs.getTree().getChildren() as child}
+						{@render treenode(child)}
+					{/each}
+				</ul>
 			</Pane>
-			<Pane class="border-primary/50 border-l">
+			<Pane class="">
 				<ul class="menu menu-horizontal bg-base-100 rounded-box m-2">
 					<li>
 						<DropdownMenuItem name="File">
@@ -89,17 +129,17 @@
 					</li>
 				</ul>
 				<Splitpanes horizontal theme="wolframe-theme">
-					<Pane size={100} minSize={10} class="border-primary/50 border-b">
+					<Pane size={100} minSize={10} class="">
 						<Splitpanes theme="wolframe-theme">
-							<Pane size={50} minSize={20} maxSize={80} class="border-primary/50 border-r">
+							<Pane size={50} minSize={20} maxSize={80} class="">
 								<p>Editor</p>
 							</Pane>
-							<Pane>
+							<Pane class="bg-base-200">
 								<p>Preview</p>
 							</Pane>
 						</Splitpanes>
 					</Pane>
-					<Pane snapSize={10} bind:size={showConsole}>
+					<Pane snapSize={10} bind:size={showConsole} class="bg-base-300">
 						<p>Console</p>
 					</Pane>
 				</Splitpanes>
@@ -147,30 +187,41 @@
 {/snippet}
 
 {#snippet file(entry: TreeNode)}
-    <li>
-        <button>
-            {@render fileicon()}
-            {entry.file.name}
-        </button>
-    </li>
+	<button
+		use:dragAction={{ dragStore, item: entry }}
+		ondragstart={() => console.log('dragstart')}
+		ondragend={() => console.log('dragend')}
+		ondragover={() => console.log('dragover')}
+	>
+		{@render fileicon()}
+		{entry.file.name}
+	</button>
 {/snippet}
 
 {#snippet folder(entry: TreeNode)}
-    <li>
-        <details>
-            <summary>
-                {@render foldericon()}
-                {entry.file.name}
-            </summary>
-            <ul>
-                {#each entry.getChildren() as child}
-                    {#if child.isFile}
-                        {@render file(child)}
-                    {:else}
-                        {@render folder(child)}
-                    {/if}
-                {/each}
-            </ul>
-        </details>
-    </li>
+	<details
+		use:dragOverAction={{ dragStore, item: entry }}
+		ondragovertimer={(e) => ((e.detail.element as HTMLDetailsElement).open = true)}
+		class={[dragStore.getDragOverItem() === entry ? 'bg-base-100' : '']}
+	>
+		<summary use:dragAction={{ dragStore, item: entry }}>
+			{@render foldericon()}
+			{entry.file.name}
+		</summary>
+		<ul>
+			{#each entry.getChildren() as child}
+				{@render treenode(child)}
+			{/each}
+		</ul>
+	</details>
+{/snippet}
+
+{#snippet treenode(entry: TreeNode)}
+	<li use:hoverQueueAction={{ queue: hoverQueue, item: entry }}>
+		{#if entry.isFile}
+			{@render file(entry)}
+		{:else}
+			{@render folder(entry)}
+		{/if}
+	</li>
 {/snippet}

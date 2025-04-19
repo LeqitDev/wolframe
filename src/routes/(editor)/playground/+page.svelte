@@ -16,6 +16,6 @@
                 vfs.addFile("test4.txt", "", folderResult.value.file.id);
                 vfs.addFile("test5.txt", "", folderResult.value.file.id);
             }
-        }, 1000);
+        }, 0);
     })
 </script>
