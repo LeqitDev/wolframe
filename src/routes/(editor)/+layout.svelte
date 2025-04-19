@@ -11,6 +11,8 @@
 	import { dragActionBuilder, dragOverActionBuilder } from '@/lib/frontend/actions/Drag.svelte';
 	import { DragStore } from '@/lib/frontend/stores/DragStore.svelte';
 	import { File, FilePlus, FolderClosed, FolderOpen, FolderPlus, Upload } from 'lucide-svelte';
+	import { Path } from '@/lib/backend/path';
+	import { untrack } from 'svelte';
 
 	let { children } = $props();
 
@@ -34,6 +36,62 @@
 		if (item.parent) addAllParents(item.parent);
 		dragStore.addDragOverItem(item);
 	}
+
+    function addNewFile(parent: TreeNode, folder: boolean = false) {
+        const result = vfs.addFile("", folder ? null : "", parent.file.id, true);
+        if (result.ok) {
+            if (!parent.open) {
+                parent.open = true;
+            }
+
+            setTimeout(() => {
+                const input = document.getElementById('newFileInput') as HTMLInputElement;
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 0);
+        }
+    }
+
+    function finalizeNewFile(el: HTMLInputElement, entry: TreeNode) {
+        const name = el.value;
+        if (name === "") {
+            vfs.removeFile(entry.file.id);
+            return;
+        }
+        try {
+            const path = (new Path(name)).rootless();
+            const parts = path.split("/");
+            const old_entry = entry;
+            entry = entry.parent!;
+            for (let i = 0; i < parts.length; i++) {
+                const part = parts[i];
+                if (i === parts.length - 1) {
+                    const result = vfs.addFile(part, "", entry.file.id);
+                    if (result.ok) {
+                        const result = vfs.removeFile(old_entry.file.id);
+                        if (!result.ok) {
+                            console.error(result.error);
+                        }
+                    }
+                } else {
+                    const result = vfs.addFile(part, null, entry.file.id);
+                    if (result.ok) {
+                        entry = result.value;
+                        entry.open = true;
+                    }
+                }
+            }
+        } catch (e) {
+            console.error(e);
+            return;
+        }
+    }
+
+    $effect(() => untrack(() => {
+        addNewFile(vfs.getTree());
+    }));
 </script>
 
 {#if contextMenuVisible}
@@ -46,17 +104,19 @@
 		{#if item?.isFile}
 			<li class="mx-1 first:mt-2 last:mb-2"><button>Preview File</button></li>
 		{:else}
-			<li class="mx-1 first:mt-2 last:mb-2"><button>New File</button></li>
-			<li class="mx-1 first:mt-2 last:mb-2"><button>New Folder</button></li>
-			<div class="divider m-0 before:h-[1px] after:h-[1px]"></div>
+			<li class="mx-1 first:mt-2 last:mb-2"><button onclick={() => addNewFile(item!)}>New File</button></li>
+			<li class="mx-1 first:mt-2 last:mb-2"><button onclick={() => addNewFile(item!, true)}>New Folder</button></li>
 		{/if}
-		<li class="mx-1 first:mt-2 last:mb-2">
-			<button>Delete {item?.isFile ? 'File' : 'Folder'}</button>
-		</li>
-		<div class="divider m-0 before:h-[1px] after:h-[1px]"></div>
-		<li class="mx-1 first:mt-2 last:mb-2">
-			<button>Rename {item?.isFile ? 'File' : 'Folder'}</button>
-		</li>
+        {#if item && item.file.id !== "root"}
+            <div class="divider m-0 before:h-[1px] after:h-[1px]"></div>
+            <li class="mx-1 first:mt-2 last:mb-2">
+                <button onclick={() => vfs.removeFile(item!.file.id)}>Delete {item?.isFile ? 'File' : 'Folder'}</button>
+            </li>
+            <div class="divider m-0 before:h-[1px] after:h-[1px]"></div>
+            <li class="mx-1 first:mt-2 last:mb-2">
+                <button>Rename {item?.isFile ? 'File' : 'Folder'}</button>
+            </li>
+        {/if}
 	</ul>
 {/if}
 
@@ -69,8 +129,12 @@
                 <div class="flex items-center p-2 pl-4 justify-between">
                     <h2 class="">File Explorer</h2>
                     <div class="join">
-                        <button class="btn btn-sm btn-square btn-soft join-item"><FilePlus class="w-4 h-4" strokeWidth="2" /></button>
-                        <button class="btn btn-sm btn-square btn-soft join-item"><FolderPlus class="w-4 h-4" strokeWidth="2" /></button>
+                        <button class="btn btn-sm btn-square btn-soft join-item" onclick={() => {
+                            addNewFile(vfs.getTree());
+                        }}><FilePlus class="w-4 h-4" strokeWidth="2" /></button>
+                        <button class="btn btn-sm btn-square btn-soft join-item" onclick={() => {
+                            addNewFile(vfs.getTree(), true);
+                        }}><FolderPlus class="w-4 h-4" strokeWidth="2" /></button>
                         <button class="btn btn-sm btn-square btn-soft join-item"><Upload class="w-4 h-4" strokeWidth="2" /></button>
                     </div>
                 </div>
@@ -96,7 +160,7 @@
 						'menu menu-sm border-base-100 h-full w-full border-t'
 					]}
 				>
-					{#each vfs.getTree().getChildren() as child}
+					{#each vfs.getTree().getChildren() as child (child.file.id)}
 						{@render treenode(child)}
 					{/each}
 				</ul>
@@ -169,6 +233,24 @@
 {@render children()}
 
 {#snippet file(entry: TreeNode)}
+{#if entry.input}
+<button>
+    <File class="w-4 h-4" strokeWidth="2" />
+    <input type="text" value={entry.file.name} id="newFileInput" onblur={(e) => {
+        const el = e.target as HTMLInputElement;
+        finalizeNewFile(el, entry);
+    }} onkeydown={(e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            const el = e.target as HTMLInputElement;
+            finalizeNewFile(el, entry);
+        } else if (e.key === 'Escape') {
+            e.preventDefault();
+            vfs.removeFile(entry.file.id);
+        }
+    }} />
+</button>
+{:else}
 	<button
 		use:dragAction={{ dragStore, item: entry }}
 		ondragstart={() => {
@@ -178,9 +260,16 @@
 		<File class="w-4 h-4" strokeWidth="2" />
 		{entry.file.name}
 	</button>
+    {/if}
 {/snippet}
 
 {#snippet folder(entry: TreeNode)}
+{#if entry.input}
+<button>
+    <FolderClosed class="w-4 h-4" strokeWidth="2" />
+    <input type="text" value={entry.file.name} id="newFileInput" class="input" onblur={() => entry.input = false} />
+</button>
+{:else}
 	<details
 		use:dragOverAction={{ dragStore, item: entry }}
 		ondragovertimer={() => {
@@ -208,11 +297,12 @@
 			{entry.file.name}
 		</summary>
 		<ul>
-			{#each entry.getChildren() as child}
+			{#each entry.getChildren() as child (child.file.id)}
 				{@render treenode(child)}
 			{/each}
 		</ul>
 	</details>
+    {/if}
 {/snippet}
 
 {#snippet treenode(entry: TreeNode)}

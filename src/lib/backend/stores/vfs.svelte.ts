@@ -40,7 +40,14 @@ export class TreeNode extends VirtualFile {
         return this.file.type === FileType.File;
     }
 
-    addChild(file: File | VirtualFile | TreeNode) {
+    addChild(file: File | VirtualFile | TreeNode): Result<void, Error> {
+        const name = file instanceof File ? file.name : (file as VirtualFile).file.name;
+        if (this.children.has(name)) {
+            return Result.err(new Error(`File with name ${name} already exists`, {
+                cause: this.children.get(name),
+            }));
+        }
+
         if (file instanceof TreeNode) {
             this.children.set(file.file.name, file);
         } else if (file instanceof VirtualFile) {
@@ -48,10 +55,41 @@ export class TreeNode extends VirtualFile {
         } else {
             this.children.set(file.name, new TreeNode(file, this));
         }
+
+        return Result.ok(undefined as void);
+    }
+
+    removeChild(file: File | VirtualFile | TreeNode) {
+        if (file instanceof VirtualFile || file instanceof TreeNode) {
+            this.children.delete(file.file.name);
+        } else {
+            this.children.delete(file.name);
+        }
     }
 
     getChildren(): TreeNode[] {
-        return Array.from(this.children.values()).map((child) => child as TreeNode);
+        return Array.from(this.children.values()).toSorted((a, b) => {
+            if (a.input) {
+                return 1;
+            } else if (b.input) {
+                return -1;
+            }
+
+            if (a.isFile && b.isFile) {
+                return a.file.name.localeCompare(b.file.name);
+            } else if (a.isFile) {
+                return 1;
+            } else if (b.isFile) {
+                return -1;
+            }
+            return a.file.name.localeCompare(b.file.name);
+        });
+    }
+
+    delete() {
+        if (this.parent) {
+            this.parent.removeChild(this);
+        }
     }
 }
 
@@ -104,7 +142,7 @@ class VirtualFileSystem {
         return Result.ok(currentNode);
     }
 
-    addFile(name: string, content: string | null, parentId?: string): Result<TreeNode> {
+    addFile(name: string, content: string | null, parentId?: string, isInput: boolean = false): Result<TreeNode> {
         const file: File = {
             id: crypto.randomUUID(),
             name,
@@ -115,20 +153,47 @@ class VirtualFileSystem {
             parentId: parentId,
         };
         let treeNode: TreeNode;
-        if (parentId) {
+        let result: Result<void, Error>;
+
+        if (parentId && parentId !== "root") {
             const parentNodeResult = this.getFileById(parentId);
             if (!parentNodeResult.ok) {
                 return Result.err(parentNodeResult.error);
             }
+
             const parentNode = parentNodeResult.unwrap();
             treeNode = new TreeNode(file, parentNode);
-            parentNode.children.set(name, treeNode);
+            treeNode.input = isInput;
+
+            result = parentNode.addChild(treeNode);
         } else {
             treeNode = new TreeNode(file, this.root);
-            this.root.children.set(name, treeNode);
+            treeNode.input = isInput;
+
+            result = this.root.addChild(treeNode);
         }
+
+        if (!result.ok) {
+            let error = result.error;
+
+            if (error.cause instanceof TreeNode) {
+                return Result.ok(error.cause);
+            }
+        }
+
         this.files.set(file.id, treeNode);
         return Result.ok(treeNode);
+    }
+
+    removeFile(id: string): Result<TreeNode> {
+        const fileResult = this.getFileById(id);
+        if (!fileResult.ok) {
+            return Result.err(fileResult.error);
+        }
+        const fileNode = fileResult.unwrap();
+        fileNode.delete();
+        this.files.delete(id);
+        return Result.ok(fileNode);
     }
 
     getTree(): TreeNode {

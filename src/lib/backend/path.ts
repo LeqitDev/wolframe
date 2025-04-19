@@ -19,7 +19,7 @@ export class Path {
 
         // Remove leading and trailing separators
         const trimmedPath = path.replace(/^[\/\\]+/, '')
-                                .replace(/[\/\\]+$/, '');
+                                .replace(/[\/\\]+$/, '').trim();
         if (trimmedPath.length === 0) {
             throw new Error('Path is empty after trimming.');
         }
@@ -27,7 +27,7 @@ export class Path {
         // Split the path into parts using the regex
         const parsedPath = path.replaceAll(/[\/\\]+/g, '/')
                                 .replaceAll(/[\/\\]+/g, '/');
-        this.parts = parsedPath.split(PATH_SEPARATOR).filter(part => part.length > 0);
+        this.parts = parsedPath.split(PATH_SEPARATOR).map((part) => part.trim()).filter(part => part.length > 0);
     }
 
     /* 
