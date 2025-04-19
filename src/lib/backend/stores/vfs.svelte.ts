@@ -8,6 +8,7 @@ class VirtualFile {
     modified: boolean = $state(false);
     open: boolean = $state(false);
     input: boolean = $state(false);
+    renaming: boolean = $state(false);
 
     file: File;
 
@@ -69,9 +70,9 @@ export class TreeNode extends VirtualFile {
 
     getChildren(): TreeNode[] {
         return Array.from(this.children.values()).toSorted((a, b) => {
-            if (a.input) {
+            if (a.input && !a.renaming) {
                 return 1;
-            } else if (b.input) {
+            } else if (b.input && !b.renaming) {
                 return -1;
             }
 
@@ -203,6 +204,34 @@ class VirtualFileSystem {
         this.files.delete(id);
         return Result.ok(fileNode);
     }
+
+    renameFile(id: string, newName: string): Result<TreeNode> {
+        const fileResult = this.getFileById(id);
+        if (!fileResult.ok) {
+            return Result.err(fileResult.error);
+        }
+        const fileNode = fileResult.unwrap();
+        if (fileNode.isRoot) {
+            return Result.err(new Error("Cannot rename root node"));
+        }
+        const parentNode = fileNode.parent!;
+        parentNode.removeChild(fileNode);
+
+        fileNode.file.name = newName;
+        fileNode.file.updatedAt = Date.now();
+
+        const result = parentNode.addChild(fileNode);
+        if (!result.ok) {
+            let error = result.error;
+            if (error.cause instanceof TreeNode) {
+                return Result.ok(error.cause);
+            }
+            return Result.err(error);
+        }
+
+        return Result.ok(fileNode);
+    }
+
 
     getTree(): TreeNode {
         return this.root;

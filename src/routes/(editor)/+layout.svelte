@@ -89,6 +89,29 @@
 		}
 	}
 
+	function finalizeRenaming(el: HTMLInputElement, entry: TreeNode) {
+        const name = el.value;
+        if (name === '') {
+            entry.renaming = false;
+            entry.input = false;
+            return;
+        }
+
+        try {
+            const path = new Path(name).rootless();
+            const parts = path.split('/');
+            
+            if (parts.length > 1) return;
+
+            vfs.renameFile(entry.file.id, name);
+            entry.renaming = false;
+            entry.input = false;
+        } catch (e) {
+            console.error(e);
+            return;
+        }
+    }
+
 	$effect(() =>
 		untrack(() => {
 			addNewFile(vfs.getTree());
@@ -122,7 +145,20 @@
 			</li>
 			<div class="divider m-0 before:h-[1px] after:h-[1px]"></div>
 			<li class="mx-1 first:mt-2 last:mb-2">
-				<button>Rename {item?.isFile ? 'File' : 'Folder'}</button>
+				<button
+					onclick={() => {
+						item!.input = true;
+						item!.renaming = true;
+
+						setTimeout(() => {
+							const input = document.getElementById('newFileInput') as HTMLInputElement;
+							if (input) {
+								input.focus();
+								input.select();
+							}
+						}, 0);
+					}}>Rename {item?.isFile ? 'File' : 'Folder'}</button
+				>
 			</li>
 		{/if}
 	</ul>
@@ -254,20 +290,34 @@
 			<File class="h-4 w-4" strokeWidth="2" />
 			<input
 				type="text"
+				class="input input-xs"
 				value={entry.file.name}
 				id="newFileInput"
 				onblur={(e) => {
 					const el = e.target as HTMLInputElement;
-					finalizeNewFile(el, entry);
+					if (entry.renaming) {
+						finalizeRenaming(el, entry);
+					} else {
+						finalizeNewFile(el, entry);
+					}
 				}}
 				onkeydown={(e) => {
 					if (e.key === 'Enter') {
 						e.preventDefault();
 						const el = e.target as HTMLInputElement;
-						finalizeNewFile(el, entry);
+						if (entry.renaming) {
+							finalizeRenaming(el, entry);
+						} else {
+							finalizeNewFile(el, entry);
+						}
 					} else if (e.key === 'Escape') {
 						e.preventDefault();
-						vfs.removeFile(entry.file.id);
+						if (entry.renaming) {
+							entry.renaming = false;
+							entry.input = false;
+						} else {
+							vfs.removeFile(entry.file.id);
+						}
 					}
 				}}
 			/>
