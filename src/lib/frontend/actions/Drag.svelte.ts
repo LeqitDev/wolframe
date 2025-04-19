@@ -87,6 +87,7 @@ export const dragActionBuilder = <T>(): Action<HTMLElement, { dragStore: DragSto
 
         node.dispatchEvent(new CustomEvent("dragend"));
         params.dragStore.clearDragItem();
+        params.dragStore.clearDragOverItems();
 
         tray.style.display = "none";
 
@@ -104,6 +105,7 @@ export const dragActionBuilder = <T>(): Action<HTMLElement, { dragStore: DragSto
         tray.style.width = "max-content";
         tray.style.pointerEvents = "none"; // Prevent mouse events on tray
         tray.style.userSelect = "none"; // Prevent text selection
+        tray.style.cursor = "move";
 
         return () => {
             node.removeEventListener("mousedown", dragStart);
@@ -115,7 +117,7 @@ export const dragActionBuilder = <T>(): Action<HTMLElement, { dragStore: DragSto
 
 export const dragOverActionBuilder = <T>(): Action<HTMLElement, { dragStore: DragStore<T>, item: T }, {
     ondragover: (e: CustomEvent) => void;
-    ondragovertimer: (e: CustomEvent<{element: HTMLElement}>) => void;
+    ondragovertimer: (e: CustomEvent) => void;
 }> => (node, params: { dragStore: DragStore<T>, item: T }) => {
     let hoverTimer: number | null = null;
     
@@ -123,13 +125,10 @@ export const dragOverActionBuilder = <T>(): Action<HTMLElement, { dragStore: Dra
         if (params.dragStore.isDragging()) {
             node.dispatchEvent(new CustomEvent("dragover"));
             params.dragStore.addDragOverItem(params.item);
-            hoverTimer = setTimeout(() => {
-                node.dispatchEvent(new CustomEvent("dragovertimer", {
-                    detail: {
-                        element: node,
-                    },
-                }));
-            }, 3000);
+            hoverTimer = window.setTimeout(() => {
+                node.dispatchEvent(new CustomEvent("dragovertimer"));
+                hoverTimer = null;
+            }, 300);
         }
     }
 
@@ -138,17 +137,17 @@ export const dragOverActionBuilder = <T>(): Action<HTMLElement, { dragStore: Dra
             params.dragStore.removeDragOverItem(params.item);
         }
         if (hoverTimer) {
-            clearTimeout(hoverTimer);
+            window.clearTimeout(hoverTimer);
             hoverTimer = null;
         }
     }
 
     $effect(() => {
-        node.addEventListener("mouseover", onEnter);
+        node.addEventListener("mouseenter", onEnter);
         node.addEventListener("mouseleave", onLeave);
 
         return () => {
-            node.removeEventListener("mouseover", onEnter);
+            node.removeEventListener("mouseenter", onEnter);
             node.removeEventListener("mouseleave", onLeave);
         };
     })

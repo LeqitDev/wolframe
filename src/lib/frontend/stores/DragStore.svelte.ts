@@ -36,6 +36,10 @@ export class DragStore<T> {
         }
     }
 
+    clearDragOverItems() {
+        this.dragOverItem = [];
+    }
+
     isDraggingOver() {
         return this.dragOverItem.length > 0;
     }

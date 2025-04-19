@@ -6,6 +6,8 @@ import { getContext, setContext } from "svelte";
 
 class VirtualFile {
     modified: boolean = $state(false);
+    open: boolean = $state(false);
+    input: boolean = $state(false);
 
     file: File;
 
@@ -24,6 +26,9 @@ export class TreeNode extends VirtualFile {
     }
 
     get path(): Path {
+        if (this.file.id === "root" && this.parent === null) {
+            return new Path(this.file.name, true);
+        }
         return this.parent ? this.parent.path.append(this.file.name) : new Path(this.file.name);
     }
 
@@ -119,7 +124,7 @@ class VirtualFileSystem {
             treeNode = new TreeNode(file, parentNode);
             parentNode.children.set(name, treeNode);
         } else {
-            treeNode = new TreeNode(file);
+            treeNode = new TreeNode(file, this.root);
             this.root.children.set(name, treeNode);
         }
         this.files.set(file.id, treeNode);

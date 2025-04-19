@@ -10,6 +10,7 @@
 	import { fade } from 'svelte/transition';
 	import { dragActionBuilder, dragOverActionBuilder } from '@/lib/frontend/actions/Drag.svelte';
 	import { DragStore } from '@/lib/frontend/stores/DragStore.svelte';
+	import { File, FilePlus, FolderClosed, FolderOpen, FolderPlus, Upload } from 'lucide-svelte';
 
 	let { children } = $props();
 
@@ -28,15 +29,21 @@
 	const dragStore = new DragStore<TreeNode>();
 	const dragAction = dragActionBuilder<TreeNode>();
 	const dragOverAction = dragOverActionBuilder<TreeNode>();
+
+	function addAllParents(item: TreeNode) {
+		if (item.parent) addAllParents(item.parent);
+		dragStore.addDragOverItem(item);
+	}
 </script>
 
 {#if contextMenuVisible}
+	{@const item = hoverQueue.item}
 	<ul
 		class="bg-base-300 rounded-box menu menu-sm absolute z-10 w-full max-w-60 p-0 shadow-lg"
 		style="top: {contextMenuPosition.y}px; left: {contextMenuPosition.x}px;"
 		use:portalAction={{}}
 	>
-		{#if hoverQueue.item?.isFile}
+		{#if item?.isFile}
 			<li class="mx-1 first:mt-2 last:mb-2"><button>Preview File</button></li>
 		{:else}
 			<li class="mx-1 first:mt-2 last:mb-2"><button>New File</button></li>
@@ -44,11 +51,11 @@
 			<div class="divider m-0 before:h-[1px] after:h-[1px]"></div>
 		{/if}
 		<li class="mx-1 first:mt-2 last:mb-2">
-			<button>Delete {hoverQueue.item?.isFile ? 'File' : 'Folder'}</button>
+			<button>Delete {item?.isFile ? 'File' : 'Folder'}</button>
 		</li>
 		<div class="divider m-0 before:h-[1px] after:h-[1px]"></div>
 		<li class="mx-1 first:mt-2 last:mb-2">
-			<button>Rename {hoverQueue.item?.isFile ? 'File' : 'Folder'}</button>
+			<button>Rename {item?.isFile ? 'File' : 'Folder'}</button>
 		</li>
 	</ul>
 {/if}
@@ -59,7 +66,14 @@
 	<div class="flex h-screen w-screen">
 		<Splitpanes theme="wolframe-theme">
 			<Pane size={18} snapSize={8} maxSize={70} class="bg-base-200">
-				<h2 class="p-2 pl-4">File Explorer "{dragStore.getDragOverItem()}"</h2>
+                <div class="flex items-center p-2 pl-4 justify-between">
+                    <h2 class="">File Explorer</h2>
+                    <div class="join">
+                        <button class="btn btn-sm btn-square btn-soft join-item"><FilePlus class="w-4 h-4" strokeWidth="2" /></button>
+                        <button class="btn btn-sm btn-square btn-soft join-item"><FolderPlus class="w-4 h-4" strokeWidth="2" /></button>
+                        <button class="btn btn-sm btn-square btn-soft join-item"><Upload class="w-4 h-4" strokeWidth="2" /></button>
+                    </div>
+                </div>
 				<ul
 					use:hoverQueueAction={{ queue: hoverQueue, item: vfs.getTree() }}
 					use:contextMenuAction={{}}
@@ -74,8 +88,10 @@
 					use:dragOverAction={{ dragStore, item: vfs.getTree() }}
 					ondragover={() => console.log('dragover root')}
 					class={[
-						dragStore.getDragOverItem() === vfs.getTree() && dragStore.isDragging()
-							? 'bg-base-100'
+						dragStore.getDragOverItem() === vfs.getTree() &&
+						dragStore.isDragging() &&
+						dragStore.getDragOverItem() !== dragStore.getDragItem()?.parent
+							? 'bg-base-100/75'
 							: '',
 						'menu menu-sm border-base-100 h-full w-full border-t'
 					]}
@@ -86,7 +102,7 @@
 				</ul>
 			</Pane>
 			<Pane class="">
-				<ul class="menu menu-horizontal bg-base-100 rounded-box m-2">
+				<ul class="menu menu-horizontal bg-base-200 w-full gap-2 pb-3">
 					<li>
 						<DropdownMenuItem name="File">
 							<li><a href="/">New File</a></li>
@@ -152,48 +168,14 @@
 
 {@render children()}
 
-{#snippet foldericon()}
-	<svg
-		xmlns="http://www.w3.org/2000/svg"
-		fill="none"
-		viewBox="0 0 24 24"
-		stroke-width="1.5"
-		stroke="currentColor"
-		class="h-4 w-4"
-	>
-		<path
-			stroke-linecap="round"
-			stroke-linejoin="round"
-			d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"
-		/>
-	</svg>
-{/snippet}
-
-{#snippet fileicon()}
-	<svg
-		xmlns="http://www.w3.org/2000/svg"
-		fill="none"
-		viewBox="0 0 24 24"
-		stroke-width="1.5"
-		stroke="currentColor"
-		class="h-4 w-4"
-	>
-		<path
-			stroke-linecap="round"
-			stroke-linejoin="round"
-			d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z"
-		/>
-	</svg>
-{/snippet}
-
 {#snippet file(entry: TreeNode)}
 	<button
 		use:dragAction={{ dragStore, item: entry }}
-		ondragstart={() => console.log('dragstart')}
-		ondragend={() => console.log('dragend')}
-		ondragover={() => console.log('dragover')}
+		ondragstart={() => {
+			addAllParents(entry.parent!);
+		}}
 	>
-		{@render fileicon()}
+		<File class="w-4 h-4" strokeWidth="2" />
 		{entry.file.name}
 	</button>
 {/snippet}
@@ -201,11 +183,28 @@
 {#snippet folder(entry: TreeNode)}
 	<details
 		use:dragOverAction={{ dragStore, item: entry }}
-		ondragovertimer={(e) => ((e.detail.element as HTMLDetailsElement).open = true)}
-		class={[dragStore.getDragOverItem() === entry ? 'bg-base-100' : '']}
+		ondragovertimer={() => {
+            entry.open = true
+        }}
+		class={[
+			dragStore.getDragOverItem() === entry &&
+			dragStore.getDragOverItem() !== dragStore.getDragItem()?.parent
+				? 'bg-base-100/75'
+				: ''
+		]}
+		bind:open={entry.open}
 	>
-		<summary use:dragAction={{ dragStore, item: entry }}>
-			{@render foldericon()}
+		<summary
+			use:dragAction={{ dragStore, item: entry }}
+			ondragstart={() => {
+				addAllParents(entry.parent!);
+			}}
+		>
+            {#if entry.open}
+                <FolderOpen class="w-4 h-4" strokeWidth="2" />
+            {:else}
+                <FolderClosed class="w-4 h-4" strokeWidth="2" />
+            {/if}
 			{entry.file.name}
 		</summary>
 		<ul>

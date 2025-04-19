@@ -8,8 +8,12 @@ export class Path {
      * @param path - The path string to parse.
      * @throws Error if the path is empty or invalid.
      */
-    constructor(path: string) {
+    constructor(path: string, root?: boolean) {
         if (path.length === 0) {
+            if (root) {
+                this.parts = [];
+                return;
+            }
             throw new Error('Path is empty.');
         }
 
