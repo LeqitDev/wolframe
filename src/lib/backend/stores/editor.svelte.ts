@@ -10,20 +10,25 @@ class EditorManager {
         percent: 0,
         message: 'Loading Project',
     });
-    private loadEditor = new Promise<void>((resolve, reject) => {
-        this.resolveLoadingEditor = resolve;
-        this.rejectLoadingEditor = reject;
-    });
 
     /**
-     * The loading promise that resolves when the editor is fully loaded.
+     * The loading promise that resolves the editor load function.
      */
     resolveLoadingEditor: ((v: void) => void) | null = null;
     
     /**
-     * The loading promise that rejects if there is an error while loading the editor.
+     * The loading promise that rejects the editor load function.
      */
     rejectLoadingEditor: ((reason?: string) => void) | null = null;
+
+    /**
+     * The loading promise that resolves when the editor is fully loaded.
+     * It is created in the constructor and can be awaited.
+     */
+    loadEditor = new Promise<void>((resolve, reject) => {
+        this.resolveLoadingEditor = resolve;
+        this.rejectLoadingEditor = reject;
+    });
 
     
     get loading() {

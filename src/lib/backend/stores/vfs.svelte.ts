@@ -9,6 +9,7 @@ class VirtualFile {
     open: boolean = $state(false); // open folder
     input: boolean = $state(false); // put input field instead of name
     renaming: boolean = $state(false); // don't delete the entry on submit just rename
+    error: string | null = $state(null); // error message
 
     file: File;
 
@@ -254,7 +255,7 @@ class VirtualFileSystem {
             let error = result.error;
 
             if (error instanceof FileAlreadyExistsError) {
-                return Result.ok(error.file);
+                return Result.err(new Error(`File or folder with name '${error.file.file.name}' already exists at this location. Please choose a different name.`));
             }
         }
 

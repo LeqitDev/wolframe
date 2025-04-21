@@ -13,6 +13,7 @@
 	import { File, FilePlus, FolderClosed, FolderOpen, FolderPlus, Upload } from 'lucide-svelte';
 	import { Path } from '@/lib/backend/path';
 	import { untrack } from 'svelte';
+	import Modal from '@/lib/frontend/components/Modal.svelte';
 
 	let { children } = $props();
 
@@ -74,6 +75,9 @@
 						if (!result.ok) {
 							console.error(result.error);
 						}
+					} else {
+						console.error(result.error);
+						old_entry.error = result.error.message;
 					}
 				} else {
 					const result = vfs.addFile(part, null, entry.file.id);
@@ -124,6 +128,8 @@
 		})
 	);
 </script>
+
+<Modal open={true} />
 
 {#if contextMenuVisible}
 	{@const item = hoverQueue.item}
@@ -292,11 +298,11 @@
 
 {#snippet file(entry: TreeNode)}
 	{#if entry.input}
-		<button>
-			<File class="h-4 w-4" strokeWidth="2" />
+		<button class="relative z-20">
+			<File class="h-4 w-4 z-20" strokeWidth="2" />
 			<input
 				type="text"
-				class="input input-xs"
+				class="input input-xs z-20"
 				value={entry.file.name}
 				id="newFileInput"
 				onblur={(e) => {
@@ -327,6 +333,13 @@
 					}
 				}}
 			/>
+			{#if entry.error}
+			<div class="absolute left-0 right-0 top-0 bottom-0 bg-error rounded-t-box transform p-2">
+			</div>
+			<div class="absolute left-0 right-0 bottom-0 bg-error z-10 rounded-b-box transform translate-y-full p-2">
+				<p class="text-error-content text-xs text-wrap">{entry.error}</p>
+			</div>
+			{/if}
 		</button>
 	{:else}
 		<button
