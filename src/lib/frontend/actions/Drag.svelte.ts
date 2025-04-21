@@ -4,6 +4,11 @@ import { createOnceFunction } from "../utils";
 
 const MOVED_THRESHOLD = 10; // px
 
+/**
+ * Copies the styles from one element to another.
+ * @param style The CSSStyleDeclaration of the source element.
+ * @param dest The destination element to which the styles will be applied.
+ */
 function massAddStyleToElement(style: CSSStyleDeclaration, dest: HTMLElement) {
     var s = style;
     for ( var i in s ) {
@@ -23,6 +28,10 @@ function massAddStyleToElement(style: CSSStyleDeclaration, dest: HTMLElement) {
     }
 }
 
+/**
+ * Creates a drag action that allows dragging an element.
+ * @returns An action that allows dragging an element.
+ */
 export const dragActionBuilder = <T>(): Action<HTMLElement, { dragStore: DragStore<T>, item: T }, {
     ondragstart: (e: CustomEvent) => void;
     ondragend: (e: CustomEvent) => void;
@@ -117,6 +126,10 @@ export const dragActionBuilder = <T>(): Action<HTMLElement, { dragStore: DragSto
     })
 }
 
+/**
+ * Creates a drag over action that observes when an element is being dragged over another element.
+ * @returns An action that allows to observe drag over events.
+ */
 export const dragOverActionBuilder = <T>(): Action<HTMLElement, { dragStore: DragStore<T>, item: T }, {
     ondragover: (e: CustomEvent) => void;
     ondragovertimer: (e: CustomEvent) => void;
