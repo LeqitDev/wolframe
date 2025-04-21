@@ -68,7 +68,7 @@
 			for (let i = 0; i < parts.length; i++) {
 				const part = parts[i];
 				if (i === parts.length - 1) {
-					const result = vfs.addFile(part, '', entry.file.id);
+					const result = vfs.addFile(part, old_entry.isFile ? '' : null, entry.file.id);
 					if (result.ok) {
 						const result = vfs.removeFile(old_entry.file.id);
 						if (!result.ok) {
@@ -112,11 +112,11 @@
 		}
 	}
 
-    function moveFile(newParent: TreeNode, moved: TreeNode) {
-        console.log('moveFile', newParent.file.name, moved.file.name);
-        const result = vfs.moveFile(moved.file.id, newParent.file.id);
-        console.log(result);
-    }
+	function moveFile(newParent: TreeNode, moved: TreeNode) {
+		console.log('moveFile', newParent.file.name, moved.file.name);
+		const result = vfs.moveFile(moved.file.id, newParent.file.id);
+		console.log(result);
+	}
 
 	$effect(() =>
 		untrack(() => {
@@ -338,7 +338,7 @@
 				const dropzone = dragStore.getDragOverItem();
 				const item = dragStore.getDragItem();
 
-                moveFile(dropzone!, item!);
+				moveFile(dropzone!, item!);
 			}}
 		>
 			<File class="h-4 w-4" strokeWidth="2" />
@@ -353,10 +353,36 @@
 			<FolderClosed class="h-4 w-4" strokeWidth="2" />
 			<input
 				type="text"
+				class="input input-xs"
 				value={entry.file.name}
 				id="newFileInput"
-				class="input"
-				onblur={() => (entry.input = false)}
+				onblur={(e) => {
+					const el = e.target as HTMLInputElement;
+					if (entry.renaming) {
+						finalizeRenaming(el, entry);
+					} else {
+						finalizeNewFile(el, entry);
+					}
+				}}
+				onkeydown={(e) => {
+					if (e.key === 'Enter') {
+						e.preventDefault();
+						const el = e.target as HTMLInputElement;
+						if (entry.renaming) {
+							finalizeRenaming(el, entry);
+						} else {
+							finalizeNewFile(el, entry);
+						}
+					} else if (e.key === 'Escape') {
+						e.preventDefault();
+						if (entry.renaming) {
+							entry.renaming = false;
+							entry.input = false;
+						} else {
+							vfs.removeFile(entry.file.id);
+						}
+					}
+				}}
 			/>
 		</button>
 	{:else}
@@ -382,7 +408,7 @@
 					const dropzone = dragStore.getDragOverItem();
 					const item = dragStore.getDragItem();
 
-                    moveFile(dropzone!, item!);
+					moveFile(dropzone!, item!);
 				}}
 			>
 				{#if entry.open}

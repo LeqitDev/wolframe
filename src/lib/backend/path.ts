@@ -1,10 +1,17 @@
 const PATH_SEPARATOR = '/';
 
+/**
+ * Path class for handling file paths.
+ * This class provides methods to manipulate and compare paths.
+ * 
+ * @class
+ */
 export class Path {
     private parts: string[] = [];
 
-    /* 
+    /**
      * Create a new Path instance from a string.
+     * 
      * @param path - The path string to parse.
      * @throws Error if the path is empty or invalid.
      */
@@ -30,15 +37,16 @@ export class Path {
         this.parts = parsedPath.split(PATH_SEPARATOR).map((part) => part.trim()).filter(part => part.length > 0);
     }
 
-    /* 
+    /** 
      * Get the path as a string without a leading separator.
+     * 
      * @returns The path as a string without a leading separator.
      */
     rootless(): string {
         return this.parts.join(PATH_SEPARATOR);
     }
 
-    /* 
+    /** 
      * Get the path as a string with a leading separator.
      * @returns The path as a string with a leading separator.
      */
@@ -46,7 +54,7 @@ export class Path {
         return PATH_SEPARATOR + this.rootless();
     }
 
-    /* 
+    /** 
      * Get the path as a string.
      * @returns The path as a string.
      */
@@ -54,7 +62,7 @@ export class Path {
         return this.rootless();
     }
 
-    /*
+    /**
      * Get the last part of the path.
      * @returns The last part of the path.
      */
@@ -62,7 +70,7 @@ export class Path {
         return this.parts[this.parts.length - 1];
     }
 
-    /* 
+    /** 
      * Get the parent path of this path.
      * @returns The parent path or null if this path has no parent.
      */
@@ -74,7 +82,7 @@ export class Path {
         return new Path(parentParts.join(PATH_SEPARATOR));
     }
 
-    /* 
+    /** 
      * Check if this path is equal to another path.
      * @param other - The other path to compare with.
      * @returns true if the paths are equal, false otherwise.
@@ -95,7 +103,7 @@ export class Path {
         return true;
     }
 
-    /* 
+    /** 
      * Append a part to the path.
      * @param part - The part to append.
      * @returns A new Path instance with the appended part.
