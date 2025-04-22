@@ -1,3 +1,5 @@
+import { getContext, setContext } from "svelte";
+
 /**
  * DragStore is a store that manages the state of drag and drop operations saving both the dragged item and the item that's under the dragged item.
  * 
@@ -84,4 +86,14 @@ export class DragStore<T> {
     isDraggingOver() {
         return this.dragOverItem.length > 0;
     }
+}
+
+const symbol = Symbol('dragStore');
+
+export function getDragStore<T>(): DragStore<T> {
+    return getContext<ReturnType<typeof setDragStore>>(symbol) as DragStore<T>;
+}
+
+export function setDragStore<T>() {
+    return setContext(symbol, new DragStore<T>());
 }

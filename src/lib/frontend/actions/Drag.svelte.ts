@@ -10,8 +10,8 @@ const MOVED_THRESHOLD = 10; // px
  * @param dest The destination element to which the styles will be applied.
  */
 function massAddStyleToElement(style: CSSStyleDeclaration, dest: HTMLElement) {
-    var s = style;
-    for ( var i in s ) {
+    const s = style;
+    for ( const i in s ) {
         // Do not use `hasOwnProperty`, nothing will get copied
         if ( typeof s[i] == "string" && s[i] && i != "cssText" && !/\d/.test(i) ) {
             // The try is for setter only properties
@@ -23,7 +23,9 @@ function massAddStyleToElement(style: CSSStyleDeclaration, dest: HTMLElement) {
                 if ( i == "font" ) {
                     dest.style.fontSize = s.fontSize;
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.error("Error copying style", e);
+            }
         }
     }
 }
@@ -41,7 +43,7 @@ export const dragActionBuilder = <T>(): Action<HTMLElement, { dragStore: DragSto
     let relative_x = 0;
     let relative_y = 0;
     let moved_amount: number = 0; // total distance moved
-    let tray = document.createElement("div");
+    const tray = document.createElement("div");
     let onDragStart: () => void;
 
     function drag(event: MouseEvent) {
@@ -90,7 +92,7 @@ export const dragActionBuilder = <T>(): Action<HTMLElement, { dragStore: DragSto
         document.addEventListener("mouseup", dragEnd);
     }
 
-    function dragEnd(event: MouseEvent) {
+    function dragEnd() {
         document.removeEventListener("mousemove", drag);
         document.removeEventListener("mouseup", dragEnd);
 

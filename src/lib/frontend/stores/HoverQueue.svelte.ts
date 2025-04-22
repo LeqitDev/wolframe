@@ -1,4 +1,4 @@
-import { untrack } from "svelte";
+import { getContext, setContext, untrack } from "svelte";
 
 /**
  * HoverQueue is a class that manages a queue of items for hover actions.
@@ -51,4 +51,14 @@ export class HoverQueue<T> {
     get updatedItem() {
         return this.queue.at(-1);
     }
+}
+
+const symbol = Symbol('hoverQueue');
+
+export function getHoverQueue<T>(): HoverQueue<T> {
+    return getContext<ReturnType<typeof setHoverQueue>>(symbol) as HoverQueue<T>;
+}
+
+export function setHoverQueue<T>() {
+    return setContext(symbol, new HoverQueue<T>());
 }
