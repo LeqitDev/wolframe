@@ -2,23 +2,25 @@
 	import { getVirtualFileSystem, TreeNode } from "@/lib/backend/stores/vfs.svelte";
 	import { FilePlus, FolderPlus, Upload } from "lucide-svelte";
 	import { hoverQueueActionBuilder } from "../../actions/HoverQueue.svelte";
-	import { getHoverQueue } from "../../stores/HoverQueue.svelte";
-	import { getDragStore } from "../../stores/DragStore.svelte";
+	import { getHoverQueue, setHoverQueue } from "../../stores/HoverQueue.svelte";
+	import { getDragStore, setDragStore } from "../../stores/DragStore.svelte";
 	import { dragOverActionBuilder } from "../../actions/Drag.svelte";
 	import { contextMenuAction } from "../../actions/ContextMenu.svelte";
 	import Entry from "./Entry.svelte";
+	import { setContextMenuStore } from "../../stores/ContextMenu.svelte";
+	import { portalAction } from "../../actions/Portal.svelte";
+	import FileExplorerContextMenu from "./FileExplorerContextMenu.svelte";
 
 
     const vfs = getVirtualFileSystem();
     
-    const hoverQueue = getHoverQueue<TreeNode>();
+    const hoverQueue = setHoverQueue<TreeNode>();
     const hoverQueueAction = hoverQueueActionBuilder<TreeNode>();
     
-    const dragStore = getDragStore<TreeNode>();
+    const dragStore = setDragStore<TreeNode>();
     const dragOverAction = dragOverActionBuilder<TreeNode>();
 
-    let contextMenuVisible = $state(false);
-    let contextMenuPosition = $state({ x: 0, y: 0 });
+    const ctxMenuStore = setContextMenuStore();
 
     function addNewFile(parent: TreeNode, folder: boolean = false) {
 		const result = vfs.addFile('', folder ? null : '', parent.file.id, true);
@@ -37,6 +39,10 @@
 		}
 	}
 </script>
+
+<div use:portalAction={{}}>
+    <FileExplorerContextMenu />
+</div>
 
 <div class="flex items-center justify-between p-2 pl-4">
     <h2 class="">File Explorer</h2>
@@ -62,13 +68,13 @@
     use:hoverQueueAction={{ queue: hoverQueue, item: vfs.getTree() }}
     use:contextMenuAction={{}}
     onshowmenu={(e) => {
-        contextMenuVisible = false;
-        contextMenuPosition = e.detail;
+        ctxMenuStore.show = false;
+        ctxMenuStore.position = e.detail;
         setTimeout(() => {
-            contextMenuVisible = true;
+            ctxMenuStore.show = true;
         }, 0);
     }}
-    onhidemenu={() => (contextMenuVisible = false)}
+    onhidemenu={() => (ctxMenuStore.show = false)}
     use:dragOverAction={{ dragStore, item: vfs.getTree() }}
     ondragover={() => console.log('dragover root')}
     class={[

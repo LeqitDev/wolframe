@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Path } from "@/lib/backend/path";
 	import { getVirtualFileSystem, type TreeNode } from "@/lib/backend/stores/vfs.svelte";
-	import { FolderClosed } from "lucide-svelte";
+	import { FolderClosed, File } from "lucide-svelte";
 
     let {
         entry,
@@ -109,10 +109,14 @@
 	}
 </script>
 <button class="relative">
+	{#if entry.isFile}
+	<File class={`h-4 w-4 ${entry.error ? 'text-error-content z-20' : ''}`} strokeWidth="2" />
+	{:else}
     <FolderClosed
         class={`h-4 w-4 ${entry.error ? 'text-error-content z-20' : ''}`}
         strokeWidth="2"
     />
+	{/if}
     <input
         type="text"
         class={['input input-xs', entry.error ? 'z-20' : '']}

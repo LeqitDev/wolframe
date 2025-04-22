@@ -1,41 +1,45 @@
 <script lang="ts">
-	import { getVirtualFileSystem, type TreeNode } from "@/lib/backend/stores/vfs.svelte";
-	import NewEntry from "./NewEntry.svelte";
-    import Entry from "./Entry.svelte";
-	import { FolderClosed, FolderOpen, File } from "lucide-svelte";
-	import { getDragStore } from "../../stores/DragStore.svelte";
-	import { dragActionBuilder, dragOverActionBuilder } from "../../actions/Drag.svelte";
+	import { getVirtualFileSystem, type TreeNode } from '@/lib/backend/stores/vfs.svelte';
+	import NewEntry from './NewEntry.svelte';
+	import Entry from './Entry.svelte';
+	import { FolderClosed, FolderOpen, File } from 'lucide-svelte';
+	import { getDragStore } from '../../stores/DragStore.svelte';
+	import { dragActionBuilder, dragOverActionBuilder } from '../../actions/Drag.svelte';
+	import { getHoverQueue } from '../../stores/HoverQueue.svelte';
+	import { hoverQueueActionBuilder } from '../../actions/HoverQueue.svelte';
 
-    let {
-        entry,
-    }: {
-        entry: TreeNode;
-    } = $props();
+	let {
+		entry
+	}: {
+		entry: TreeNode;
+	} = $props();
 
-    const dragStore = getDragStore<TreeNode>();
-    const dragAction = dragActionBuilder<TreeNode>();
-    const dragOverAction = dragOverActionBuilder<TreeNode>();
+	const dragStore = getDragStore<TreeNode>();
+	const dragAction = dragActionBuilder<TreeNode>();
+	const dragOverAction = dragOverActionBuilder<TreeNode>();
 
-    const vfs = getVirtualFileSystem();
+	const hoverQueue = getHoverQueue<TreeNode>();
+	const hoverQueueAction = hoverQueueActionBuilder<TreeNode>();
 
-    function addAllParents(item: TreeNode) {
+	const vfs = getVirtualFileSystem();
+
+	function addAllParents(item: TreeNode) {
 		if (item.parent) addAllParents(item.parent);
 		dragStore.addDragOverItem(item);
 	}
 
-    function moveFile(newParent: TreeNode, moved: TreeNode) {
+	function moveFile(newParent: TreeNode, moved: TreeNode) {
 		console.log('moveFile', newParent.file.name, moved.file.name);
 		const result = vfs.moveFile(moved.file.id, newParent.file.id);
 		console.log(result);
 	}
 </script>
 
-<li>
-    {#if entry.input}
-        <NewEntry entry={entry} />
-    {:else}
-    {#if entry.isFile}
-    <button
+<li use:hoverQueueAction={{ queue: hoverQueue, item: entry }}>
+	{#if entry.input}
+		<NewEntry {entry} />
+	{:else if entry.isFile}
+		<button
 			use:dragAction={{ dragStore, item: entry }}
 			ondragstart={() => {
 				addAllParents(entry.parent!);
@@ -50,8 +54,8 @@
 			<File class="h-4 w-4" strokeWidth="2" />
 			{entry.file.name}
 		</button>
-    {:else}
-    <details
+	{:else}
+		<details
 			use:dragOverAction={{ dragStore, item: entry }}
 			ondragovertimer={() => {
 				entry.open = true;
@@ -89,6 +93,5 @@
 				{/each}
 			</ul>
 		</details>
-    {/if}
-    {/if}
+	{/if}
 </li>

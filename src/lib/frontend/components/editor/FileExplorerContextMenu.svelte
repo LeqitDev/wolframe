@@ -2,14 +2,9 @@
 	import { getVirtualFileSystem, TreeNode } from "@/lib/backend/stores/vfs.svelte";
 	import { portalAction } from "../../actions/Portal.svelte";
 	import { getHoverQueue } from "../../stores/HoverQueue.svelte";
+	import { getContextMenuStore } from "../../stores/ContextMenu.svelte";
 
-    let {
-        visible = $bindable(false),
-        position = $bindable({ x: 0, y: 0 }),
-    }: {
-        visible: boolean;
-        position: { x: number, y: number };
-    } = $props();
+    const ctxMenuStore = getContextMenuStore();
 
     const vfs = getVirtualFileSystem();
     const hoverQueue = getHoverQueue<TreeNode>();
@@ -32,11 +27,11 @@
 	}
 </script>
 
-{#if visible}
+{#if ctxMenuStore.show}
 	{@const item = hoverQueue.item}
 	<ul
 		class="bg-base-300 rounded-box menu menu-sm absolute z-10 w-full max-w-60 p-0 shadow-lg"
-		style="top: {position.y}px; left: {position.x}px;"
+		style="top: {ctxMenuStore.position.y}px; left: {ctxMenuStore.position.x}px;"
 		use:portalAction={{}}
 	>
 		{#if item?.isFile}
