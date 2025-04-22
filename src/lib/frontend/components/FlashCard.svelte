@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { FlashMessage } from "$lib/backend/stores/flash.svelte";
+	import type { FlashMessage } from "@/lib/frontend/stores/Flash.svelte";
 	import { fade } from "svelte/transition";
     import { elasticOut } from "svelte/easing";
 

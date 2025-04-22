@@ -13,15 +13,31 @@
 	import { File, FilePlus, FolderClosed, FolderOpen, FolderPlus, Upload } from 'lucide-svelte';
 	import { Path } from '@/lib/backend/path';
 	import { untrack } from 'svelte';
-	import Modal from '@/lib/frontend/components/Modal.svelte';
+	// import Modal from '@/lib/frontend/components/Modal.svelte';
+	import { getModalManager } from '@/lib/frontend/stores/Modal.svelte';
+	import { Modal } from '@/app.types';
 
 	let { children } = $props();
 
+	const modalManager = getModalManager();
 	const editorManager = setEditorManager();
 	const vfs = setVirtualFileSystem();
 	const awaitLoad = editorManager.loadEditor; // https://github.com/sveltejs/svelte/discussions/14692
 	let showConsole = $state(15);
 	let detailsElement: HTMLDetailsElement;
+	let modal: {
+		open?: boolean;
+		title?: string;
+		content?: string;
+		actionButtons?: Array<{ label: string; action: () => void; close: boolean; primary?: boolean }>;
+		clickOutsideClose?: boolean;
+	} = $state({
+		open: false,
+		title: '',
+		content: '',
+		actionButtons: [],
+		clickOutsideClose: false
+	});
 
 	let contextMenuVisible = $state(false);
 	let contextMenuPosition = $state({ x: 0, y: 0 });
@@ -76,7 +92,6 @@
 							console.error(result.error);
 						}
 					} else {
-						console.error(result.error);
 						old_entry.error = result.error.message;
 					}
 				} else {
@@ -122,14 +137,49 @@
 		console.log(result);
 	}
 
+	function onNewEntryBlurEvent(e: FocusEvent, entry: TreeNode) {
+		if (entry.renaming) {
+			finalizeRenaming(e.target as HTMLInputElement, entry);
+		} else {
+			finalizeNewFile(e.target as HTMLInputElement, entry);
+		}
+	}
+
+	function onNewEntryKeydownEvent(e: KeyboardEvent, entry: TreeNode) {
+		if (e.key === 'Enter') {
+			e.preventDefault();
+			if (entry.renaming) {
+				finalizeRenaming(e.target as HTMLInputElement, entry);
+			} else {
+				finalizeNewFile(e.target as HTMLInputElement, entry);
+			}
+		} else if (e.key === 'Escape') {
+			e.preventDefault();
+			if (entry.renaming) {
+				entry.renaming = false;
+				entry.input = false;
+			} else {
+				vfs.removeFile(entry.file.id);
+			}
+		}
+	}
+
+	function onNewEntryInputEvent(e: Event, entry: TreeNode) {
+		const el = e.target as HTMLInputElement;
+
+		if (entry.parent?.hasChild(el.value)) {
+			entry.error = `File or folder with name '${el.value}' already exists at this location. Please choose a different name.`;
+		} else {
+			entry.error = null;
+		}
+	}
+
 	$effect(() =>
 		untrack(() => {
 			addNewFile(vfs.getTree());
 		})
 	);
 </script>
-
-<Modal open={true} />
 
 {#if contextMenuVisible}
 	{@const item = hoverQueue.item}
@@ -298,47 +348,32 @@
 
 {#snippet file(entry: TreeNode)}
 	{#if entry.input}
-		<button class="relative z-20">
-			<File class="h-4 w-4 z-20" strokeWidth="2" />
+		<button class="relative">
+			<File class={`h-4 w-4 ${entry.error ? 'text-error-content z-20' : ''}`} strokeWidth="2" />
 			<input
 				type="text"
-				class="input input-xs z-20"
+				class={['input input-xs', entry.error ? 'z-20' : '']}
 				value={entry.file.name}
 				id="newFileInput"
 				onblur={(e) => {
-					const el = e.target as HTMLInputElement;
-					if (entry.renaming) {
-						finalizeRenaming(el, entry);
-					} else {
-						finalizeNewFile(el, entry);
-					}
+					onNewEntryBlurEvent(e, entry);
 				}}
 				onkeydown={(e) => {
-					if (e.key === 'Enter') {
-						e.preventDefault();
-						const el = e.target as HTMLInputElement;
-						if (entry.renaming) {
-							finalizeRenaming(el, entry);
-						} else {
-							finalizeNewFile(el, entry);
-						}
-					} else if (e.key === 'Escape') {
-						e.preventDefault();
-						if (entry.renaming) {
-							entry.renaming = false;
-							entry.input = false;
-						} else {
-							vfs.removeFile(entry.file.id);
-						}
-					}
+					onNewEntryKeydownEvent(e, entry);
+				}}
+				oninput={(e) => {
+					onNewEntryInputEvent(e, entry);
 				}}
 			/>
 			{#if entry.error}
-			<div class="absolute left-0 right-0 top-0 bottom-0 bg-error rounded-t-box transform p-2">
-			</div>
-			<div class="absolute left-0 right-0 bottom-0 bg-error z-10 rounded-b-box transform translate-y-full p-2">
-				<p class="text-error-content text-xs text-wrap">{entry.error}</p>
-			</div>
+				<div
+					class="bg-error rounded-t-box absolute top-0 right-0 bottom-0 left-0 transform p-2"
+				></div>
+				<div
+					class="bg-error rounded-b-box absolute right-0 bottom-0 left-0 z-10 translate-y-full transform p-2"
+				>
+					<p class="text-error-content text-xs text-wrap">{entry.error}</p>
+				</div>
 			{/if}
 		</button>
 	{:else}
@@ -362,41 +397,36 @@
 
 {#snippet folder(entry: TreeNode)}
 	{#if entry.input}
-		<button>
-			<FolderClosed class="h-4 w-4" strokeWidth="2" />
+		<button class="relative">
+			<FolderClosed
+				class={`h-4 w-4 ${entry.error ? 'text-error-content z-20' : ''}`}
+				strokeWidth="2"
+			/>
 			<input
 				type="text"
-				class="input input-xs"
+				class={['input input-xs', entry.error ? 'z-20' : '']}
 				value={entry.file.name}
 				id="newFileInput"
+				oninput={(e) => {
+					onNewEntryInputEvent(e, entry);
+				}}
 				onblur={(e) => {
-					const el = e.target as HTMLInputElement;
-					if (entry.renaming) {
-						finalizeRenaming(el, entry);
-					} else {
-						finalizeNewFile(el, entry);
-					}
+					onNewEntryBlurEvent(e, entry);
 				}}
 				onkeydown={(e) => {
-					if (e.key === 'Enter') {
-						e.preventDefault();
-						const el = e.target as HTMLInputElement;
-						if (entry.renaming) {
-							finalizeRenaming(el, entry);
-						} else {
-							finalizeNewFile(el, entry);
-						}
-					} else if (e.key === 'Escape') {
-						e.preventDefault();
-						if (entry.renaming) {
-							entry.renaming = false;
-							entry.input = false;
-						} else {
-							vfs.removeFile(entry.file.id);
-						}
-					}
+					onNewEntryKeydownEvent(e, entry);
 				}}
 			/>
+			{#if entry.error}
+				<div
+					class="bg-error rounded-t-box absolute top-0 right-0 bottom-0 left-0 transform p-2"
+				></div>
+				<div
+					class="bg-error rounded-b-box absolute right-0 bottom-0 left-0 z-10 translate-y-full transform p-2"
+				>
+					<p class="text-error-content text-xs text-wrap">{entry.error}</p>
+				</div>
+			{/if}
 		</button>
 	{:else}
 		<details

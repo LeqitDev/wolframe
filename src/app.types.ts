@@ -52,3 +52,31 @@ export class ActionRequiredError<A, R> extends Error {
 		this.reject = reject;
 	}
 }
+
+export class Modal {
+	title: string;
+	content: string;
+	cancel: () => void;
+	closeOnOutsideClick: boolean;
+	actions: Array<{ label: string; action: () => void; close: boolean; primary?: boolean }>;
+
+	constructor(title: string, content: string, cancel: () => void, closeOnOutsideClick: boolean) {
+		this.title = title;
+		this.content = content;
+		this.cancel = cancel;
+		this.closeOnOutsideClick = closeOnOutsideClick;
+		this.actions = [];
+	}
+
+	addAction(label: string, action: () => void, close: boolean, primary = false) {
+		this.actions.push({ label, action, close, primary });
+		return this;
+	}
+
+	static closeOrAccept(title: string, content: string, closeText: string, cancel: () => void, acceptText: string, acceptFn: () => void, closeOnOutsideClick = true) {
+		const modal = new Modal(title, content, cancel, closeOnOutsideClick);
+		modal.addAction(closeText, cancel, true, false);
+		modal.addAction(acceptText, acceptFn, true, true);
+		return modal;
+	}
+}

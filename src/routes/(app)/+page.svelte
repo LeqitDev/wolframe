@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { PageProps } from './$types';
-    import { getFlashManager } from "$lib/backend/stores/flash.svelte";
+    import { getFlashManager } from "@/lib/frontend/stores/Flash.svelte";
 	import { createId } from '@paralleldrive/cuid2';
 
     const flashManager = getFlashManager();

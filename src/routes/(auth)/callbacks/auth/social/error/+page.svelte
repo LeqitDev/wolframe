@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import { authClient } from '$lib/auth-client';
-	import { FlashMessage, getFlashManager } from '$lib/backend/stores/flash.svelte';
+	import { FlashMessage, getFlashManager } from '@/lib/frontend/stores/Flash.svelte';
 	import { untrack } from 'svelte';
 
 	const flashManager = getFlashManager();

@@ -68,6 +68,16 @@ export class TreeNode extends VirtualFile {
     }
 
     /**
+     * Checks if a filename already exists in the current node.
+     * @param name The name of the child to check
+     * @returns True if the child exists, false otherwise
+     */
+    hasChild(name: string): boolean {
+        if (name === "") return false; // root node has no name
+        return this.children.has(name);
+    }
+
+    /**
      * Adds a child to the current node.
      * 
      * @remarks
@@ -252,7 +262,7 @@ class VirtualFileSystem {
         }
 
         if (!result.ok) {
-            let error = result.error;
+            const error = result.error;
 
             if (error instanceof FileAlreadyExistsError) {
                 return Result.err(new Error(`File or folder with name '${error.file.file.name}' already exists at this location. Please choose a different name.`));
@@ -310,7 +320,7 @@ class VirtualFileSystem {
 
         const result = parentNode.addChild(fileNode); // add to the new parent to save the entry with the new name
         if (!result.ok) {
-            let error = result.error;
+            const error = result.error;
             if (error.cause instanceof TreeNode) {
                 return Result.ok(error.cause);
             }
@@ -360,7 +370,7 @@ class VirtualFileSystem {
 
         const result = newParentNode.addChild(fileNode); // add to the new parent
         if (!result.ok) {
-            let error = result.error;
+            const error = result.error;
             if (error instanceof FileAlreadyExistsError) {
                 return Result.ok(error.file);
             }

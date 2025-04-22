@@ -1,13 +1,17 @@
 <script lang="ts">
-	import { FlashMessage, setFlashManager } from '$lib/backend/stores/flash.svelte';
+	import { FlashMessage, setFlashManager } from '@/lib/frontend/stores/Flash.svelte';
 	import '../app.css';
 	import type { LayoutProps } from './$types';
 	import FlashCard from '$lib/frontend/components/FlashCard.svelte';
+	import { setModalManager } from '@/lib/frontend/stores/Modal.svelte';
+	import Modal from '@/lib/frontend/components/Modal.svelte';
 
 	let { data, children }: LayoutProps = $props();
 
 	const flashManager = setFlashManager();
 	const flashes: FlashMessage[] = $state([]);
+
+	const modalManager = setModalManager();
 
 	$effect(() => {
 		console.log("Layout here :)", flashManager.hasMessages);
@@ -28,3 +32,10 @@
 		{/each}
 	<!-- </div> -->
 </div>
+
+{#if modalManager.hasModal}
+	{@const modal = modalManager.modal!}
+	<Modal open={true} bind:title={modal.title} bind:content={modal.content} bind:actionButtons={modal.actions} bind:clickOutsideClose={modal.closeOnOutsideClick} onclose={() => {
+		modalManager.clear();
+	}} />
+{/if}
