@@ -7,6 +7,8 @@
 	import { dragActionBuilder, dragOverActionBuilder } from '../../actions/Drag.svelte';
 	import { getHoverQueue } from '../../stores/HoverQueue.svelte';
 	import { hoverQueueActionBuilder } from '../../actions/HoverQueue.svelte';
+	import { ActionRequiredError, Modal } from '@/app.types';
+	import { getModalManager } from '../../stores/Modal.svelte';
 
 	let {
 		entry
@@ -22,6 +24,7 @@
 	const hoverQueueAction = hoverQueueActionBuilder<TreeNode>();
 
 	const vfs = getVirtualFileSystem();
+	const modalManager = getModalManager();
 
 	function addAllParents(item: TreeNode) {
 		if (item.parent) addAllParents(item.parent);
@@ -31,7 +34,24 @@
 	function moveFile(newParent: TreeNode, moved: TreeNode) {
 		console.log('moveFile', newParent.file.name, moved.file.name);
 		const result = vfs.moveFile(moved.file.id, newParent.file.id);
-		console.log(result);
+		if (!result.ok) {
+			if (result.error instanceof ActionRequiredError) {
+				const err = result.error as ActionRequiredError<() => void, () => void>;
+				modalManager.set(Modal.closeOrAccept(
+					"Conflicting file names",
+					err.message,
+					'Cancel',
+					() => {
+						err.reject();
+					},
+					"Overwrite",
+					() => {
+						err.accept();
+					},
+					true
+				))
+			}
+		}
 	}
 </script>
 

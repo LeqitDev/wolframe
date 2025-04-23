@@ -1,5 +1,5 @@
 import { SvelteMap } from "svelte/reactivity";
-import { FileAlreadyExistsError, FileType, type File, type IBackendFileSystem } from "@/app.types";
+import { ActionRequiredError, FileAlreadyExistsError, FileType, type File, type IBackendFileSystem } from "@/app.types";
 import { Result } from "../functionals";
 import { Path } from "../path";
 import { getContext, setContext } from "svelte";
@@ -366,16 +366,38 @@ class VirtualFileSystem {
         }
 
         const parentNode = fileNode.parent!;
-        parentNode.removeChild(fileNode); // remove from the current parent
 
         const result = newParentNode.addChild(fileNode); // add to the new parent
         if (!result.ok) {
             const error = result.error;
-            if (error instanceof FileAlreadyExistsError) {
-                return Result.ok(error.file);
+            if (error instanceof FileAlreadyExistsError) { // return actionrequirederror because filename in new parent already exists
+                return Result.err(new ActionRequiredError<() => void, () => void>(
+                    () => {
+                        console.log("Accept");
+                        error.file.delete(); // delete the file with the same name in the new parent
+
+                        parentNode.removeChild(fileNode); // remove from the current parent
+
+                        const result = newParentNode.addChild(fileNode); // add to the new parent
+
+                        if (result.ok) {
+                            fileNode.parent = newParentNode; // set the new parent
+                            fileNode.file.updatedAt = Date.now(); // update the updatedAt timestamp
+                        } else {
+                            console.log("Error adding file to new parent", result.error);
+                        }
+                    },
+                    () => {
+                        console.log("Rejected");
+                    },
+                    `File or folder with name '${error.file.file.name}' already exists at this location. Do you want to overwrite the file?`
+                ));
             }
             return Result.err(error);
         }
+
+        parentNode.removeChild(fileNode); // remove from the current parent
+
         fileNode.parent = newParentNode; // set the new parent
         fileNode.file.updatedAt = Date.now(); // update the updatedAt timestamp
         return Result.ok(fileNode);
