@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getVirtualFileSystem, TreeNode } from "@/lib/backend/stores/vfs.svelte";
+	import { getVirtualFileSystem } from "@/lib/backend/stores/vfs.svelte";
 	import { FilePlus, FolderPlus, Upload } from "lucide-svelte";
 	import { hoverQueueActionBuilder } from "../../actions/HoverQueue.svelte";
 	import { getHoverQueue, setHoverQueue } from "../../stores/HoverQueue.svelte";
@@ -10,6 +10,7 @@
 	import { setContextMenuStore } from "../../stores/ContextMenu.svelte";
 	import { portalAction } from "../../actions/Portal.svelte";
 	import FileExplorerContextMenu from "./FileExplorerContextMenu.svelte";
+	import type { TreeNode } from "@/lib/backend/stores/vfs/TreeNode.svelte";
 
 
     const vfs = getVirtualFileSystem();

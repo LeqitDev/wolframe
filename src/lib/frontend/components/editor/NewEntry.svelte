@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Path } from "@/lib/backend/path";
-	import { getVirtualFileSystem, type TreeNode } from "@/lib/backend/stores/vfs.svelte";
+	import { getVirtualFileSystem } from "@/lib/backend/stores/vfs.svelte";
+	import type { TreeNode } from "@/lib/backend/stores/vfs/TreeNode.svelte";
 	import { FolderClosed, File } from "lucide-svelte";
 
     let {

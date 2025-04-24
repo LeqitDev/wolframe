@@ -21,16 +21,6 @@
 		if (flashManager.hasMessages) {
 			flashes.push(flashManager.getMessage()!);
 		}
-
-		const typstTheme = new TypstTheme();
-		
-		monacoController.initMonaco();
-		monacoController.addTheme(typstTheme);
-
-		return () => {
-			eventController.clearAll();
-			monacoController.dispose();
-		}
 	})
 </script>
 

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { getVirtualFileSystem, type TreeNode } from '@/lib/backend/stores/vfs.svelte';
+	import { getVirtualFileSystem } from '@/lib/backend/stores/vfs.svelte';
 	import NewEntry from './NewEntry.svelte';
 	import Entry from './Entry.svelte';
 	import { FolderClosed, FolderOpen, File } from 'lucide-svelte';
@@ -9,6 +9,7 @@
 	import { hoverQueueActionBuilder } from '../../actions/HoverQueue.svelte';
 	import { ActionRequiredError, Modal } from '@/app.types';
 	import { getModalManager } from '../../stores/Modal.svelte';
+	import type { TreeNode } from '@/lib/backend/stores/vfs/TreeNode.svelte';
 
 	let {
 		entry

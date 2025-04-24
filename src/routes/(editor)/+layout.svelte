@@ -6,6 +6,8 @@
 	import FileExplorer from '@/lib/frontend/components/editor/FileExplorer.svelte';
 	import eventController from '@/lib/backend/events';
 	import monacoController from '@/lib/backend/monaco';
+	import { TypstTheme } from '@/lib/backend/monaco/typst/theme';
+	import { TypstLanguage } from '@/lib/backend/monaco/typst/language';
 
 	let { children } = $props();
 
@@ -19,6 +21,18 @@
 		eventController.register("app/monaco:loaded", () => {
 			monacoController.createEditor(editorContainer);
 		});
+
+		const typstTheme = new TypstTheme();
+		const typstLanguage = new TypstLanguage();
+
+		monacoController.initMonaco();
+		monacoController.addTheme(typstTheme);
+		monacoController.addLanguage(typstLanguage);
+
+		return () => {
+			eventController.clearAll();
+			monacoController.dispose();
+		}
 	})
 </script>
 

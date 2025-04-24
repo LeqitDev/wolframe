@@ -1,8 +1,9 @@
 <script lang="ts">
-	import { getVirtualFileSystem, TreeNode } from "@/lib/backend/stores/vfs.svelte";
+	import { getVirtualFileSystem } from "@/lib/backend/stores/vfs.svelte";
 	import { portalAction } from "../../actions/Portal.svelte";
 	import { getHoverQueue } from "../../stores/HoverQueue.svelte";
 	import { getContextMenuStore } from "../../stores/ContextMenu.svelte";
+	import type { TreeNode } from "@/lib/backend/stores/vfs/TreeNode.svelte";
 
     const ctxMenuStore = getContextMenuStore();
 

@@ -1,4 +1,4 @@
-import type { TreeNode } from "./lib/backend/stores/vfs.svelte";
+import type { TreeNode } from "./lib/backend/stores/vfs/TreeNode.svelte";
 import type { Monaco } from "./lib/backend/monaco";
 
 export enum LoadingComponents {
