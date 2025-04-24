@@ -7,6 +7,7 @@
 	import Modal from '@/lib/frontend/components/Modal.svelte';
 	import eventController from '@/lib/backend/events';
 	import monacoController from '@/lib/backend/monaco';
+	import { TypstTheme } from '@/lib/backend/monaco/typst/theme';
 
 	let { data, children }: LayoutProps = $props();
 
@@ -20,12 +21,15 @@
 		if (flashManager.hasMessages) {
 			flashes.push(flashManager.getMessage()!);
 		}
+
+		const typstTheme = new TypstTheme();
 		
 		monacoController.initMonaco();
+		monacoController.addTheme(typstTheme);
 
 		return () => {
 			eventController.clearAll();
-			monacoController.disposeEditor();
+			monacoController.dispose();
 		}
 	})
 </script>
