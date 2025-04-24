@@ -7,8 +7,8 @@ import type { IMonacoLanguage, IMonacoTheme } from "@/app.types";
 class MonacoController {
     private monaco?: typeof Monaco;
     private editor?: Monaco.editor.IStandaloneCodeEditor;
-    private languages: IMonacoLanguage[] = [];
-    private themes: IMonacoTheme[] = [];
+    private languages: Set<IMonacoLanguage> = new Set();
+    private themes: Set<IMonacoTheme> = new Set();
 
     constructor() {}
 
@@ -19,6 +19,11 @@ class MonacoController {
         eventController.fire("app/monaco:loaded");
     }
 
+    // Only development
+    isMonacoLoaded() {
+        return !!this.monaco;
+    }
+
     createEditor(container: HTMLElement) {
         if (!this.monaco) {
             throw new Error("Monaco is not loaded yet.");
@@ -26,7 +31,7 @@ class MonacoController {
             throw new Error("Editor is already created.");
         }
 
-        console.log("Creating Monaco editor...", this.languages.length, this.themes.length);
+        console.log("Creating Monaco editor...", this.languages.size, this.themes.size);
 
         for (const language of this.languages) {
             language.init?.(this.monaco);
@@ -52,13 +57,7 @@ class MonacoController {
 			}
 		});
 
-        // Testing
-        this.editor.setModel(
-            this.monaco.editor.createModel(
-                "Hello World\nThis is $3/4$ a test\n",
-                "typst"
-            )
-        );
+        this.editor.setModel(null);
 
         for (const language of this.languages) {
             language.postInit?.(this.monaco, this.editor);
@@ -79,22 +78,47 @@ class MonacoController {
     }
 
     addLanguage(language: IMonacoLanguage) {
-        this.languages.push(language);
+        this.languages.add(language);
     }
 
     addTheme(theme: IMonacoTheme) {
-        this.themes.push(theme);
+        this.themes.add(theme);
+    }
+
+    private createURI(id: string, extension: string) {
+        if (!this.monaco) {
+            throw new Error("Monaco is not loaded yet.");
+        }
+        return this.monaco.Uri.parse(`fileid:${id}/file.${extension}`);
+    }
+
+    createModel(id: string, extension: string, content: string, language: string | undefined = "typst") {
+        if (!this.monaco) {
+            throw new Error("Monaco is not loaded yet.");
+        }
+
+        const uri = this.createURI(id, extension);
+        const model = this.monaco.editor.createModel(content, language, uri);
+        return model;
+    }
+
+    setModel(model: Monaco.editor.ITextModel) {
+        if (!this.editor) {
+            throw new Error("Editor is not created yet.");
+        }
+
+        this.editor.setModel(model);
     }
 
     dispose() {
         for (const language of this.languages) {
             language.dispose?.();
         }
-        this.languages = [];
+        this.languages.clear();
         for (const theme of this.themes) {
             theme.dispose?.();
         }
-        this.themes = [];
+        this.themes.clear();
 
         this.disposeEditor();
     }

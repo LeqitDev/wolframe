@@ -8,6 +8,7 @@
 	import monacoController from '@/lib/backend/monaco';
 	import { TypstTheme } from '@/lib/backend/monaco/typst/theme';
 	import { TypstLanguage } from '@/lib/backend/monaco/typst/language';
+	import MonacoEditor from '@/lib/frontend/components/editor/MonacoEditor.svelte';
 
 	let { children } = $props();
 
@@ -15,24 +16,9 @@
 	const vfs = setVirtualFileSystem();
 	const awaitLoad = editorManager.loadEditor; // https://github.com/sveltejs/svelte/discussions/14692
 	let showConsole = $state(15);
-	let editorContainer: HTMLDivElement;
 
 	$effect(() => {
-		eventController.register("app/monaco:loaded", () => {
-			monacoController.createEditor(editorContainer);
-		});
-
-		const typstTheme = new TypstTheme();
-		const typstLanguage = new TypstLanguage();
-
-		monacoController.initMonaco();
-		monacoController.addTheme(typstTheme);
-		monacoController.addLanguage(typstLanguage);
-
-		return () => {
-			eventController.clearAll();
-			monacoController.dispose();
-		}
+		
 	})
 </script>
 
@@ -91,7 +77,7 @@
 					<Pane size={100} minSize={10} class="">
 						<Splitpanes theme="wolframe-theme">
 							<Pane size={50} minSize={20} maxSize={80} class="">
-								<div bind:this={editorContainer} class="h-full"></div>
+								<MonacoEditor />
 							</Pane>
 							<Pane class="bg-base-200">
 								<p>Preview</p>

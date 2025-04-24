@@ -10,6 +10,7 @@
 	import { ActionRequiredError, Modal } from '@/app.types';
 	import { getModalManager } from '../../stores/Modal.svelte';
 	import type { TreeNode } from '@/lib/backend/stores/vfs/TreeNode.svelte';
+	import monacoController from '@/lib/backend/monaco';
 
 	let {
 		entry
@@ -70,6 +71,9 @@
 				const item = dragStore.getDragItem();
 
 				moveFile(dropzone!, item!);
+			}}
+			onclick={() => {
+				monacoController.setModel(entry.model!);
 			}}
 		>
 			<File class="h-4 w-4" strokeWidth="2" />

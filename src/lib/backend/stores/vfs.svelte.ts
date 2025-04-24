@@ -5,6 +5,7 @@ import { Path } from "../path";
 import { getContext, setContext } from "svelte";
 import type { VirtualFile } from "./vfs/VirtualFile.svelte";
 import { TreeNode } from "./vfs/TreeNode.svelte";
+import monacoController from "../monaco";
 
 
 class VirtualFileSystem {
@@ -29,10 +30,6 @@ class VirtualFileSystem {
         if (this.useBackend) {
             // this.loadFilesFromBackend();
         }
-
-        // !!!TEST!!!
-        this.addFile("file1.txt", "Hello World");
-        this.addFile("file2.txt", "Hello World");
     }
 
     /**
@@ -113,6 +110,9 @@ class VirtualFileSystem {
             }
         }
 
+        const model = monacoController.createModel(file.id, treeNode.extension!, content ?? "", undefined);
+        treeNode.setModel(model); // set the model for the file
+
         this.files.set(file.id, treeNode);
         return Result.ok(treeNode);
     }
@@ -131,11 +131,12 @@ class VirtualFileSystem {
         if (fileNode.isRoot) {
             return Result.err(new Error("Cannot delete root node"));
         }
-        if (!fileNode.isFile) {
+        if (!fileNode.isFile) { // todo: request action to delete recursively
             for (const child of fileNode.getChildren()) {
                 this.removeFile(child.file.id);
             }
         }
+        fileNode.model?.dispose();
         fileNode.delete();
         this.files.delete(id);
         return Result.ok(fileNode);
