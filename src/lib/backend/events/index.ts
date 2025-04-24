@@ -1,5 +1,7 @@
 type AppEvents = {
-    "app:load": []
+    "app:load": [],
+    "app/monaco:loaded": [],
+    "app/monaco/editor:created": []
 }
 
 class EventController {
@@ -28,6 +30,10 @@ class EventController {
                 callback(...args);
             }
         }
+    }
+
+    public clearAll(): void {
+        this.listeners.clear();
     }
 }
 

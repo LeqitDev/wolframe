@@ -1,4 +1,5 @@
 import type { TreeNode } from "./lib/backend/stores/vfs.svelte";
+import type { Monaco } from "./lib/backend/monaco";
 
 export enum LoadingComponents {
 	Compiler = 'compiler',
@@ -30,6 +31,24 @@ export interface File extends FileMetadata {
 export interface IBackendFileSystem {
 
 }
+
+interface IMonacoExtension {
+	init?: (monaco: typeof Monaco) => void;
+	postInit?: (monaco: typeof Monaco, editor: Monaco.editor.IStandaloneCodeEditor) => void;
+}
+
+interface IDisposable {
+	dispose?: () => void;
+}
+
+export interface IMonacoLanguage extends IMonacoExtension, IDisposable {
+	onDidChangeModelContent?: (
+		model: Monaco.editor.ITextModel,
+		event: Monaco.editor.IModelContentChangedEvent
+	) => void;
+}
+
+export interface IMonacoTheme extends IMonacoExtension, IDisposable {}
 
 export class FileAlreadyExistsError extends Error {
 	file: TreeNode;

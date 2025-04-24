@@ -4,6 +4,8 @@
 	import DropdownMenuItem from '@/lib/frontend/components/DropdownMenuItem.svelte';
 	import { Pane, Splitpanes } from 'svelte-splitpanes';
 	import FileExplorer from '@/lib/frontend/components/editor/FileExplorer.svelte';
+	import eventController from '@/lib/backend/events';
+	import monacoController from '@/lib/backend/monaco';
 
 	let { children } = $props();
 
@@ -11,6 +13,13 @@
 	const vfs = setVirtualFileSystem();
 	const awaitLoad = editorManager.loadEditor; // https://github.com/sveltejs/svelte/discussions/14692
 	let showConsole = $state(15);
+	let editorContainer: HTMLDivElement;
+
+	$effect(() => {
+		eventController.register("app/monaco:loaded", () => {
+			monacoController.createEditor(editorContainer);
+		});
+	})
 </script>
 
 {#await awaitLoad}
@@ -68,7 +77,7 @@
 					<Pane size={100} minSize={10} class="">
 						<Splitpanes theme="wolframe-theme">
 							<Pane size={50} minSize={20} maxSize={80} class="">
-								<p>Editor</p>
+								<div bind:this={editorContainer} class="h-full"></div>
 							</Pane>
 							<Pane class="bg-base-200">
 								<p>Preview</p>

@@ -54,7 +54,10 @@
     "drizzle-orm": "^0.40.0",
     "hotkeys-js": "^3.13.9",
     "lucide-svelte": "^0.501.0",
+    "monaco-editor": "^0.52.2",
     "postgres": "^3.4.5",
-    "svelte-splitpanes": "^8.0.9"
+    "svelte-splitpanes": "^8.0.9",
+    "vscode-oniguruma": "^2.0.1",
+    "vscode-textmate": "^9.2.0"
   }
 }

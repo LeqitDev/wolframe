@@ -5,6 +5,8 @@
 	import FlashCard from '$lib/frontend/components/FlashCard.svelte';
 	import { setModalManager } from '@/lib/frontend/stores/Modal.svelte';
 	import Modal from '@/lib/frontend/components/Modal.svelte';
+	import eventController from '@/lib/backend/events';
+	import monacoController from '@/lib/backend/monaco';
 
 	let { data, children }: LayoutProps = $props();
 
@@ -17,6 +19,13 @@
 		console.log("Layout here :)", flashManager.hasMessages);
 		if (flashManager.hasMessages) {
 			flashes.push(flashManager.getMessage()!);
+		}
+		
+		monacoController.initMonaco();
+
+		return () => {
+			eventController.clearAll();
+			monacoController.disposeEditor();
 		}
 	})
 </script>
