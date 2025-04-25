@@ -39,7 +39,7 @@
 			<FileExplorer />
 		</Pane>
 		<Pane class="">
-			<ul class="menu menu-horizontal bg-base-200 w-full gap-2 pb-3">
+			<ul class="menu menu-horizontal bg-base-200 w-full gap-2 p-2 h-12">
 				<li>
 					<DropdownMenuItem name="File">
 						<li><a href="/">New File</a></li>

@@ -41,10 +41,12 @@
     })
 </script>
 <div class="h-full">
-    <div role="tablist" class="tabs tabs-sm tabs-box">
-        {#each vfs.getFiles().filter(file => file.isFile && file.openedFile) as file (file.file.id)}
-            <button role="tab" class={["tab", editor.getOpenFileId() === file.file.id ? "tab-active" : ""]} onclick={() => {file.openFile()}}>{file.file.name}</button>
-        {/each}
-    </div>
+    {#if vfs.getFiles().length >= 0}
+        <div role="tablist" class="tabs tabs-sm tabs-box rounded-none border-t">
+            {#each vfs.getFiles().filter(file => file.isFile && file.openedFile) as file (file.file.id)}
+                <button role="tab" class={["tab", editor.getOpenFileId() === file.file.id ? "tab-active" : ""]} onclick={() => {file.openFile()}}>{file.file.name}</button>
+            {/each}
+        </div>
+    {/if}
     <div bind:this={editorContainer} class="h-full"></div>
 </div>
