@@ -1,21 +1,29 @@
 <script lang="ts">
 	import { getEditorManager } from "$lib/backend/stores/editor.svelte";
 	import eventController from "@/lib/backend/events";
+	import monacoController from "@/lib/backend/monaco";
 	import { getVirtualFileSystem } from "@/lib/backend/stores/vfs.svelte";
 
     const editorManager = getEditorManager();
 
     const vfs = getVirtualFileSystem();
 
-    $effect(() => {
-        eventController.register("app/monaco:loaded", () => {
-            vfs.addFile("test.txt", "Hello World!");
-            vfs.addFile("test.typ", "Hello *Typst*!");
-        })
+    function onMonacoLoaded() {
+        vfs.addFile("test.txt", "Hello World!");
+        vfs.addFile("test.typ", "Hello *Typst*!");
+    }
 
-        eventController.register("app/monaco/editor:created", () => {
-            editorManager.resolveLoadingEditor?.();
-        })
+    function onEditorCreated() {
+        editorManager.resolveLoadingEditor?.();
+    }
+
+    $effect(() => {
+        eventController.register("app/monaco:loaded", onMonacoLoaded)
+        eventController.register("app/monaco/editor:created", onEditorCreated)
+
+        if (monacoController.isEditorAlreadyCreated()) {
+            eventController.fire("app/monaco/editor:created")
+        }
         /* setTimeout(() => {
             const folderResult = vfs.addFile("test", null);
             if (folderResult.ok) {
@@ -25,5 +33,10 @@
                 vfs.addFile("test5.txt", "", folderResult.value.file.id);
             }
         }, 0); */
+
+        return () => {
+            eventController.unregister("app/monaco:loaded", onMonacoLoaded)
+            eventController.unregister("app/monaco/editor:created", onEditorCreated)
+        }
     })
 </script>

@@ -24,6 +24,11 @@ class MonacoController {
         return !!this.monaco;
     }
 
+    // Only development
+    isEditorAlreadyCreated() {
+        return !!this.editor;
+    }
+
     createEditor(container: HTMLElement) {
         if (!this.monaco) {
             throw new Error("Monaco is not loaded yet.");

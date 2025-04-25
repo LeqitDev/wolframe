@@ -73,7 +73,7 @@
 				moveFile(dropzone!, item!);
 			}}
 			onclick={() => {
-				monacoController.setModel(entry.model!);
+				entry.openFile();
 			}}
 		>
 			<File class="h-4 w-4" strokeWidth="2" />
