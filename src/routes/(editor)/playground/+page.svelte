@@ -8,11 +8,13 @@
     const vfs = getVirtualFileSystem();
 
     $effect(() => {
-        editorManager.resolveLoadingEditor?.();
-
         eventController.register("app/monaco:loaded", () => {
             vfs.addFile("test.txt", "Hello World!");
             vfs.addFile("test.typ", "Hello *Typst*!");
+        })
+
+        eventController.register("app/monaco/editor:created", () => {
+            editorManager.resolveLoadingEditor?.();
         })
         /* setTimeout(() => {
             const folderResult = vfs.addFile("test", null);

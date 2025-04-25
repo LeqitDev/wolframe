@@ -92,7 +92,7 @@ class MonacoController {
         return this.monaco.Uri.parse(`fileid:${id}/file.${extension}`);
     }
 
-    createModel(id: string, extension: string, content: string, language: string | undefined = "typst") {
+    createModel(id: string, extension: string, content: string, language: string | undefined) {
         if (!this.monaco) {
             throw new Error("Monaco is not loaded yet.");
         }
