@@ -13,6 +13,7 @@ class EditorManager {
     });
 
     private openFileId: string = $state('');
+    private lastOpenedFiles: string[] = [];
 
     /**
      * The loading promise that resolves the editor load function.
@@ -35,6 +36,7 @@ class EditorManager {
 
     constructor() {
         eventController.register("app/file:opened", this.openFile.bind(this));
+        eventController.register("app/file:closed", this.closeFile.bind(this));
     }
 
     
@@ -62,6 +64,22 @@ class EditorManager {
 
     private openFile(id: string) {
         this.openFileId = id;
+        this.lastOpenedFiles = [id, ...this.lastOpenedFiles.filter((file) => file !== id)];
+    }
+
+    private closeFile(id: string) {
+        this.lastOpenedFiles = this.lastOpenedFiles.filter((file) => file !== id);
+
+        if (this.openFileId === id) {
+            if (this.lastOpenedFiles.length === 0) {
+                eventController.fire("request/file:open", null);
+                this.openFileId = '';
+                return;
+            }
+            eventController.fire("request/file:open", this.lastOpenedFiles[0]);
+            this.openFileId = this.lastOpenedFiles[0];
+            return;
+        }
     }
 
     getOpenFileId() {
@@ -70,6 +88,7 @@ class EditorManager {
 
     dispose() {
         eventController.unregister("app/file:opened", this.openFile);
+        eventController.unregister("app/file:closed", this.closeFile);
     }
 }
 

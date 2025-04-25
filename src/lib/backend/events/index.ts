@@ -1,8 +1,10 @@
 type AppEvents = {
-    "app:load": [],
-    "app/monaco:loaded": [],
-    "app/monaco/editor:created": [],
-    "app/file:opened": [string],
+    "app:load": [], // Fired when the app is loaded
+    "app/monaco:loaded": [], // Fired when Monaco is loaded
+    "app/monaco/editor:created": [], // Fired when the Monaco editor is created
+    "app/file:opened": [string], // Fired when a file is opened
+    "app/file:closed": [string], // Fired when a file is closed
+    "request/file:open": [string | null], // Fired when a file is requested to be opened
 }
 
 class EventController {

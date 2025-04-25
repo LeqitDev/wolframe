@@ -146,7 +146,7 @@ class MonacoController {
      * @param {Monaco.editor.ITextModel} model - The model to set.
      * @throws {Error} - Throws an error if the editor is not created yet.
      */
-    setModel(model: Monaco.editor.ITextModel) {
+    setModel(model: Monaco.editor.ITextModel | null) {
         if (!this.editor) {
             throw new Error("Editor is not created yet.");
         }
@@ -170,6 +170,22 @@ class MonacoController {
         }
 
         return model.uri;
+    }
+
+    /**
+     * Gets the id of the file from which the model is currently open.
+     * Strips the URI of the fileid: prefix and the extension placeholder.
+     * @returns {string} - The ID of the current model.
+     * @throws {Error} - Throws an error if the editor is not created or the model is not set yet.
+     */
+    getCurrentId() {
+        const uri = this.getCurrentURI();
+
+        const id = uri.toString().replace("fileid:", "").replace(/\/file\..*$/, "");
+        if (!id) {
+            throw new Error("Model is not set yet.");
+        }
+        return id;
     }
 
     /**

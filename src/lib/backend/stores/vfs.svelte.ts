@@ -5,6 +5,7 @@ import { Path } from "../path";
 import { getContext, setContext } from "svelte";
 import { TreeNode } from "./vfs/TreeNode.svelte";
 import monacoController from "../monaco";
+import eventController from "../events";
 
 
 class VirtualFileSystem {
@@ -28,6 +29,8 @@ class VirtualFileSystem {
         if (this.useBackend) {
             // this.loadFilesFromBackend();
         }
+
+        eventController.register("request/file:open", this.openFileRequested.bind(this));
     }
 
     /**
@@ -260,6 +263,27 @@ class VirtualFileSystem {
      */
     getFiles(): TreeNode[] {
         return Array.from(this.files.values());
+    }
+
+    private openFileRequested(id: string | null) {
+        if (id == null) monacoController.setModel(null);
+        else {
+            const fileResult = this.getFileById(id);
+            if (fileResult.ok) {
+                const fileNode = fileResult.unwrap();
+                fileNode.openFile(); // open the file in the editor
+            } else {
+                console.error(fileResult.error);
+            }
+        }
+    }
+
+    dispose() {
+        this.files.forEach((file) => {
+            file.model?.dispose();
+        });
+        this.files.clear();
+        eventController.unregister("request/file:open", this.openFileRequested.bind(this));
     }
 }
 

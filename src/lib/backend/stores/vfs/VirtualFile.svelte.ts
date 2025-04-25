@@ -39,5 +39,6 @@ export class VirtualFile {
 
     closeFile() {
         this.openedFile = false;
+        eventController.fire("app/file:closed", this.file.id);
     }
 }
