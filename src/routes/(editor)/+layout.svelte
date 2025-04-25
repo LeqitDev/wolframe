@@ -18,7 +18,11 @@
 	const awaitLoad = editorManager.loadEditor; // https://github.com/sveltejs/svelte/discussions/14692
 	let showConsole = $state(15);
 
-	$effect(() => {});
+	$effect(() => {
+		return () => {
+			editorManager.dispose();
+		}
+	});
 </script>
 
 {#await awaitLoad}

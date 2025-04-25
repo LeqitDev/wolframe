@@ -11,6 +11,7 @@
 	import { getModalManager } from '../../stores/Modal.svelte';
 	import type { TreeNode } from '@/lib/backend/stores/vfs/TreeNode.svelte';
 	import monacoController from '@/lib/backend/monaco';
+	import { getEditorManager } from '@/lib/backend/stores/editor.svelte';
 
 	let {
 		entry
@@ -27,6 +28,7 @@
 
 	const vfs = getVirtualFileSystem();
 	const modalManager = getModalManager();
+	const editor = getEditorManager();
 
 	function addAllParents(item: TreeNode) {
 		if (item.parent) addAllParents(item.parent);

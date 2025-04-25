@@ -9,11 +9,13 @@
     const vfs = getVirtualFileSystem();
 
     function onMonacoLoaded() {
+        console.log("Monaco loaded, adding files");
         vfs.addFile("test.txt", "Hello World!");
         vfs.addFile("test.typ", "Hello *Typst*!");
     }
 
     function onEditorCreated() {
+        console.log("Editor created, resolving loading editor");
         editorManager.resolveLoadingEditor?.();
     }
 
@@ -22,7 +24,8 @@
         eventController.register("app/monaco/editor:created", onEditorCreated)
 
         if (monacoController.isEditorAlreadyCreated()) {
-            eventController.fire("app/monaco/editor:created")
+            console.log("Editor already created, firing event");
+            eventController.fire("app/monaco/editor:created");
         }
         /* setTimeout(() => {
             const folderResult = vfs.addFile("test", null);

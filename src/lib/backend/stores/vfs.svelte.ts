@@ -3,14 +3,12 @@ import { ActionRequiredError, FileAlreadyExistsError, FileType, type File, type 
 import { Result } from "../functionals";
 import { Path } from "../path";
 import { getContext, setContext } from "svelte";
-import type { VirtualFile } from "./vfs/VirtualFile.svelte";
 import { TreeNode } from "./vfs/TreeNode.svelte";
 import monacoController from "../monaco";
 
 
 class VirtualFileSystem {
-    openFiles: SvelteMap<string, VirtualFile> = new SvelteMap();
-    private files: Map<string, TreeNode> = new Map();
+    private files: SvelteMap<string, TreeNode> = new SvelteMap();
     private backend: IBackendFileSystem | null = null;
     private useBackend: boolean;
     private root: TreeNode = new TreeNode({
@@ -254,6 +252,14 @@ class VirtualFileSystem {
      */
     getTree(): TreeNode {
         return this.root;
+    }
+
+    /**
+     * Gets all files in the file system.
+     * @returns An array of all files in the file system.
+     */
+    getFiles(): TreeNode[] {
+        return Array.from(this.files.values());
     }
 }
 

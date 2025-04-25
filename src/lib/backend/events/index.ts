@@ -1,7 +1,8 @@
 type AppEvents = {
     "app:load": [],
     "app/monaco:loaded": [],
-    "app/monaco/editor:created": []
+    "app/monaco/editor:created": [],
+    "app/file:opened": [string],
 }
 
 class EventController {

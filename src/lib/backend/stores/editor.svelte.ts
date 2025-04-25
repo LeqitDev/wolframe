@@ -1,4 +1,5 @@
 import { getContext, setContext } from "svelte";
+import eventController from "../events";
 
 /**
  * EditorManager is a class that manages the loading state of an editor in a Svelte application.
@@ -10,6 +11,8 @@ class EditorManager {
         percent: 0,
         message: 'Loading Project',
     });
+
+    private openFileId: string = $state('');
 
     /**
      * The loading promise that resolves the editor load function.
@@ -29,6 +32,10 @@ class EditorManager {
         this.resolveLoadingEditor = resolve;
         this.rejectLoadingEditor = reject;
     });
+
+    constructor() {
+        eventController.register("app/file:opened", this.openFile.bind(this));
+    }
 
     
     get loading() {
@@ -52,6 +59,18 @@ class EditorManager {
         this.loadingState.percent = percent;
         this.loadingState.message = message;
     }
+
+    private openFile(id: string) {
+        this.openFileId = id;
+    }
+
+    getOpenFileId() {
+        return this.openFileId;
+    }
+
+    dispose() {
+        eventController.unregister("app/file:opened", this.openFile);
+    }
 }
 
 const symbol = Symbol('editorManager');
@@ -63,3 +82,5 @@ export function getEditorManager(): EditorManager {
 export function setEditorManager() {
     return setContext(symbol, new EditorManager());
 }
+
+export type {EditorManager};

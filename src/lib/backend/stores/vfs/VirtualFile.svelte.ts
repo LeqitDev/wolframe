@@ -1,6 +1,7 @@
 import { FileType, type File } from '@/app.types';
 import type { Monaco } from '../../monaco';
 import monacoController from '../../monaco';
+import eventController from '../../events';
 
 export class VirtualFile {
     modified: boolean = $state(false); // file is modified
@@ -24,10 +25,15 @@ export class VirtualFile {
     setModel(model: Monaco.editor.ITextModel) {
         this.model = model;
         this.modified = false;
+
+        model.onDidChangeContent(() => {
+            this.modified = true;
+        })
     }
 
     openFile() {
         this.openedFile = true;
         monacoController.setModel(this.model!);
+        eventController.fire("app/file:opened", this.file.id);
     }
 }

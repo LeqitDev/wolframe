@@ -16,6 +16,7 @@ class MonacoController {
         if (this.monaco) return;
 
         this.monaco = (await import("./wrapper")).default;
+        console.log("Monaco loaded");
         eventController.fire("app/monaco:loaded");
     }
 
@@ -113,6 +114,19 @@ class MonacoController {
         }
 
         this.editor.setModel(model);
+    }
+
+    getCurrentURI() {
+        if (!this.editor) {
+            throw new Error("Editor is not created yet.");
+        }
+
+        const model = this.editor.getModel();
+        if (!model) {
+            throw new Error("Model is not set yet.");
+        }
+
+        return model.uri;
     }
 
     dispose() {
