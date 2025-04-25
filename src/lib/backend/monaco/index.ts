@@ -12,6 +12,11 @@ class MonacoController {
 
     constructor() {}
 
+    /**
+     * Initializes the Monaco editor.
+     * This method loads the Monaco editor asynchronously and fires an event when it's loaded.
+     * @returns {Promise<void>} - A promise that resolves when Monaco is loaded.
+     */
     async initMonaco() {
         if (this.monaco) return;
 
@@ -30,6 +35,12 @@ class MonacoController {
         return !!this.editor;
     }
 
+    /**
+     * Creates the Monaco editor instance.
+     * This method should be called after Monaco is loaded and a container element is provided.
+     * @param {HTMLElement} container - The container element for the editor.
+     * @throws {Error} - Throws an error if Monaco is not loaded or the editor is already created.
+     */
     createEditor(container: HTMLElement) {
         if (!this.monaco) {
             throw new Error("Monaco is not loaded yet.");
@@ -76,6 +87,10 @@ class MonacoController {
         eventController.fire("app/monaco/editor:created");
     }
 
+    /**
+     * Disposes the Monaco editor instance.
+     * This method should be called when the editor is no longer needed.
+     */
     disposeEditor() {
         if (!this.editor) return;
 
@@ -83,10 +98,20 @@ class MonacoController {
         this.editor = undefined;
     }
 
+    /**
+     * Adds a language to the Monaco editor.
+     * @see {@link IMonacoLanguage}
+     * @param {IMonacoLanguage} language - The language to add.
+     */
     addLanguage(language: IMonacoLanguage) {
         this.languages.add(language);
     }
 
+    /**
+     * Adds a theme to the Monaco editor.
+     * @see {@link IMonacoTheme}
+     * @param {IMonacoTheme} theme - The theme to add.
+     */
     addTheme(theme: IMonacoTheme) {
         this.themes.add(theme);
     }
@@ -98,6 +123,14 @@ class MonacoController {
         return this.monaco.Uri.parse(`fileid:${id}/file.${extension}`);
     }
 
+    /**
+     * Creates a Monaco model.
+     * @param {string} id - The ID of the model.
+     * @param {string} extension - The file extension.
+     * @param {string} content - The content of the model.
+     * @param {string | undefined} language - The language of the model. If undefined, the language will be interpreted from the extension.
+     * @returns {Monaco.editor.ITextModel} - The created model.
+     */
     createModel(id: string, extension: string, content: string, language: string | undefined) {
         if (!this.monaco) {
             throw new Error("Monaco is not loaded yet.");
@@ -108,6 +141,11 @@ class MonacoController {
         return model;
     }
 
+    /**
+     * Sets the model for the editor.
+     * @param {Monaco.editor.ITextModel} model - The model to set.
+     * @throws {Error} - Throws an error if the editor is not created yet.
+     */
     setModel(model: Monaco.editor.ITextModel) {
         if (!this.editor) {
             throw new Error("Editor is not created yet.");
@@ -116,6 +154,11 @@ class MonacoController {
         this.editor.setModel(model);
     }
 
+    /**
+     * Gets the URI of the current model of the editor.
+     * @returns {Monaco.Uri} - The current URI of the editor's model.
+     * @throws {Error} - Throws an error if the editor is not created or the model is not set yet.
+     */
     getCurrentURI() {
         if (!this.editor) {
             throw new Error("Editor is not created yet.");
@@ -129,6 +172,11 @@ class MonacoController {
         return model.uri;
     }
 
+    /**
+     * Disposes the Monaco controller and all its resources.
+     * This method should be called when the controller is no longer needed.
+     * It disposes of all languages, themes, and the editor instance.
+     */
     dispose() {
         for (const language of this.languages) {
             language.dispose?.();

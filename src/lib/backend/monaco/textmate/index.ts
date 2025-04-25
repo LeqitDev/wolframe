@@ -33,7 +33,7 @@ const registry = new vsctm.Registry({
 		const url = scopeUrlMap[scopeName];
 		if (url) {
 			return fetchGrammar(url).then((grammar) => {
-				let parsed_grammar = JSON.parse(grammar);
+				const parsed_grammar = JSON.parse(grammar);
 				parsed_grammar.repository.markup.patterns = [
 					...parsed_grammar.repository.markup.patterns.slice(0, 28),
 					{

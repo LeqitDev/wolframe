@@ -18,6 +18,22 @@ export class TypstTheme implements IMonacoTheme {
 		});
 	}
 
+	/**
+	 * Parses a VS Code theme and converts it into a Monaco Editor standalone theme data object.
+	 *
+	 * This method processes the `typstTheme` object to extract color and token style information
+	 * and maps it to the Monaco Editor theme format. It supports token customization, background,
+	 * foreground, and other editor-specific styles.
+	 *
+	 * @returns {Monaco.editor.IStandaloneThemeData} The Monaco Editor theme data object.
+	 *
+	 * @remarks
+	 * - The `typstTheme` object is expected to follow the VS Code theme format, where `settings`
+	 *   contains an array of rules for token styling and editor colors.
+	 * - The first element in `typstTheme.settings` is used to extract general editor colors.
+	 * - Subsequent elements in `typstTheme.settings` define token-specific styles, which are
+	 *   converted into Monaco Editor token theme rules.
+	 */
 	private parseVscodeTheme(): Monaco.editor.IStandaloneThemeData {
 		const colors = typstTheme.settings[0].settings;
 

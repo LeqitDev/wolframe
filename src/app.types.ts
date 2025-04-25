@@ -41,7 +41,18 @@ interface IDisposable {
 	dispose?: () => void;
 }
 
+/**
+ * Represents a Monaco language extension that includes disposable resources
+ * and an optional handler for model content changes.
+ */
 export interface IMonacoLanguage extends IMonacoExtension, IDisposable {
+	/**
+	 * Optional callback function that is triggered when the content of a Monaco
+	 * editor model changes.
+	 *
+	 * @param model - The Monaco editor text model that has changed.
+	 * @param event - The event object containing details about the content change.
+	 */
 	onDidChangeModelContent?: (
 		model: Monaco.editor.ITextModel,
 		event: Monaco.editor.IModelContentChangedEvent
