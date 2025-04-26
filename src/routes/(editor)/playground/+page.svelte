@@ -20,12 +20,12 @@
     }
 
     $effect(() => {
-        eventController.register("app/monaco:loaded", onMonacoLoaded)
-        eventController.register("app/monaco/editor:created", onEditorCreated)
+        eventController.register("monaco:loaded", onMonacoLoaded)
+        eventController.register("monaco/editor:created", onEditorCreated)
 
         if (monacoController.isEditorAlreadyCreated()) {
             console.log("Editor already created, firing event");
-            eventController.fire("app/monaco/editor:created");
+            eventController.fire("monaco/editor:created");
         }
         /* setTimeout(() => {
             const folderResult = vfs.addFile("test", null);
@@ -38,8 +38,8 @@
         }, 0); */
 
         return () => {
-            eventController.unregister("app/monaco:loaded", onMonacoLoaded)
-            eventController.unregister("app/monaco/editor:created", onEditorCreated)
+            eventController.unregister("monaco:loaded", onMonacoLoaded)
+            eventController.unregister("monaco/editor:created", onEditorCreated)
         }
     })
 </script>

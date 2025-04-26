@@ -15,7 +15,7 @@
 
 <details bind:this={detailsElement}>
     <summary class="after:hidden py-1">{name}</summary>
-    <ul class="bg-base-200 mt-0! min-w-44">
+    <ul class="bg-base-200 mt-0! min-w-44 z-20">
         {@render children()}
     </ul>
 </details>

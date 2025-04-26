@@ -30,7 +30,7 @@ class VirtualFileSystem {
             // this.loadFilesFromBackend();
         }
 
-        eventController.register("request/file:open", this.openFileRequested.bind(this));
+        eventController.register("command/file:open", this.openFileRequested.bind(this));
     }
 
     /**
@@ -283,7 +283,7 @@ class VirtualFileSystem {
             file.model?.dispose();
         });
         this.files.clear();
-        eventController.unregister("request/file:open", this.openFileRequested.bind(this));
+        eventController.unregister("command/file:open", this.openFileRequested.bind(this));
     }
 }
 

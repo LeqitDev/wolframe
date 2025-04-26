@@ -20,7 +20,7 @@
 	}
 
 	$effect(() => {
-		eventController.register('app/monaco:loaded', onMonacoLoaded);
+		eventController.register('monaco:loaded', onMonacoLoaded);
 
 		const typstTheme = new TypstTheme();
 		const typstLanguage = new TypstLanguage();
@@ -30,7 +30,7 @@
 			monacoController.dispose();
 			monacoController.addTheme(typstTheme);
 			monacoController.addLanguage(typstLanguage);
-			eventController.fire('app/monaco:loaded');
+			eventController.fire('monaco:loaded');
 		} else {
 			monacoController.initMonaco();
 			monacoController.addTheme(typstTheme);
@@ -38,7 +38,7 @@
 		}
 
 		return () => {
-			eventController.unregister('app/monaco:loaded', onMonacoLoaded);
+			eventController.unregister('monaco:loaded', onMonacoLoaded);
 			monacoController.dispose();
 		};
 	});

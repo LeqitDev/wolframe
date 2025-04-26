@@ -34,11 +34,11 @@ export class VirtualFile {
     openFile() {
         this.openedFile = true;
         monacoController.setModel(this.model!);
-        eventController.fire("app/file:opened", this.file.id);
+        eventController.fire("file:opened", this.file.id);
     }
 
     closeFile() {
         this.openedFile = false;
-        eventController.fire("app/file:closed", this.file.id);
+        eventController.fire("file:closed", this.file.id);
     }
 }

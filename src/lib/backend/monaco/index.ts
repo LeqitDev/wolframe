@@ -22,7 +22,7 @@ class MonacoController {
 
         this.monaco = (await import("./wrapper")).default;
         console.log("Monaco loaded");
-        eventController.fire("app/monaco:loaded");
+        eventController.fire("monaco:loaded");
     }
 
     // Only development
@@ -84,7 +84,7 @@ class MonacoController {
             theme.postInit?.(this.monaco, this.editor);
         }
 
-        eventController.fire("app/monaco/editor:created");
+        eventController.fire("monaco/editor:created");
     }
 
     /**

@@ -35,8 +35,8 @@ class EditorManager {
     });
 
     constructor() {
-        eventController.register("app/file:opened", this.openFile.bind(this));
-        eventController.register("app/file:closed", this.closeFile.bind(this));
+        eventController.register("file:opened", this.openFile.bind(this));
+        eventController.register("file:closed", this.closeFile.bind(this));
     }
 
     
@@ -72,11 +72,11 @@ class EditorManager {
 
         if (this.openFileId === id) {
             if (this.lastOpenedFiles.length === 0) {
-                eventController.fire("request/file:open", null);
+                eventController.fire("command/file:open", null);
                 this.openFileId = '';
                 return;
             }
-            eventController.fire("request/file:open", this.lastOpenedFiles[0]);
+            eventController.fire("command/file:open", this.lastOpenedFiles[0]);
             this.openFileId = this.lastOpenedFiles[0];
             return;
         }
@@ -87,8 +87,8 @@ class EditorManager {
     }
 
     dispose() {
-        eventController.unregister("app/file:opened", this.openFile);
-        eventController.unregister("app/file:closed", this.closeFile);
+        eventController.unregister("file:opened", this.openFile);
+        eventController.unregister("file:closed", this.closeFile);
     }
 }
 
