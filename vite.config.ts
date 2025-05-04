@@ -33,5 +33,10 @@ export default defineConfig({
 	},
 	define: {
 		'import.meta.vitest': 'undefined', 
+	},
+	server: {
+		fs: {
+			allow: ['P:/Programmieren/Rust/wolframe-typstcore/pkg'],
+		}
 	}
 });

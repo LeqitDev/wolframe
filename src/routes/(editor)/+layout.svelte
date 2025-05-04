@@ -10,6 +10,9 @@
 	import { TypstLanguage } from '@/lib/backend/monaco/typst/language';
 	import MonacoEditor from '@/lib/frontend/components/editor/MonacoEditor.svelte';
 	import { portalAction } from '@/lib/frontend/actions/Portal.svelte';
+	import CompilerWorker from '@/lib/backend/worker/compiler?worker';
+	import * as Comlink from 'comlink';
+	import { type Compiler as CompilerType } from '@/lib/backend/worker/compiler/compiler';
 
 	let { children } = $props();
 
@@ -19,6 +22,13 @@
 	let showConsole = $state(15);
 
 	$effect(() => {
+		const Compiler = Comlink.wrap<CompilerType>(new CompilerWorker());
+		(async () => {
+			await Compiler.initialize(Comlink.proxy(() => {
+				console.log('Compiler initialized');
+			}));
+		})();
+
 		return () => {
 			editorManager.dispose();
 		}
@@ -26,7 +36,7 @@
 </script>
 
 {#await awaitLoad}
-	<div class="bg-base-100 absolute top-0 left-0 flex h-screen w-screen items-center justify-center" use:portalAction={{}}>
+	<div class="bg-base-100 absolute top-0 left-0 flex h-screen w-screen items-center justify-center z-50" use:portalAction={{}}>
 		<p>{editorManager.loading.message}</p>
 	</div>
 {:catch e}
