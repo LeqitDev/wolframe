@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { setEditorManager } from '$lib/backend/stores/editor.svelte';
-	import { setVirtualFileSystem } from '@/lib/backend/stores/vfs.svelte';
+	import { getVirtualFileSystem, setVirtualFileSystem } from '@/lib/backend/stores/vfs.svelte';
 	import DropdownMenuItem from '@/lib/frontend/components/DropdownMenuItem.svelte';
 	import { Pane, Splitpanes } from 'svelte-splitpanes';
 	import FileExplorer from '@/lib/frontend/components/editor/FileExplorer.svelte';
@@ -17,7 +17,8 @@
 	let { children } = $props();
 
 	const editorManager = setEditorManager();
-	const vfs = setVirtualFileSystem();
+	setVirtualFileSystem();
+	const vfs = getVirtualFileSystem();
 	const awaitLoad = editorManager.loadEditor; // https://github.com/sveltejs/svelte/discussions/14692
 	let showConsole = $state(15);
 
@@ -26,6 +27,13 @@
 		(async () => {
 			await Compiler.initialize(Comlink.proxy(() => {
 				console.log('Compiler initialized');
+				eventController.fire("compiler:loaded");
+
+				eventController.register('files:loaded', () => {
+					vfs.getFiles().forEach((file) => {
+						console.log("File:", file.file.name);
+					})
+				})
 			}));
 		})();
 

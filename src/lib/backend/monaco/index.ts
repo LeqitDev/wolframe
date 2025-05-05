@@ -96,6 +96,7 @@ class MonacoController {
 
         this.editor.dispose();
         this.editor = undefined;
+        eventController.resetOneShotEvent("monaco/editor:created");
     }
 
     /**
@@ -204,6 +205,8 @@ class MonacoController {
         this.themes.clear();
 
         this.disposeEditor();
+        this.monaco = undefined;
+        eventController.resetOneShotEvent("monaco:loaded");
     }
 }
 

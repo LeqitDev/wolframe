@@ -23,10 +23,10 @@
         eventController.register("monaco:loaded", onMonacoLoaded)
         eventController.register("monaco/editor:created", onEditorCreated)
 
-        if (monacoController.isEditorAlreadyCreated()) {
+        /* if (monacoController.isEditorAlreadyCreated()) {
             console.log("Editor already created, firing event");
             eventController.fire("monaco/editor:created");
-        }
+        } */
         /* setTimeout(() => {
             const folderResult = vfs.addFile("test", null);
             if (folderResult.ok) {

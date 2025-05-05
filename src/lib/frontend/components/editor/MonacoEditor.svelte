@@ -13,7 +13,7 @@
 	const vfs = getVirtualFileSystem();
 	const editor = getEditorManager();
 
-    let filteredFiles = $derived(vfs.getFiles().filter((file) => file.isFile && file.openedFile));
+    // let filteredFiles = $derived();
 
 	function onMonacoLoaded() {
 		monacoController.createEditor(editorContainer);
@@ -26,11 +26,11 @@
 		const typstLanguage = new TypstLanguage();
 
 		if (monacoController.isMonacoLoaded()) {
-			console.log('Monaco already loaded, creating editor');
+			/* console.log('Monaco already loaded, creating editor');
 			monacoController.dispose();
 			monacoController.addTheme(typstTheme);
 			monacoController.addLanguage(typstLanguage);
-			eventController.fire('monaco:loaded');
+			eventController.fire('monaco:loaded'); */
 		} else {
 			monacoController.initMonaco();
 			monacoController.addTheme(typstTheme);
@@ -45,10 +45,10 @@
 </script>
 
 <div class="h-full">
-	{#if filteredFiles.length > 0}
+	{#if vfs.getFiles().filter((file) => file.isFile && file.openedFile).length > 0}
     <div class="overflow-x-auto max-h-12 max-w-full">
 		<div role="tablist" class="tabs tabs-sm tabs-box border-base-100 rounded-none border-t min-w-max">
-			{#each filteredFiles as file (file.file.id)}
+			{#each vfs.getFiles().filter((file) => file.isFile && file.openedFile) as file (file.file.id)}
 				<button
 					role="tab"
                     type="button"

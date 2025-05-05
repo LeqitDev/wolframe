@@ -21,6 +21,10 @@
 		if (flashManager.hasMessages) {
 			flashes.push(flashManager.getMessage()!);
 		}
+
+		return () => {
+			eventController.clearAll();
+		}
 	})
 </script>
 
