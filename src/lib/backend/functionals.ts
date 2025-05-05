@@ -22,6 +22,10 @@ export class Result<T, E = Error> {
         return new Result<T>(true, value);
     }
 
+    static none_err_ok<T, E>(value: T): Result<T, E> {
+        return new Result<T, E>(true, value);
+    }
+
     /**
      * Creates a Result object representing an error.
      * @param error The error to be returned in case of failure.

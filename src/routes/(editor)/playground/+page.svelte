@@ -12,6 +12,8 @@
         console.log("Monaco loaded, adding files");
         vfs.addFile("test.txt", "Hello World!");
         vfs.addFile("test.typ", "Hello *Typst*!");
+
+        eventController.fire("files:loaded");
     }
 
     function onEditorCreated() {

@@ -29,10 +29,17 @@
 				console.log('Compiler initialized');
 				eventController.fire("compiler:loaded");
 
-				eventController.register('files:loaded', () => {
-					vfs.getFiles().forEach((file) => {
+				eventController.register('files:loaded', async () => {
+					for (const file of vfs.getFiles().filter((f) => f.isFile)) {
 						console.log("File:", file.file.name);
-					})
+						await Compiler.addFile(file.path.rooted(), file.file.content!);
+					}
+					await Compiler.setRoot("/test.typ", Comlink.proxy((err) => {
+						console.log("Error on setRoot:", err);
+					}))
+					const result = await Compiler.compile(Comlink.proxy((value) => {
+						console.log("Compiler result:", value);
+					}));
 				})
 			}));
 		})();

@@ -1,4 +1,5 @@
-import init, { TypstCore } from 'wolframe-typst-core';
+import init, { TypstCore, type TypstCoreError } from 'wolframe-typst-core';
+import { Result } from '../../functionals';
 
 let core: TypstCore;
 
@@ -37,6 +38,24 @@ export const Compiler = {
         // Call the callback function when done
         callback();
     },
+    addFile(path: string, content: string) {
+        core.add_source(path, content);
+    },
+    compile(callback: (result: Result<string[], TypstCoreError>) => void) {
+        try {
+            const result = core.compile();
+            callback(Result.none_err_ok(result));
+        } catch (e) {
+            callback(Result.err(e as TypstCoreError));
+        }
+    },
+    setRoot(path: string, callback: (err: TypstCoreError) => void) {
+        try {
+            core.set_root(path);
+        } catch (e) {
+            callback(e as TypstCoreError);
+        }
+    }
 };
 
 export type Compiler = typeof Compiler;
