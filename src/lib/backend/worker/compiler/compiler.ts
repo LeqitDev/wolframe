@@ -1,4 +1,4 @@
-import init, { TypstCore, type TypstCoreError } from 'wolframe-typst-core';
+import init, { TypstCore, type TypstCoreError, type OutputFormat } from 'wolframe-typst-core';
 import { Result } from '../../functionals';
 
 let core: TypstCore;
@@ -43,7 +43,7 @@ export const Compiler = {
     },
     compile(callback: (result: Result<string[], TypstCoreError>) => void) {
         try {
-            const result = core.compile();
+            const result = core.compile("svg");
             callback(Result.none_err_ok(result));
         } catch (e) {
             callback(Result.err(e as TypstCoreError));

@@ -59,6 +59,7 @@
     "postgres": "^3.4.5",
     "svelte-splitpanes": "^8.0.9",
     "vscode-oniguruma": "^2.0.1",
-    "vscode-textmate": "^9.2.0"
+    "vscode-textmate": "^9.2.0",
+    "xmldom": "^0.6.0"
   }
 }
