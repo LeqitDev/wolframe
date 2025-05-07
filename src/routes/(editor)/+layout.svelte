@@ -13,6 +13,8 @@
 	import CompilerWorker from '@/lib/backend/worker/compiler?worker';
 	import * as Comlink from 'comlink';
 	import { type Compiler as CompilerType } from '@/lib/backend/worker/compiler/compiler';
+	import RendererWorker from '@/lib/backend/worker/renderer?worker';
+	import { type Renderer as RendererType } from '@/lib/backend/worker/renderer/renderer';
 
 	let { children } = $props();
 
@@ -22,8 +24,11 @@
 	const awaitLoad = editorManager.loadEditor; // https://github.com/sveltejs/svelte/discussions/14692
 	let showConsole = $state(15);
 
+	let canvasContainer: HTMLDivElement;
+
 	$effect(() => {
 		const Compiler = Comlink.wrap<CompilerType>(new CompilerWorker());
+		const Renderer = Comlink.wrap<RendererType>(new RendererWorker());
 		(async () => {
 			await Compiler.initialize(Comlink.proxy(() => {
 				console.log('Compiler initialized');
@@ -38,7 +43,28 @@
 						console.log("Error on setRoot:", err);
 					}))
 					const result = await Compiler.compile(Comlink.proxy((value) => {
-						console.log("Compiler result:", value);
+						console.log("Compilation progress:", value, value.ok);
+						if (value.ok) {	
+							console.log("Compilation result:", value.value);
+							let i = 0;
+							let cur_count = canvasContainer.childElementCount;
+							if ('Html' in value.value) return;
+							for (const [i, page] of value.value.Svg.entries()) {
+								if (i < cur_count) {
+
+								} else {
+									const canvas = document.createElement('canvas');
+									canvas.setAttribute('typst-page', i.toString());
+									canvasContainer.appendChild(canvas);
+
+									const offscreen = canvas.transferControlToOffscreen();
+
+									Renderer.newPage(Comlink.transfer(offscreen, [offscreen]), page);
+								}
+							}
+						} else {
+							console.log("Error:", value.error);
+						}
 					}));
 				})
 			}));
@@ -113,7 +139,7 @@
 							<MonacoEditor />
 						</Pane>
 						<Pane class="bg-base-200">
-							<p>Preview</p>
+							<div bind:this={canvasContainer}></div>
 						</Pane>
 					</Splitpanes>
 				</Pane>

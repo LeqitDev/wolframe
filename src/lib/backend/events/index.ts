@@ -57,17 +57,18 @@ class EventController {
     public fire<E extends keyof AppEvents>(event: E, ...args: AppEvents[E]): void {
         debug("Firing event", event, args);
 
+        const executedEvent = executedEvents.find(e => e.event === event);
+        if (executedEvent) {
+            if (executedEvent.executed) {
+                return; // Event has already been executed, do not fire again
+            } else {
+                executedEvent.executed = true; // Mark the event as executed
+                executedEvent.args = args; // Store the arguments for future callbacks
+            }
+        }
+
         if (this.listeners.has(event)) {
             // Check if the event has been executed before
-            const executedEvent = executedEvents.find(e => e.event === event);
-            if (executedEvent) {
-                if (executedEvent.executed) {
-                    return; // Event has already been executed, do not fire again
-                } else {
-                    executedEvent.executed = true; // Mark the event as executed
-                    executedEvent.args = args; // Store the arguments for future callbacks
-                }
-            }
 
             for (const callback of this.listeners.get(event)!) {
                 callback(...args);

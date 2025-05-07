@@ -1,5 +1,6 @@
-import init, { TypstCore, type TypstCoreError, type OutputFormat } from 'wolframe-typst-core';
+import init, { TypstCore, type TypstCoreError, type OutputFormat, type Output } from 'wolframe-typst-core';
 import { Result } from '../../functionals';
+import * as Comlink from 'comlink';
 
 let core: TypstCore;
 
@@ -41,11 +42,19 @@ export const Compiler = {
     addFile(path: string, content: string) {
         core.add_source(path, content);
     },
-    compile(callback: (result: Result<string[], TypstCoreError>) => void) {
+    compile(callback: (result: Result<Output, TypstCoreError>) => void) {
         try {
-            const result = core.compile("svg");
-            callback(Result.none_err_ok(result));
+            const result = Result.none_err_ok<Output, TypstCoreError>(core.compile("svg") as Output);
+            console.log("Compile result", result);
+            const sendable_result = {
+                _ok: true,
+                _value: result.unwrap(),
+                ok: Comlink.proxy(result.ok),
+                value: Comlink.proxy(result.value),
+            }
+            callback(sendable_result as unknown as Result<Output, TypstCoreError>);
         } catch (e) {
+            console.error("Compile error", e);
             callback(Result.err(e as TypstCoreError));
         }
     },

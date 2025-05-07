@@ -36,7 +36,7 @@ export default defineConfig({
 	},
 	server: {
 		fs: {
-			allow: ['P:/Programmieren/Rust/wolframe-typstcore/pkg', '/Users/markushamacher/programming_projects/typst_core/pkg/wolframe_typst_core_bg.wasm'],
+			allow: ['P:/Programmieren/Rust/wolframe-typstcore/pkg', '/Users/markushamacher/programming_projects/typst_core/pkg', '/media/markus-hamacher/ssd/projects/toys/rust/wolframe-typstcore/pkg'],
 		}
 	}
 });
