@@ -90,6 +90,8 @@
 				path,
 				content
 			);
+
+			editorManager.compile();
 		}
 	}
 
@@ -100,6 +102,8 @@
 			await editorManager.compiler.removeFile(
 				path
 			);
+
+			editorManager.compile();
 		}
 	}
 
@@ -213,7 +217,7 @@
 							<MonacoEditor />
 						</Pane>
 						<Pane class="bg-base-300">
-							<div bind:this={canvasContainer} class="flex flex-col justify-center items-center gap-3 w-full h-full overflow-auto"></div>
+							<div bind:this={canvasContainer} class="flex flex-col justify-center-safe items-center-safe gap-3 w-full h-full p-3 overflow-auto"></div>
 						</Pane>
 					</Splitpanes>
 				</Pane>
