@@ -84,7 +84,7 @@
         dragStore.getDragOverItem() !== dragStore.getDragItem()?.parent
             ? 'bg-base-100/75'
             : '',
-        'menu menu-sm border-base-100 h-full w-full border-t'
+        'menu menu-md border-base-100 h-full w-full border-t'
     ]}
 >
     {#each vfs.getTree().getChildren() as child (child.file.id)}

@@ -1,6 +1,7 @@
 import type { TreeNode } from "../stores/vfs/TreeNode.svelte";
 import type { Monaco } from "../monaco";
 import { debug } from "../utils";
+import type { Output } from "wolframe-typst-core";
 
 type AppEvents = {
     "app:loaded": [], // Fired when the app is loaded
@@ -12,9 +13,14 @@ type AppEvents = {
 
     "compiler:loaded": [], // Fired when the compiler is loaded
 
+    "renderer:render": [Output],
+
+    "file:created": [TreeNode], // Fired when a file is created
+    "file:deleted": [TreeNode], // Fired when a file is deleted
     "file:opened": [string], // Fired when a file is opened
     "file:closed": [string], // Fired when a file is closed
     "file:edited": [TreeNode, Monaco.editor.IModelContentChangedEvent], // Fired when a file is changed
+    "file:preview": [string | null], // Fired when a file is set to be previewed
 
     "command/file:open": [string | null], // Fired when a file is requested to be opened
 }

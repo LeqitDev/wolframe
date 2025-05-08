@@ -14,7 +14,7 @@ export const Renderer = {
             throw new Error("Failed to get 2D context");
         }
 
-        const ttc = new TypstToCanvas(canvas, 500);
+        const ttc = new TypstToCanvas(canvas, 600);
 
         ttc.renderSVG(svg);
 

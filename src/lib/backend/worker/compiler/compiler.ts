@@ -42,6 +42,9 @@ export const Compiler = {
     addFile(path: string, content: string) {
         core.add_source(path, content);
     },
+    removeFile(path: string) {
+        core.remove_source(path);
+    },
     compile(ok: (result: Output) => void, err: (error: TypstCoreError) => void) {
         try {
             const result = core.compile("svg") as Output;

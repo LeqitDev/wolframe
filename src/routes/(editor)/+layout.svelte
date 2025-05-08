@@ -5,7 +5,7 @@
 	import { Pane, Splitpanes } from 'svelte-splitpanes';
 	import FileExplorer from '@/lib/frontend/components/editor/FileExplorer.svelte';
 	import eventController from '@/lib/backend/events';
-	import monacoController from '@/lib/backend/monaco';
+	import monacoController, { type Monaco } from '@/lib/backend/monaco';
 	import { TypstTheme } from '@/lib/backend/monaco/typst/theme';
 	import { TypstLanguage } from '@/lib/backend/monaco/typst/language';
 	import MonacoEditor from '@/lib/frontend/components/editor/MonacoEditor.svelte';
@@ -16,6 +16,7 @@
 	import RendererWorker from '@/lib/backend/worker/renderer?worker';
 	import { type Renderer as RendererType } from '@/lib/backend/worker/renderer/renderer';
 	import type { Output, TypstCoreError } from 'wolframe-typst-core';
+	import type { TreeNode } from '@/lib/backend/stores/vfs/TreeNode.svelte';
 
 	let { children } = $props();
 
@@ -27,70 +28,130 @@
 
 	let canvasContainer: HTMLDivElement;
 
-	function typstErrorhandler(err: TypstCoreError) {
-		console.error("Typst error:", err);
+	function handleTypstError(err: TypstCoreError) {
+		console.error('Typst error:', err);
 	}
 
-	function compileResult(Renderer: Comlink.Remote<RendererType>, output: Output) {
-		let i = 0;
-							let cur_count = canvasContainer.childElementCount;
-							if ('Html' in output) return;
-							for (const [i, page] of output.Svg.entries()) {
-								if (i < cur_count) {
-									Renderer.update(i, page);
-								} else {
-									const canvas = document.createElement('canvas');
-									canvas.setAttribute('typst-page', i.toString());
-									canvasContainer.appendChild(canvas);
+	function renderCompilationResult(output: Output) {
+		let cur_count = canvasContainer.childElementCount;
+		if ('Html' in output) return;
+		for (const [i, page] of output.Svg.entries()) {
+			if (i < cur_count) {
+				editorManager.renderer.update(i, page);
+			} else {
+				const canvas = document.createElement('canvas');
+				canvas.setAttribute('typst-page', i.toString());
+				canvasContainer.appendChild(canvas);
 
-									const offscreen = canvas.transferControlToOffscreen();
+				const offscreen = canvas.transferControlToOffscreen();
 
-									Renderer.newPage(Comlink.transfer(offscreen, [offscreen]), page);
-								}
-							}
+				editorManager.renderer.newPage(Comlink.transfer(offscreen, [offscreen]), page);
+			}
+		}
+	}
+
+	async function rootChanged(path: string | null) {
+		if (path) {
+			await editorManager.compiler.setRoot(
+				path,
+				Comlink.proxy((err) => {
+					console.log('Error on setRoot:', err);
+				})
+			);
+
+			editorManager.compile();
+		}
+	}
+
+	async function fileContentChanged(node: TreeNode, event: Monaco.editor.IModelContentChangedEvent) {
+		if (node.isFile) {
+			const path = node.path.rooted();
+
+			for (const change of event.changes) {
+				await editorManager.compiler.edit(
+					path,
+					change.text,
+					change.rangeOffset,
+					change.rangeOffset + change.rangeLength,
+					Comlink.proxy(handleTypstError)
+				);
+			}
+
+			editorManager.compile();
+		}
+	}
+
+	async function addFile(node: TreeNode) {
+		if (node.isFile) {
+			const path = node.path.rooted();
+			const content = node.file.content!;
+
+			await editorManager.compiler.addFile(
+				path,
+				content
+			);
+		}
+	}
+
+	async function deleteFile(node: TreeNode) {
+		if (node.isFile) {
+			const path = node.path.rooted();
+
+			await editorManager.compiler.removeFile(
+				path
+			);
+		}
 	}
 
 	$effect(() => {
 		const Compiler = Comlink.wrap<CompilerType>(new CompilerWorker());
 		const Renderer = Comlink.wrap<RendererType>(new RendererWorker());
-		(async () => {
-			await Compiler.initialize(Comlink.proxy(() => {
-				console.log('Compiler initialized');
-				eventController.fire("compiler:loaded");
+		editorManager.setRenderer(Renderer);
+		eventController.register('renderer:render', renderCompilationResult);
 
-				eventController.register('files:loaded', async () => {
+		(async () => {
+			await Compiler.initialize(
+				Comlink.proxy(async () => {
+					console.log('Compiler initialized');
+					eventController.fire('compiler:loaded');
+
+					await eventController.waitFor('files:loaded');
+
 					for (const file of vfs.getFiles().filter((f) => f.isFile)) {
-						console.log("File:", file.file.name);
+						console.log('File:', file.file.name);
 						await Compiler.addFile(file.path.rooted(), file.file.content!);
 					}
-					await Compiler.setRoot("/test.typ", Comlink.proxy((err) => {
-						console.log("Error on setRoot:", err);
-					}))
-					await Compiler.compile(Comlink.proxy((value) => compileResult(Renderer, value)), Comlink.proxy(typstErrorhandler));
-				});
+					
+					eventController.register('file:created', addFile);
+					eventController.register('file:deleted', deleteFile);
 
-				eventController.register('file:edited', async (node, changedEvent) => {
-					if (node.isFile) {
-						const path = node.path.rooted();
+					await rootChanged(editorManager.previewFilePath);
 
-						for (const change of changedEvent.changes) {
-							await Compiler.edit(path, change.text, change.rangeOffset, change.rangeOffset + change.rangeLength, Comlink.proxy(typstErrorhandler));
-						}
+					editorManager.setCompiler(Compiler);
 
-						await Compiler.compile(Comlink.proxy((value) => compileResult(Renderer, value)), Comlink.proxy(typstErrorhandler));
-					}
+					eventController.register('file:preview', rootChanged);
+
+					eventController.register('file:edited', fileContentChanged);
 				})
-			}));
+			);
 		})();
 
 		return () => {
+			eventController.unregister('renderer:render', renderCompilationResult);
+			eventController.unregister('file:preview', rootChanged);
+			eventController.unregister('file:edited', fileContentChanged);
+			eventController.unregister('file:created', addFile);
+			eventController.unregister('file:deleted', deleteFile);
 			editorManager.dispose();
-		}
+		};
 	});
 </script>
 
 {#await awaitLoad}
-	<div class="bg-base-100 absolute top-0 left-0 flex h-screen w-screen items-center justify-center z-50" use:portalAction={{}}>
+	<div
+		class="bg-base-100 absolute top-0 left-0 z-50 flex h-screen w-screen items-center justify-center"
+		use:portalAction={{}}
+	>
 		<p>{editorManager.loading.message}</p>
 	</div>
 {:catch e}
@@ -103,7 +164,7 @@
 			<FileExplorer />
 		</Pane>
 		<Pane class="">
-			<ul class="menu menu-horizontal bg-base-200 w-full gap-2 p-2 h-12">
+			<ul class="menu menu-horizontal bg-base-200 h-12 w-full gap-2 p-2">
 				<li>
 					<DropdownMenuItem name="File">
 						<li><a href="/">New File</a></li>
@@ -152,7 +213,7 @@
 							<MonacoEditor />
 						</Pane>
 						<Pane class="bg-base-200">
-							<div bind:this={canvasContainer}></div>
+							<div bind:this={canvasContainer} class="flex justify-center"></div>
 						</Pane>
 					</Splitpanes>
 				</Pane>

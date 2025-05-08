@@ -1,5 +1,8 @@
 import { getContext, setContext } from "svelte";
 import eventController from "../events";
+import * as Comlink  from 'comlink';
+import type { Renderer as RendererType } from '../worker/renderer/renderer';
+import type { Compiler as CompilerType } from '../worker/compiler/compiler';
 
 /**
  * EditorManager is a class that manages the loading state of an editor in a Svelte application.
@@ -14,6 +17,12 @@ class EditorManager {
 
     private openFileId: string = $state('');
     private lastOpenedFiles: string[] = [];
+
+    private _previewFilePath: string | null = $state(null);
+
+    // Access to the renderer and compiler workers
+    private Renderer: Comlink.Remote<RendererType> | null = null;
+    private Compiler: Comlink.Remote<CompilerType> | null = null;
 
     /**
      * The loading promise that resolves the editor load function.
@@ -84,6 +93,74 @@ class EditorManager {
 
     getOpenFileId() {
         return this.openFileId;
+    }
+
+    /**
+     * Sets the renderer worker to be used by the editor.
+     * @param renderer The renderer worker to set.
+     */
+    setRenderer(renderer: Comlink.Remote<RendererType>) {
+        this.Renderer = renderer;
+    }
+
+    /**
+     * Gets the renderer worker used by the editor.
+     * @returns The renderer worker.
+     * @throws Error if the renderer is not set.
+     */
+    get renderer() {
+        if (!this.Renderer) {
+            throw new Error('Renderer not set');
+        }
+        return this.Renderer;
+    }
+
+    /**
+     * Sets the compiler worker to be used by the editor.
+     * @param compiler The compiler worker to set.
+     */
+    setCompiler(compiler: Comlink.Remote<CompilerType>) {
+        this.Compiler = compiler;
+    }
+
+    /**
+     * Gets the compiler worker used by the editor.
+     * @returns The compiler worker.
+     * @throws Error if the compiler is not set.
+     */
+    get compiler() {
+        if (!this.Compiler) {
+            throw new Error('Compiler not set');
+        }
+        return this.Compiler;
+    }
+
+    compile() {
+        if (!this.Compiler) {
+            throw new Error('Compiler not set');
+        }
+        this.Compiler.compile(Comlink.proxy((output) => {
+            eventController.fire("renderer:render", output);
+        }), Comlink.proxy((error) => {
+            console.error('Error compiling', error);
+        }));
+    }
+
+    /**
+     * Sets the preview file path.
+     * @param path The path to the preview file.
+     */
+    setPreviewFilePath(path: string | null) {
+        eventController.fire("file:preview", path);
+        this._previewFilePath = path;
+    }
+
+    /**
+     * Gets the preview file path.
+     * @returns The path to the preview file.
+     */
+    get previewFilePath() {
+        return this._previewFilePath;
     }
 
     dispose() {

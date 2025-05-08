@@ -120,6 +120,7 @@ class VirtualFileSystem {
         })
 
         this.files.set(file.id, treeNode);
+        eventController.fire("file:created", treeNode); // fire the file created event
         return Result.ok(treeNode);
     }
 
@@ -145,6 +146,7 @@ class VirtualFileSystem {
         fileNode.model?.dispose();
         fileNode.delete();
         this.files.delete(id);
+        eventController.fire("file:deleted", fileNode); // fire the file deleted event
         return Result.ok(fileNode);
     }
 
