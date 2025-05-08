@@ -212,8 +212,8 @@
 						<Pane size={50} minSize={20} maxSize={80} class="">
 							<MonacoEditor />
 						</Pane>
-						<Pane class="bg-base-200">
-							<div bind:this={canvasContainer} class="flex justify-center"></div>
+						<Pane class="bg-base-300">
+							<div bind:this={canvasContainer} class="flex flex-col justify-center items-center gap-3 w-full h-full overflow-auto"></div>
 						</Pane>
 					</Splitpanes>
 				</Pane>
