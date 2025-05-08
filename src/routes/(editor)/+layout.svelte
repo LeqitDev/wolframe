@@ -15,6 +15,7 @@
 	import { type Compiler as CompilerType } from '@/lib/backend/worker/compiler/compiler';
 	import RendererWorker from '@/lib/backend/worker/renderer?worker';
 	import { type Renderer as RendererType } from '@/lib/backend/worker/renderer/renderer';
+	import type { Output, TypstCoreError } from 'wolframe-typst-core';
 
 	let { children } = $props();
 
@@ -25,6 +26,29 @@
 	let showConsole = $state(15);
 
 	let canvasContainer: HTMLDivElement;
+
+	function typstErrorhandler(err: TypstCoreError) {
+		console.error("Typst error:", err);
+	}
+
+	function compileResult(Renderer: Comlink.Remote<RendererType>, output: Output) {
+		let i = 0;
+							let cur_count = canvasContainer.childElementCount;
+							if ('Html' in output) return;
+							for (const [i, page] of output.Svg.entries()) {
+								if (i < cur_count) {
+									Renderer.update(i, page);
+								} else {
+									const canvas = document.createElement('canvas');
+									canvas.setAttribute('typst-page', i.toString());
+									canvasContainer.appendChild(canvas);
+
+									const offscreen = canvas.transferControlToOffscreen();
+
+									Renderer.newPage(Comlink.transfer(offscreen, [offscreen]), page);
+								}
+							}
+	}
 
 	$effect(() => {
 		const Compiler = Comlink.wrap<CompilerType>(new CompilerWorker());
@@ -42,30 +66,19 @@
 					await Compiler.setRoot("/test.typ", Comlink.proxy((err) => {
 						console.log("Error on setRoot:", err);
 					}))
-					const result = await Compiler.compile(Comlink.proxy((value) => {
-						console.log("Compilation progress:", value, value.ok);
-						if (value.ok) {	
-							console.log("Compilation result:", value.value);
-							let i = 0;
-							let cur_count = canvasContainer.childElementCount;
-							if ('Html' in value.value) return;
-							for (const [i, page] of value.value.Svg.entries()) {
-								if (i < cur_count) {
+					await Compiler.compile(Comlink.proxy((value) => compileResult(Renderer, value)), Comlink.proxy(typstErrorhandler));
+				});
 
-								} else {
-									const canvas = document.createElement('canvas');
-									canvas.setAttribute('typst-page', i.toString());
-									canvasContainer.appendChild(canvas);
+				eventController.register('file:edited', async (node, changedEvent) => {
+					if (node.isFile) {
+						const path = node.path.rooted();
 
-									const offscreen = canvas.transferControlToOffscreen();
-
-									Renderer.newPage(Comlink.transfer(offscreen, [offscreen]), page);
-								}
-							}
-						} else {
-							console.log("Error:", value.error);
+						for (const change of changedEvent.changes) {
+							await Compiler.edit(path, change.text, change.rangeOffset, change.rangeOffset + change.rangeLength, Comlink.proxy(typstErrorhandler));
 						}
-					}));
+
+						await Compiler.compile(Comlink.proxy((value) => compileResult(Renderer, value)), Comlink.proxy(typstErrorhandler));
+					}
 				})
 			}));
 		})();

@@ -114,6 +114,11 @@ class VirtualFileSystem {
         const model = monacoController.createModel(file.id, treeNode.extension!, content ?? "", undefined);
         treeNode.setModel(model); // set the model for the file
 
+        // Add file change listener
+        model.onDidChangeContent((event) => {
+            eventController.fire("file:edited", treeNode, event)
+        })
+
         this.files.set(file.id, treeNode);
         return Result.ok(treeNode);
     }

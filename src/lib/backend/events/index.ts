@@ -1,3 +1,5 @@
+import type { TreeNode } from "../stores/vfs/TreeNode.svelte";
+import type { Monaco } from "../monaco";
 import { debug } from "../utils";
 
 type AppEvents = {
@@ -12,6 +14,7 @@ type AppEvents = {
 
     "file:opened": [string], // Fired when a file is opened
     "file:closed": [string], // Fired when a file is closed
+    "file:edited": [TreeNode, Monaco.editor.IModelContentChangedEvent], // Fired when a file is changed
 
     "command/file:open": [string | null], // Fired when a file is requested to be opened
 }

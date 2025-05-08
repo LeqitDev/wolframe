@@ -14,7 +14,7 @@ export const Renderer = {
             throw new Error("Failed to get 2D context");
         }
 
-        const ttc = new TypstToCanvas(canvas, 900);
+        const ttc = new TypstToCanvas(canvas, 500);
 
         ttc.renderSVG(svg);
 
@@ -22,6 +22,21 @@ export const Renderer = {
             canvas: ttc,
             svg,
         });
+    },
+    update(pageId: number, svg?: string) {
+        console.log("Updating page", pageId, svg);
+        const page = pages[pageId];
+
+        if (!page) {
+            throw new Error(`Page with id ${pageId} not found`);
+        }
+
+        if (svg) {
+            page.svg = svg;
+        }
+
+        page.canvas.renderSVG(page.svg ?? "");
+
     }
 }
 

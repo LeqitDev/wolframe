@@ -42,27 +42,26 @@ export const Compiler = {
     addFile(path: string, content: string) {
         core.add_source(path, content);
     },
-    compile(callback: (result: Result<Output, TypstCoreError>) => void) {
+    compile(ok: (result: Output) => void, err: (error: TypstCoreError) => void) {
         try {
-            const result = Result.none_err_ok<Output, TypstCoreError>(core.compile("svg") as Output);
-            console.log("Compile result", result);
-            const sendable_result = {
-                _ok: true,
-                _value: result.unwrap(),
-                ok: Comlink.proxy(result.ok),
-                value: Comlink.proxy(result.value),
-            }
-            callback(sendable_result as unknown as Result<Output, TypstCoreError>);
+            const result = core.compile("svg") as Output;
+            ok(result);
         } catch (e) {
-            console.error("Compile error", e);
-            callback(Result.err(e as TypstCoreError));
+            err(e as TypstCoreError);
         }
     },
-    setRoot(path: string, callback: (err: TypstCoreError) => void) {
+    setRoot(path: string, err: (error: TypstCoreError) => void) {
         try {
             core.set_root(path);
         } catch (e) {
-            callback(e as TypstCoreError);
+            err(e as TypstCoreError);
+        }
+    },
+    edit(path: string, content: string, begin: number, end: number, err: (error: TypstCoreError) => void) {
+        try {
+            core.edit_source(path, content, begin, end);
+        } catch (e) {
+            err(e as TypstCoreError);
         }
     }
 };
