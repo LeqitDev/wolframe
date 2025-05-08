@@ -23,6 +23,7 @@ type AppEvents = {
     "file:preview": [string | null], // Fired when a file is set to be previewed
 
     "command/file:open": [string | null], // Fired when a file is requested to be opened
+    "command/ui/console:visibility": [boolean], // Fired when the console visibility is changed
 }
 
 // One shot events that are fired once and never again

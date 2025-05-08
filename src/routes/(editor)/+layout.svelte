@@ -17,37 +17,22 @@
 	import { type Renderer as RendererType } from '@/lib/backend/worker/renderer/renderer';
 	import type { Output, TypstCoreError } from 'wolframe-typst-core';
 	import type { TreeNode } from '@/lib/backend/stores/vfs/TreeNode.svelte';
+	import PreviewPanel from '@/lib/frontend/components/editor/PreviewPanel.svelte';
+	import Menu from '@/lib/frontend/components/editor/Menu.svelte';
+	import DebugPanel from '@/lib/frontend/components/editor/DebugPanel.svelte';
+	import { setUiStore } from '@/lib/backend/stores/ui.svelte';
 
 	let { children } = $props();
 
 	const editorManager = setEditorManager();
 	setVirtualFileSystem();
 	const vfs = getVirtualFileSystem();
+	const uiStore = setUiStore();
 	const awaitLoad = editorManager.loadEditor; // https://github.com/sveltejs/svelte/discussions/14692
-	let showConsole = $state(15);
-
-	let canvasContainer: HTMLDivElement;
+	let showConsole = $state(6);
 
 	function handleTypstError(err: TypstCoreError) {
 		console.error('Typst error:', err);
-	}
-
-	function renderCompilationResult(output: Output) {
-		let cur_count = canvasContainer.childElementCount;
-		if ('Html' in output) return;
-		for (const [i, page] of output.Svg.entries()) {
-			if (i < cur_count) {
-				editorManager.renderer.update(i, page);
-			} else {
-				const canvas = document.createElement('canvas');
-				canvas.setAttribute('typst-page', i.toString());
-				canvasContainer.appendChild(canvas);
-
-				const offscreen = canvas.transferControlToOffscreen();
-
-				editorManager.renderer.newPage(Comlink.transfer(offscreen, [offscreen]), page);
-			}
-		}
 	}
 
 	async function rootChanged(path: string | null) {
@@ -107,11 +92,15 @@
 		}
 	}
 
+	function consoleVisibility(show: boolean) {
+		showConsole = show ? 15 : 0;
+	}
+
 	$effect(() => {
+		uiStore.initDebugPanelHeights();
+		eventController.register('command/ui/console:visibility', consoleVisibility);
+
 		const Compiler = Comlink.wrap<CompilerType>(new CompilerWorker());
-		const Renderer = Comlink.wrap<RendererType>(new RendererWorker());
-		editorManager.setRenderer(Renderer);
-		eventController.register('renderer:render', renderCompilationResult);
 
 		(async () => {
 			await Compiler.initialize(
@@ -141,11 +130,11 @@
 		})();
 
 		return () => {
-			eventController.unregister('renderer:render', renderCompilationResult);
 			eventController.unregister('file:preview', rootChanged);
 			eventController.unregister('file:edited', fileContentChanged);
 			eventController.unregister('file:created', addFile);
 			eventController.unregister('file:deleted', deleteFile);
+			eventController.unregister('command/ui/console:visibility', consoleVisibility);
 			editorManager.dispose();
 		};
 	});
@@ -168,61 +157,20 @@
 			<FileExplorer />
 		</Pane>
 		<Pane class="">
-			<ul class="menu menu-horizontal bg-base-200 h-12 w-full gap-2 p-2">
-				<li>
-					<DropdownMenuItem name="File">
-						<li><a href="/">New File</a></li>
-						<li><a href="/">Open File</a></li>
-						<li><a href="/">Save</a></li>
-						<li><a href="/">Save As</a></li>
-						<li><a href="/">Close File</a></li>
-						<li><a href="/">Export File</a></li>
-					</DropdownMenuItem>
-				</li>
-				<li>
-					<DropdownMenuItem name="Edit">
-						<li><a href="/">Undo</a></li>
-						<li><a href="/">Redo</a></li>
-						<li><a href="/">Cut</a></li>
-						<li><a href="/">Copy</a></li>
-						<li><a href="/">Paste</a></li>
-						<li><a href="/">Select All</a></li>
-					</DropdownMenuItem>
-				</li>
-				<li>
-					<DropdownMenuItem name="Project">
-						<li><a href="/">Export Project</a></li>
-						<li>
-							<button onclick={() => (showConsole = showConsole === 0 ? 20 : 0)}>
-								{showConsole === 0 ? 'Show' : 'Hide'} Console
-							</button>
-						</li>
-					</DropdownMenuItem>
-				</li>
-				<li>
-					<DropdownMenuItem name="Preview">
-						<li><a href="/">Hide Preview</a></li>
-						<li><a href="/">Refresh Preview</a></li>
-						<li><a href="/">Preview in New Window</a></li>
-						<li><a href="/">Zoom In</a></li>
-						<li><a href="/">Zoom Out</a></li>
-						<li><a href="/">Set Zoom</a></li>
-					</DropdownMenuItem>
-				</li>
-			</ul>
-			<Splitpanes horizontal theme="wolframe-theme">
+			<Menu />
+			<Splitpanes horizontal theme="wolframe-theme" on:resized={() => (uiStore.debugPanelCurrentHeight = 20)}>
 				<Pane size={100} minSize={10} class="">
 					<Splitpanes theme="wolframe-theme">
 						<Pane size={50} minSize={20} maxSize={80} class="">
 							<MonacoEditor />
 						</Pane>
 						<Pane class="bg-base-300">
-							<div bind:this={canvasContainer} class="flex flex-col justify-center-safe items-center-safe gap-3 w-full h-full p-3 overflow-auto"></div>
+							<PreviewPanel />
 						</Pane>
 					</Splitpanes>
 				</Pane>
-				<Pane snapSize={10} bind:size={showConsole} class="bg-base-300">
-					<p>Console</p>
+				<Pane bind:size={uiStore.debugPanelCurrentHeight} class="bg-base-200">
+					<DebugPanel />
 				</Pane>
 			</Splitpanes>
 		</Pane>
