@@ -66,6 +66,7 @@ class MonacoController {
 			roundedSelection: false,
 			automaticLayout: true,
 			fixedOverflowWidgets: true,
+            readOnly: false,
 			suggest: {
 				showInlineDetails: true,
 				showMethods: true,
