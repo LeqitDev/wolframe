@@ -3,6 +3,12 @@ import type { TypstCoreError } from "wolframe-typst-core";
 
 class DebugStore {
     compileError: TypstCoreError | null = $state(null);
+    logs: {
+        id: string;
+        type?: "info" | "error" | "warning";
+        domain?: string;
+        message: string;
+    }[] = $state([]);
 }
 
 

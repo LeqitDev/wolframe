@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { getDebugStore } from "@/lib/backend/stores/debug.svelte";
 	import { getUiStore } from "@/lib/backend/stores/ui.svelte";
+	import { debugLogStore } from "@/lib/backend/utils";
 	import { createId } from "@paralleldrive/cuid2";
 	import { ChevronRight } from "lucide-svelte";
 	import { untrack } from "svelte";
@@ -15,6 +16,7 @@
     const uiStore = getUiStore();
     const debugStore = getDebugStore();
     
+    let tab: "output" | "log" = $state("log");
     let filterType = $state("all");
 
     let errors: DebugError[] = $state([]);
@@ -43,6 +45,22 @@
             }
         }
     })
+
+    const scrollToBottom = (node: HTMLElement, list: any) => {
+        const scroll = () => node.scroll({
+            top: node.scrollHeight,
+            // behavior: 'smooth',
+        });
+        scroll();
+
+        return { 
+            update: (list: any) => {
+                if (list.length > 0) {
+                    scroll();
+                }
+            },
+        };
+    };
 </script>
 
 {#if uiStore.isDebugPanelMinimized}
@@ -51,38 +69,54 @@
     </button>
 {:else}
     <div class="flex w-full h-full flex-col gap-2 px-2 pt-2">
-        <div class="flex w-full items-center justify-between">
-            <h2 class="font-bold">Compile output</h2>
-            <div class="flex gap-2" role="radiogroup">
-                <input class="btn btn-sm btn-accent not-checked:btn-soft" type="radio" bind:group={filterType}  value="all" aria-label="All" />
-                <input class="btn btn-sm btn-warning not-checked:btn-soft" type="radio" bind:group={filterType} value="warning" aria-label="Warnings" />
-                <input class="btn btn-sm btn-error not-checked:btn-soft" type="radio" bind:group={filterType} value="error" aria-label="Errors" />
+        <div class="flex w-full items-center justify-between min-h-10 max-h-10">
+            <div class="flex gap-4">
+                <button class={[tab === "output" ? "underline underline-offset-8 decoration-2" : "text-gray-400", "cursor-pointer"]} onclick={() => (tab = "output")}>Compile output</button>
+                <button class={[tab === "log" ? "underline underline-offset-8 decoration-2" : "text-gray-400", "cursor-pointer"]} onclick={() => (tab = "log")}>Logs</button>
             </div>
+            {#if tab === "output"}
+                <div class="flex gap-2" role="radiogroup">
+                    <input class="btn btn-sm btn-accent not-checked:btn-soft" type="radio" bind:group={filterType}  value="all" aria-label="All" />
+                    <input class="btn btn-sm btn-warning not-checked:btn-soft" type="radio" bind:group={filterType} value="warning" aria-label="Warnings" />
+                    <input class="btn btn-sm btn-error not-checked:btn-soft" type="radio" bind:group={filterType} value="error" aria-label="Errors" />
+                </div>
+            {/if}
         </div>
-        <div class="flex flex-col gap-2 bg-base-300 h-full w-full px-1 pt-1 rounded-t overflow-y-auto">
-            {#each errors.filter((value) => filterType === "all" || value.severity === filterType) as error (error.id)}
-                {@const colorTrailer = error.severity === "error" ? "-error" : error.severity === "warning" ? "-warning" : "-info"}
-                {#if error.details}
-                    <details class="collapse group">
-                        <summary class="collapse-title p-2 min-h-8 hover:brightness-90">
-                            <div class="flex gap-2 items-center">
-                                <ChevronRight class="w-4 h-4 transition-transform duration-200 group-open:rotate-90 {'text' + colorTrailer}" />
-                                <p class="font-mono">{error.message}</p>
+        {#if tab === "output"}
+            <div class="flex flex-col gap-2 bg-base-300 h-full w-full px-1 pt-1 rounded-t overflow-y-auto">
+                {#each errors.filter((value) => filterType === "all" || value.severity === filterType) as error (error.id)}
+                    {@const colorTrailer = error.severity === "error" ? "-error" : error.severity === "warning" ? "-warning" : "-info"}
+                    {#if error.details}
+                        <details class="collapse group">
+                            <summary class="collapse-title p-2 min-h-8 hover:brightness-90">
+                                <div class="flex gap-2 items-center">
+                                    <ChevronRight class="w-4 h-4 transition-transform duration-200 group-open:rotate-90 {'text' + colorTrailer}" />
+                                    <p class="font-mono">{error.message}</p>
+                                </div>
+                            </summary>
+                            <div class="collapse-content text-sm px-2 pb-2 relative">
+                                <div class="absolute top-0 left-4 w-0.5 h-full {'bg' + colorTrailer} transform -translate-x-1/2 -translate-y-2"></div>
+                                <div class="absolute bottom-2 left-4 w-2 h-0.5 {'bg' + colorTrailer}"></div>
+                                <p class="text-gray-400 font-mono pl-5">{error.details}</p>
                             </div>
-                        </summary>
-                        <div class="collapse-content text-sm px-2 pb-2 relative">
-                            <div class="absolute top-0 left-4 w-0.5 h-full {'bg' + colorTrailer} transform -translate-x-1/2 -translate-y-2"></div>
-                            <div class="absolute bottom-2 left-4 w-2 h-0.5 {'bg' + colorTrailer}"></div>
-                            <p class="text-gray-400 font-mono pl-5">{error.details}</p>
+                        </details>
+                    {:else}
+                        <div class="flex gap-2 items-center">
+                            <div class="w-2 h-2 rounded-full {'bg' + colorTrailer}"></div>
+                            <p class="font-mono">{error.message}</p>
                         </div>
-                    </details>
-                {:else}
-                    <div class="flex gap-2 items-center">
-                        <div class="w-2 h-2 rounded-full {'bg' + colorTrailer}"></div>
-                        <p class="font-mono">{error.message}</p>
+                    {/if}
+                {/each}
+            </div>
+        {:else if tab === "log"}
+            <div class="bg-base-300 grow min-h-0 w-full px-1 pt-1 rounded-t overflow-y-auto mb-12" use:scrollToBottom={$debugLogStore}>
+                {#each $debugLogStore as log (log.id)}
+                    {@const colorTrailer = log.type === "error" ? "-error" : log.type === "warning" ? "-warning" : log.type === "info" ? "-info" : "-gray-400"}
+                    <div class="flex gap-2 items-center text-sm {'text' + colorTrailer}">
+                        <p class="font-mono">{#if log.domain}<span class="pr-2">{log.domain}</span>{/if}{log.message}</p>
                     </div>
-                {/if}
-            {/each}
-        </div>
+                {/each}
+            </div>
+        {/if}
     </div>
 {/if}

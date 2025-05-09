@@ -200,7 +200,7 @@
 					</div>
 				{/snippet}
 				{#snippet b()}
-					<div class="bg-base-200">
+					<div class="bg-base-200 min-h-0 h-full w-full">
 						<DebugPanel />
 					</div>
 				{/snippet}
