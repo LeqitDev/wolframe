@@ -192,6 +192,34 @@ class MonacoController {
     }
 
     /**
+     * This method changes the selection in the editor.
+     * It sets the selection to the specified range and reveals it in the center of the editor.
+     * @param range - The range to select in the editor.
+     * @throws {Error} - Throws an error if the editor is not created yet or if Monaco is not loaded yet.
+     */
+    changeSelection(range: Monaco.IRange | {start: number, end: number}) {
+        if (!this.monaco) {
+            throw new Error("Monaco is not loaded yet.");
+        }
+        if (!this.editor) {
+            throw new Error("Editor is not created yet.");
+        }
+
+        if (!this.monaco.Range.isIRange(range)) {
+            const curModel = this.editor.getModel();
+            if (!curModel) {
+                throw new Error("Model is not set yet.");
+            }
+            const start = curModel.getPositionAt(range.start);
+            const end = curModel.getPositionAt(range.end);
+            range = this.monaco.Range.fromPositions(start, end);
+        }
+
+        this.editor.setSelection(range);
+        this.editor.revealRangeInCenter(range);
+    }
+
+    /**
      * Disposes the Monaco controller and all its resources.
      * This method should be called when the controller is no longer needed.
      * It disposes of all languages, themes, and the editor instance.

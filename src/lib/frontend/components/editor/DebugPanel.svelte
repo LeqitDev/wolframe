@@ -49,7 +49,10 @@
 								label: 'view',
 								onClick: () => {
 									eventController.fire('command/file:open', error.range.path, () => {
-										debug('info', 'debug', 'hi');
+										eventController.fire('command/monaco/editor:selection', {
+											start: error.range.start,
+											end: error.range.end
+										});
 									});
 								}
 							}
@@ -159,7 +162,7 @@
 										class="h-4 w-4 transition-transform duration-200 group-open:rotate-90 {'text' +
 											colorTrailer}"
 									/>
-									<p class="font-mono">{error.message}{#if error.action} <span><button class="link btn-xs text-gray-400 text-sm" onclick={error.action.onClick}>({error.action.label})</button></span>{/if}</p>
+									<p class="font-mono">{error.message}{#if error.action} <span><button class="link btn-xs text-gray-400 text-sm pl-2" onclick={error.action.onClick}>({error.action.label})</button></span>{/if}</p>
 								</div>
 							</summary>
 							<div class="collapse-content relative px-2 pb-2 text-sm">

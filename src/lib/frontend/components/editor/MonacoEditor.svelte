@@ -1,6 +1,6 @@
 <script lang="ts">
 	import eventController from '@/lib/backend/events';
-	import monacoController from '@/lib/backend/monaco';
+	import monacoController, { type Monaco } from '@/lib/backend/monaco';
 	import { TypstLanguage } from '@/lib/backend/monaco/typst/language';
 	import { TypstTheme } from '@/lib/backend/monaco/typst/theme';
 	import { getEditorManager } from '@/lib/backend/stores/editor.svelte';
@@ -19,19 +19,18 @@
 		monacoController.createEditor(editorContainer);
 	}
 
+	function onChangeSelection(range: Monaco.IRange | {start: number, end: number}) {
+		monacoController.changeSelection(range);
+	}
+
 	$effect(() => {
 		eventController.register('monaco:loaded', onMonacoLoaded);
+		eventController.register('command/monaco/editor:selection', onChangeSelection);
 
 		const typstTheme = new TypstTheme();
 		const typstLanguage = new TypstLanguage();
 
-		if (monacoController.isMonacoLoaded()) {
-			/* console.log('Monaco already loaded, creating editor');
-			monacoController.dispose();
-			monacoController.addTheme(typstTheme);
-			monacoController.addLanguage(typstLanguage);
-			eventController.fire('monaco:loaded'); */
-		} else {
+		if (!monacoController.isMonacoLoaded()) {
 			monacoController.initMonaco();
 			monacoController.addTheme(typstTheme);
 			monacoController.addLanguage(typstLanguage);
@@ -39,6 +38,7 @@
 
 		return () => {
 			eventController.unregister('monaco:loaded', onMonacoLoaded);
+			eventController.unregister('command/monaco/editor:selection', onChangeSelection);
 			monacoController.dispose();
 		};
 	});
