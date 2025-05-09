@@ -48,7 +48,7 @@ class EventController {
 
 
         const executedEvent = executedEvents.find(e => e.event === event);
-        debug("Registering event", event, executedEvent);
+        debug("info", "event", "Registering event", event, executedEvent);
         if (executedEvent) {
             if (executedEvent.executed) {// Event has already been executed, fire the callback immediately
                 callback(...executedEvent.args as AppEvents[E]);
@@ -66,7 +66,7 @@ class EventController {
     }
 
     public fire<E extends keyof AppEvents>(event: E, ...args: AppEvents[E]): void {
-        debug("Firing event", event, args);
+        debug("info", "event", "Firing event", event, args);
 
         const executedEvent = executedEvents.find(e => e.event === event);
         if (executedEvent) {
@@ -102,7 +102,7 @@ class EventController {
     }
 
     public resetOneShotEvent(event: keyof AppEvents): void {
-        debug("Resetting one shot event", event);
+        debug("info", "event", "Resetting one shot event", event);
 
         const executedEvent = executedEvents.find(e => e.event === event);
         if (executedEvent) {

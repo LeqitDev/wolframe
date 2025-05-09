@@ -23,6 +23,7 @@
 	import { setUiStore } from '@/lib/backend/stores/ui.svelte';
 	import CustomSplitpanes from '@/lib/frontend/components/splitpane/Splitpane.svelte';
 	import { setDebugStore } from '@/lib/backend/stores/debug.svelte';
+	import { debug } from '@/lib/backend/utils';
 
 	let { children } = $props();
 
@@ -45,7 +46,7 @@
 			await editorManager.compiler.setRoot(
 				path,
 				Comlink.proxy((err) => {
-					console.log('Error on setRoot:', err);
+					debug('error', 'compiler', 'Error on setRoot:', err);
 				})
 			);
 
@@ -122,13 +123,13 @@
 		(async () => {
 			await Compiler.initialize(
 				Comlink.proxy(async () => {
-					console.log('Compiler initialized');
+					debug('info', 'compiler', 'Compiler initialized');
 					eventController.fire('compiler:loaded');
 
 					await eventController.waitFor('files:loaded');
 
 					for (const file of vfs.getFiles().filter((f) => f.isFile)) {
-						console.log('File:', file.file.name);
+						debug('info', 'compiler', 'Adding file:', file.file.name);
 						await Compiler.addFile(file.path.rooted(), file.file.content!);
 					}
 

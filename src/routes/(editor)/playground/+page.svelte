@@ -3,13 +3,14 @@
 	import eventController from "@/lib/backend/events";
 	import monacoController from "@/lib/backend/monaco";
 	import { getVirtualFileSystem } from "@/lib/backend/stores/vfs.svelte";
+	import { debug } from "@/lib/backend/utils";
 
     const editorManager = getEditorManager();
 
     const vfs = getVirtualFileSystem();
 
     function onMonacoLoaded() {
-        console.log("Monaco loaded, adding files");
+        debug('info', 'vfs', "Monaco loaded, adding files");
         vfs.addFile("test.txt", "Hello World!");
         vfs.addFile("test.typ", "Hello *Typst*!");
 
@@ -17,7 +18,7 @@
     }
 
     function onEditorCreated() {
-        console.log("Editor created, resolving loading editor");
+        debug('info', 'editor', "Editor created, resolving loading editor");
         editorManager.resolveLoadingEditor?.();
     }
 

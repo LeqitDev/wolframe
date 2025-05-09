@@ -3,6 +3,7 @@ import type * as Monaco from "monaco-editor/esm/vs/editor/editor.api";
 export {type Monaco};
 import eventController from "../events";
 import type { IMonacoLanguage, IMonacoTheme } from "@/app.types";
+import { debug } from "../utils";
 
 class MonacoController {
     private monaco?: typeof Monaco;
@@ -21,7 +22,7 @@ class MonacoController {
         if (this.monaco) return;
 
         this.monaco = (await import("./wrapper")).default;
-        console.log("Monaco loaded");
+        debug('info', 'monaco', "Monaco loaded");
         eventController.fire("monaco:loaded");
     }
 
@@ -48,7 +49,7 @@ class MonacoController {
             throw new Error("Editor is already created.");
         }
 
-        console.log("Creating Monaco editor...", this.languages.size, this.themes.size);
+        debug('info', 'monaco', "Creating Monaco editor...", 'Loaded languages:', this.languages, 'Loaded themes:', this.themes);
 
         for (const language of this.languages) {
             language.init?.(this.monaco);
