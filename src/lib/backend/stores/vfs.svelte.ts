@@ -6,6 +6,7 @@ import { getContext, setContext } from "svelte";
 import { TreeNode } from "./vfs/TreeNode.svelte";
 import monacoController from "../monaco";
 import eventController from "../events";
+import { debug } from "../utils";
 
 
 class VirtualFileSystem {
@@ -30,7 +31,7 @@ class VirtualFileSystem {
             // this.loadFilesFromBackend();
         }
 
-        eventController.register("command/file:open", this.openFileRequested.bind(this));
+        eventController.register("command/file:open", this.handleOpenFileRequestedEvent.bind(this));
     }
 
     /**
@@ -272,6 +273,13 @@ class VirtualFileSystem {
         return Array.from(this.files.values());
     }
 
+    private handleOpenFileRequestedEvent(idOrPath: string | null, callback?: (file: TreeNode) => void) {
+        const fileNode = this.openFileRequested(idOrPath);
+        if (fileNode) {
+            callback?.(fileNode);
+        }
+    }
+
     private openFileRequested(id: string | null) {
         if (id == null) monacoController.setModel(null);
         else {
@@ -279,8 +287,16 @@ class VirtualFileSystem {
             if (fileResult.ok) {
                 const fileNode = fileResult.unwrap();
                 fileNode.openFile(); // open the file in the editor
+                return fileNode;
             } else {
-                console.error(fileResult.error);
+                const byPath = this.getFileByPath(new Path(id));
+                if (byPath.ok) {
+                    const fileNode = byPath.unwrap();
+                    fileNode.openFile(); // open the file in the editor
+                    return fileNode;
+                } else {
+                    debug('error', 'vfs', fileResult.error, byPath.error);
+                }
             }
         }
     }
@@ -290,7 +306,7 @@ class VirtualFileSystem {
             file.model?.dispose();
         });
         this.files.clear();
-        eventController.unregister("command/file:open", this.openFileRequested.bind(this));
+        eventController.unregister("command/file:open", this.handleOpenFileRequestedEvent.bind(this));
     }
 }
 

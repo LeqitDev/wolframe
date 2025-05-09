@@ -23,7 +23,7 @@ type AppEvents = {
     "file:edited": [TreeNode, Monaco.editor.IModelContentChangedEvent], // Fired when a file is changed
     "file:preview": [string | null], // Fired when a file is set to be previewed
 
-    "command/file:open": [string | null], // Fired when a file is requested to be opened
+    "command/file:open": [string | null, ((fileNode: TreeNode) => void)] | [string | null], // Fired when a file is requested to be opened with the file path
     "command/ui/console:visibility": [boolean], // Fired when the console visibility is changed
 }
 

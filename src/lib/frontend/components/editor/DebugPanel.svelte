@@ -1,7 +1,8 @@
 <script lang="ts">
+	import eventController from '@/lib/backend/events';
 	import { getDebugStore } from '@/lib/backend/stores/debug.svelte';
 	import { getUiStore } from '@/lib/backend/stores/ui.svelte';
-	import { debugLogStore } from '@/lib/backend/utils';
+	import { debug, debugLogStore } from '@/lib/backend/utils';
 	import { createId } from '@paralleldrive/cuid2';
 	import { ChevronRight } from 'lucide-svelte';
 	import { untrack } from 'svelte';
@@ -11,12 +12,16 @@
 		severity: 'error' | 'warning' | 'info';
 		message: string;
 		details?: string;
+		action?: {
+			label: string;
+			onClick: () => void;
+		}
 	}
 
 	const uiStore = getUiStore();
 	const debugStore = getDebugStore();
 
-	let tab: 'output' | 'log' = $state('log');
+	let tab: 'output' | 'log' = $state('output');
 	let filterType = $state('all');
 
 	let errors: DebugError[] = $state([]);
@@ -39,7 +44,15 @@
 										? 'warning'
 										: 'info',
 							message: error.message,
-							details: `on file ${error.range.path} at ${error.range.start}:${error.range.end}`
+							details: `on file ${error.range.path} at ${error.range.start}:${error.range.end}`,
+							action: {
+								label: 'view',
+								onClick: () => {
+									eventController.fire('command/file:open', error.range.path, () => {
+										debug('info', 'debug', 'hi');
+									});
+								}
+							}
 						})
 					);
 				}
@@ -146,7 +159,7 @@
 										class="h-4 w-4 transition-transform duration-200 group-open:rotate-90 {'text' +
 											colorTrailer}"
 									/>
-									<p class="font-mono">{error.message}</p>
+									<p class="font-mono">{error.message}{#if error.action} <span><button class="link btn-xs text-gray-400 text-sm" onclick={error.action.onClick}>({error.action.label})</button></span>{/if}</p>
 								</div>
 							</summary>
 							<div class="collapse-content relative px-2 pb-2 text-sm">
