@@ -1,7 +1,7 @@
 import type { TreeNode } from "../stores/vfs/TreeNode.svelte";
 import type { Monaco } from "../monaco";
 import { debug } from "../utils";
-import type { Output } from "wolframe-typst-core";
+import type { Output, TypstCoreError } from "wolframe-typst-core";
 
 type AppEvents = {
     "app:loaded": [], // Fired when the app is loaded
@@ -12,6 +12,7 @@ type AppEvents = {
     "files:loaded": [], // Fired when the files are loaded
 
     "compiler:loaded": [], // Fired when the compiler is loaded
+    "compiler/compile:error": [TypstCoreError], // Fired when the compiler encounters an error
 
     "renderer:render": [Output],
 

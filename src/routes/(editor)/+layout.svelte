@@ -22,6 +22,7 @@
 	import DebugPanel from '@/lib/frontend/components/editor/DebugPanel.svelte';
 	import { setUiStore } from '@/lib/backend/stores/ui.svelte';
 	import CustomSplitpanes from '@/lib/frontend/components/splitpane/Splitpane.svelte';
+	import { setDebugStore } from '@/lib/backend/stores/debug.svelte';
 
 	let { children } = $props();
 
@@ -29,8 +30,11 @@
 	setVirtualFileSystem();
 	const vfs = getVirtualFileSystem();
 	const uiStore = setUiStore();
+	const debugStore = setDebugStore();
 	const awaitLoad = editorManager.loadEditor; // https://github.com/sveltejs/svelte/discussions/14692
 	let showConsole = $state(6);
+	let outputMinimized = $state(false);
+	let debugPanelSplitter = $state();
 
 	function handleTypstError(err: TypstCoreError) {
 		console.error('Typst error:', err);
@@ -49,7 +53,10 @@
 		}
 	}
 
-	async function fileContentChanged(node: TreeNode, event: Monaco.editor.IModelContentChangedEvent) {
+	async function fileContentChanged(
+		node: TreeNode,
+		event: Monaco.editor.IModelContentChangedEvent
+	) {
 		if (node.isFile) {
 			const path = node.path.rooted();
 
@@ -72,10 +79,7 @@
 			const path = node.path.rooted();
 			const content = node.file.content!;
 
-			await editorManager.compiler.addFile(
-				path,
-				content
-			);
+			await editorManager.compiler.addFile(path, content);
 
 			editorManager.compile();
 		}
@@ -85,9 +89,7 @@
 		if (node.isFile) {
 			const path = node.path.rooted();
 
-			await editorManager.compiler.removeFile(
-				path
-			);
+			await editorManager.compiler.removeFile(path);
 
 			editorManager.compile();
 		}
@@ -97,9 +99,23 @@
 		showConsole = show ? 15 : 0;
 	}
 
+	function addCompileError(err: TypstCoreError) {
+		debugStore.compileError = err;
+	}
+
+	function clearCompileError() {
+		debugStore.compileError = null;
+	}
+
 	$effect(() => {
-		uiStore.initDebugPanelHeights();
+		(debugPanelSplitter as any).setSize(100 - 20);
+		uiStore.setDebugPanelSize = (size: number) => {
+			(debugPanelSplitter as any).setSize(size);
+		}
+
 		eventController.register('command/ui/console:visibility', consoleVisibility);
+		eventController.register('compiler/compile:error', addCompileError);
+		eventController.register('renderer:render', clearCompileError);
 
 		const Compiler = Comlink.wrap<CompilerType>(new CompilerWorker());
 
@@ -115,7 +131,7 @@
 						console.log('File:', file.file.name);
 						await Compiler.addFile(file.path.rooted(), file.file.content!);
 					}
-					
+
 					eventController.register('file:created', addFile);
 					eventController.register('file:deleted', deleteFile);
 
@@ -136,6 +152,8 @@
 			eventController.unregister('file:created', addFile);
 			eventController.unregister('file:deleted', deleteFile);
 			eventController.unregister('command/ui/console:visibility', consoleVisibility);
+			eventController.unregister('compiler/compile:error', addCompileError);
+			eventController.unregister('renderer:render', clearCompileError);
 			editorManager.dispose();
 		};
 	});
@@ -159,7 +177,16 @@
 		</Pane>
 		<Pane class="">
 			<Menu />
-			<CustomSplitpanes direction="vertical">
+			<CustomSplitpanes
+				direction="vertical"
+				max="-70px"
+				min="10%"
+				maxThreshold={80}
+				maxReleaseThreshold={88}
+				class="hover:after:bg-primary!"
+				bind:maximized={uiStore.isDebugPanelMinimized}
+				bind:this={debugPanelSplitter}
+			>
 				{#snippet a()}
 					<div class="">
 						<Splitpanes theme="wolframe-theme">

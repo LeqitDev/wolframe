@@ -142,7 +142,7 @@ class EditorManager {
         this.Compiler.compile(Comlink.proxy((output) => {
             eventController.fire("renderer:render", output);
         }), Comlink.proxy((error) => {
-            console.error('Error compiling', error);
+            eventController.fire("compiler/compile:error", error);
         }));
     }
 

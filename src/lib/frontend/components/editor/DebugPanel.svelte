@@ -1,13 +1,43 @@
 <script lang="ts">
+	import { getDebugStore } from "@/lib/backend/stores/debug.svelte";
 	import { getUiStore } from "@/lib/backend/stores/ui.svelte";
-	import { fade } from "svelte/transition";
+	import { untrack } from "svelte";
+    
+    interface DebugError {
+        severity: "error" | "warning" | "info";
+        message: string;
+    }
 
     const uiStore = getUiStore();
+    const debugStore = getDebugStore();
+
+    let errors: DebugError[] = $state([]);
+
+    $effect(() => {
+        untrack(() => errors = []);
+        if (debugStore.compileError) {
+            let err = debugStore.compileError;
+
+            if ("CompileError" in err) {
+                for (const error of err.CompileError) {
+                    untrack(() => errors.push({
+                        severity: error.severity,
+                        message: error.message,
+                    }));
+                }
+            } else if ("DefaultError" in err) {
+                untrack(() => errors.push({
+                    severity: "error",
+                    message: err.DefaultError,
+                }));
+            }
+        }
+    })
 </script>
 
-{#if uiStore.debugPanelState === 'minimized'}
-    <button class="flex w-full gap-2 px-2" on:click={() => uiStore.expandDebugPanel()}>
-        <p class="text-sm text-gray-400">Compile Errors: <span class="p-0.5 text-error/80 font-bold">0</span></p>
+{#if uiStore.isDebugPanelMinimized}
+    <button class="flex w-full gap-2 px-2 items-center" onclick={() => (uiStore.setDebugPanelSize?.(100 - 30))}>
+        <p class="text-sm text-gray-400">Compile Errors: <span class="p-0.5 text-error/80 font-bold">{errors.length}</span></p>
     </button>
 {:else}
     <div class="flex w-full h-full flex-col gap-2 px-2 pt-2">
@@ -20,7 +50,12 @@
             </div>
         </div>
         <div class="flex flex-col gap-2 bg-base-300 h-full w-full px-2 rounded-t">
-            hihi
+            {#each errors as error}
+                <div class="flex gap-2 items-center">
+                    <div class="w-2 h-2 rounded-full {error.severity === 'error' ? 'bg-error' : error.severity === 'warning' ? 'bg-warning' : 'bg-info'}"></div>
+                    <p class="text-sm text-gray-400">{error.message}</p>
+                </div>
+            {/each}
         </div>
     </div>
 {/if}
