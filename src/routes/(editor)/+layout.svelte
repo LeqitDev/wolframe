@@ -21,6 +21,7 @@
 	import Menu from '@/lib/frontend/components/editor/Menu.svelte';
 	import DebugPanel from '@/lib/frontend/components/editor/DebugPanel.svelte';
 	import { setUiStore } from '@/lib/backend/stores/ui.svelte';
+	import CustomSplitpanes from '@/lib/frontend/components/splitpane/Splitpane.svelte';
 
 	let { children } = $props();
 
@@ -158,21 +159,25 @@
 		</Pane>
 		<Pane class="">
 			<Menu />
-			<Splitpanes horizontal theme="wolframe-theme" on:resized={() => (uiStore.debugPanelCurrentHeight = 20)}>
-				<Pane size={100} minSize={10} class="">
-					<Splitpanes theme="wolframe-theme">
-						<Pane size={50} minSize={20} maxSize={80} class="">
-							<MonacoEditor />
-						</Pane>
-						<Pane class="bg-base-300">
-							<PreviewPanel />
-						</Pane>
-					</Splitpanes>
-				</Pane>
-				<Pane bind:size={uiStore.debugPanelCurrentHeight} class="bg-base-200">
-					<DebugPanel />
-				</Pane>
-			</Splitpanes>
+			<CustomSplitpanes direction="vertical">
+				{#snippet a()}
+					<div class="">
+						<Splitpanes theme="wolframe-theme">
+							<Pane size={50} minSize={20} maxSize={80} class="">
+								<MonacoEditor />
+							</Pane>
+							<Pane class="bg-base-300">
+								<PreviewPanel />
+							</Pane>
+						</Splitpanes>
+					</div>
+				{/snippet}
+				{#snippet b()}
+					<div class="bg-base-200">
+						<DebugPanel />
+					</div>
+				{/snippet}
+			</CustomSplitpanes>
 		</Pane>
 	</Splitpanes>
 </div>
