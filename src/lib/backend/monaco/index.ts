@@ -62,12 +62,13 @@ class MonacoController {
         this.editor = this.monaco.editor.create(container, {
 			theme: 'typst-dark',
 			minimap: { enabled: false },
-			fontSize: 14,
+			fontSize: 13,
 			lineNumbers: 'on',
 			roundedSelection: false,
 			automaticLayout: true,
 			fixedOverflowWidgets: true,
             readOnly: false,
+            fontFamily: 'JetBrains Mono',
 			suggest: {
 				showInlineDetails: true,
 				showMethods: true,
