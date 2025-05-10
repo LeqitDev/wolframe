@@ -69,6 +69,7 @@ class MonacoController {
 			fixedOverflowWidgets: true,
             readOnly: false,
             fontFamily: 'JetBrains Mono',
+            fontLigatures: true,
 			suggest: {
 				showInlineDetails: true,
 				showMethods: true,

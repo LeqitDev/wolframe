@@ -1,7 +1,9 @@
 <script lang="ts">
 	import eventController from "@/lib/backend/events";
 	import DropdownMenuItem from "../DropdownMenuItem.svelte";
+	import { getUiStore } from "@/lib/backend/stores/ui.svelte";
 
+    const uiStore = getUiStore();
     let showConsole = $state(true);
 </script>
 
@@ -31,10 +33,9 @@
             <li><a href="/">Export Project</a></li>
             <li>
                 <button onclick={() => {
-                    showConsole = !showConsole;
-                    eventController.fire('command/ui/console:visibility', showConsole);
+                    uiStore.setDebugPanelSize(100 - (uiStore.isDebugPanelMinimized ? 30 : 0));
                 }}>
-                    {showConsole ? 'Show' : 'Hide'} Console
+                    {uiStore.isDebugPanelMinimized ? 'Show' : 'Hide'} Console
                 </button>
             </li>
         </DropdownMenuItem>
