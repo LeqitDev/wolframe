@@ -163,6 +163,10 @@ class EditorManager {
         return this._previewFilePath;
     }
 
+    set previewFilePath(path: string | null) {
+        this.setPreviewFilePath(path);
+    }
+
     dispose() {
         eventController.unregister("file:opened", this.openFile);
         eventController.unregister("file:closed", this.closeFile);

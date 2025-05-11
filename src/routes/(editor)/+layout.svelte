@@ -109,7 +109,6 @@
 	}
 
 	$effect(() => {
-		(debugPanelSplitter as any).setSize(100 - 20);
 		uiStore.setDebugPanelSize = (size: number) => {
 			(debugPanelSplitter as any).setSize(size);
 		}
@@ -133,12 +132,26 @@
 						await Compiler.addFile(file.path.rooted(), file.file.content!);
 					}
 
+					// Probe for available entry points
+					// first check for /main.typ then /lib.typ else the first .typ file
+					const entryPoints = vfs.getFiles().filter((f) => f.isFile && f.file.name.endsWith('.typ'));
+					const mainFile = entryPoints.find((f) => f.file.name === 'main.typ' && !f.file.parentId);
+					const libFile = entryPoints.find((f) => f.file.name === 'lib.typ' && !f.file.parentId);
+					const entryPoint = mainFile || libFile || entryPoints[0];
+					debug('info', 'compiler', 'Entry point:', entryPoint?.file.name);
+
+					// Set entry point as root
+					editorManager.previewFilePath = entryPoint?.path.rooted() || null;
+
+					// open entry point
+					if (entryPoint) entryPoint.openFile();
+
 					eventController.register('file:created', addFile);
 					eventController.register('file:deleted', deleteFile);
 
-					await rootChanged(editorManager.previewFilePath);
-
 					editorManager.setCompiler(Compiler);
+
+					await rootChanged(editorManager.previewFilePath);
 
 					eventController.register('file:preview', rootChanged);
 

@@ -26,7 +26,7 @@
 		a,
 		b,
 		disabled,
-		pos = '50%',
+		pos = '100%',
 		min = '0px',
 		max = '100%',
 		minThreshold = 0,
