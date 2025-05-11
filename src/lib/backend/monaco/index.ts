@@ -92,6 +92,17 @@ class MonacoController {
     }
 
     /**
+     * Remeasures the fonts in the Monaco editor. Needs to be called after the custom font is loaded.
+     */
+    remasureFonts() {
+        if (!this.monaco) {
+            throw new Error("Monaco is not loaded yet.");
+        }
+
+        this.monaco.editor.remeasureFonts();
+    }
+
+    /**
      * Disposes the Monaco editor instance.
      * This method should be called when the editor is no longer needed.
      */

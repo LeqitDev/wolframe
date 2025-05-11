@@ -6,6 +6,7 @@
 	import { getEditorManager } from '@/lib/backend/stores/editor.svelte';
 	import { getVirtualFileSystem } from '@/lib/backend/stores/vfs.svelte';
 	import type { TreeNode } from '@/lib/backend/stores/vfs/TreeNode.svelte';
+	import { debug } from '@/lib/backend/utils';
 	import { X } from 'lucide-svelte';
 
 	let editorContainer: HTMLDivElement;
@@ -17,6 +18,11 @@
 
 	function onMonacoLoaded() {
 		monacoController.createEditor(editorContainer);
+
+		document.fonts.ready.then(() => {
+			debug('info', 'monaco/fonts', 'Fonts are ready');
+			monacoController.remasureFonts();
+		});
 	}
 
 	function onChangeSelection(range: Monaco.IRange | {start: number, end: number}) {
