@@ -6,17 +6,18 @@
 	import type { Renderer as RendererType } from '@/lib/backend/worker/renderer/renderer';
 	import eventController from '@/lib/backend/events';
 	import { debug } from '@/lib/backend/utils';
+	import { createId } from '@paralleldrive/cuid2';
 
 	const editorManager = getEditorManager();
 	let canvasContainer: HTMLDivElement;
 	const pages: {
+		id: string;
 		normalDimensions: {
 			width: number;
 			height: number;
 		};
-		previewElement: HTMLImageElement;
-		previewContainer: HTMLDivElement;
-	}[] = [];
+		imgSrc: string;
+	}[] = $state([]);
 
 	let zoom = $state(1);
 
@@ -33,44 +34,21 @@
 			}
 			if (page) {
 				const base = btoa(svg);
-				page.previewElement.src = `data:image/svg+xml;base64,${base}`;
-
-				page.previewContainer.style.width = `${page.normalDimensions.width * zoom}px`;
-				page.previewContainer.style.height = `${page.normalDimensions.height * zoom}px`;
-				page.previewElement.width = page.normalDimensions.width * zoom;
+				
+				page.imgSrc = `data:image/svg+xml;base64,${base}`;
 			} else {
-				const img = document.createElement('img');
 				const base = btoa(svg);
-				img.src = `data:image/svg+xml;base64,${base}`;
 				const [x, y, width, height] = viewBox[1].split(' ').map(Number);
-				img.width = width * zoom;
-				const div = document.createElement('div');
-				div.setAttribute('typst-page', i.toString());
-				div.style.width = `${width * zoom}px`;
-				div.style.height = `${height * zoom}px`;
-				div.appendChild(img);
-				canvasContainer.appendChild(div);
 				const normalDimensions = {
 					width: width,
 					height: height,
 				};
 				pages.push({
+					id: createId(),
 					normalDimensions,
-					previewElement: img,
-					previewContainer: div,
+					imgSrc: `data:image/svg+xml;base64,${base}`,
 				});
 			}
-			/* if (i < cur_count) {
-				editorManager.renderer.update(i, page);
-			} else {
-				const canvas = document.createElement('canvas');
-				canvas.setAttribute('typst-page', i.toString());
-				canvasContainer.appendChild(canvas);
-
-				const offscreen = canvas.transferControlToOffscreen();
-
-				editorManager.renderer.newPage(Comlink.transfer(offscreen, [offscreen]), page);
-			} */
 		}
 	}
 
@@ -85,9 +63,26 @@
 	});
 </script>
 
+{#snippet pageImg(id: number)}
+	{@const page = pages[id]}
+	<typst-preview-page typst-page={id} style="--tpp-width: {page.normalDimensions.width * zoom}px; ">
+		<img src={page.imgSrc} alt="Page {id} of the output" width={page.normalDimensions.width * zoom} />
+	</typst-preview-page>
+{/snippet}
+
 <div class="overflow-auto h-full flex justify-center-safe p-3">
 	<div
 		bind:this={canvasContainer}
 		class="grid items-center-safe justify-center-safe w-max h-max gap-3"
-	></div>
+	>
+		{#each pages as page, i (page.id)}
+			{@render pageImg(i)}
+		{/each}
+	</div>
 </div>
+
+<style>
+	typst-preview-page {
+		width: var(--tpp-width);
+	}
+</style>
