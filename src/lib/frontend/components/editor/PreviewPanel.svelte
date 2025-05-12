@@ -7,6 +7,7 @@
 	import eventController from '@/lib/backend/events';
 	import { debug } from '@/lib/backend/utils';
 	import { createId } from '@paralleldrive/cuid2';
+	import { Minus, Plus } from 'lucide-svelte';
 
 	const editorManager = getEditorManager();
 	let canvasContainer: HTMLDivElement;
@@ -52,6 +53,12 @@
 		}
 	}
 
+	function setZoom(x: number) {
+		if (x < 0.25) x = 0.25; // minimum zoom
+		if (x > 3) x = 3; // maximum zoom
+		zoom = x;
+	}
+
 	$effect(() => {
 		const Renderer = Comlink.wrap<RendererType>(new RendererWorker());
 		editorManager.setRenderer(Renderer);
@@ -65,24 +72,37 @@
 
 {#snippet pageImg(id: number)}
 	{@const page = pages[id]}
-	<typst-preview-page typst-page={id} style="--tpp-width: {page.normalDimensions.width * zoom}px; ">
+	<typst-preview-page-container typst-page={id} class="w-[var(--tpp-width)]" style="--tpp-width: {page.normalDimensions.width * zoom}px; ">
 		<img src={page.imgSrc} alt="Page {id} of the output" width={page.normalDimensions.width * zoom} />
-	</typst-preview-page>
+	</typst-preview-page-container>
 {/snippet}
-
-<div class="overflow-auto h-full flex justify-center-safe p-3">
-	<div
-		bind:this={canvasContainer}
-		class="grid items-center-safe justify-center-safe w-max h-max gap-3"
-	>
-		{#each pages as page, i (page.id)}
-			{@render pageImg(i)}
-		{/each}
+<div>
+	<div class="flex items-center justify-between bg-base-200 p-2">
+		<div class="join">
+			<button class="btn btn-sm btn-soft join-item" onclick={() => setZoom(zoom - .1)}><Minus class="size-4" /></button>
+			<details class="dropdown">
+				<summary class="btn btn-sm btn-soft join-item">{Math.trunc(zoom * 100)}%</summary>
+				<ul class="menu dropdown-content bg-base-100 rounded-box z-1 w-52 p-2 shadow-sm">
+					<li><button class="" onclick={() => setZoom(.25)}>25%</button></li>
+					<li><button class="" onclick={() => setZoom(.5)}>50%</button></li>
+					<li><button class="" onclick={() => setZoom(.75)}>75%</button></li>
+					<li><button class="" onclick={() => setZoom(1)}>100%</button></li>
+					<li><button class="" onclick={() => setZoom(2)}>200%</button></li>
+					<li><button class="" onclick={() => setZoom(3)}>300%</button></li>
+				</ul>
+			</details>
+			<button class="btn btn-sm btn-soft join-item" onclick={() => setZoom(zoom + .1)}><Plus class="size-4" /></button>
+		</div>
 	</div>
+	<typst-preview-scroll-container class="overflow-auto h-full flex justify-center-safe p-[var(--outset)]" style="--outset: 1rem;">
+		<typst-preview-layout-container
+			bind:this={canvasContainer}
+			class="grid items-center-safe justify-center-safe w-max h-max gap-[var(--page-gap)]"
+			style="--page-gap: 1rem;"
+		>
+			{#each pages as page, i (page.id)}
+				{@render pageImg(i)}
+			{/each}
+		</typst-preview-layout-container>
+	</typst-preview-scroll-container>
 </div>
-
-<style>
-	typst-preview-page {
-		width: var(--tpp-width);
-	}
-</style>

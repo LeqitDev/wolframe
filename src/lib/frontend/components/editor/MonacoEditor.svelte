@@ -59,6 +59,7 @@
 					role="tab"
                     type="button"
 					class={['tab', editor.getOpenFileId() === file.file.id ? 'tab-active' : '']}
+					style="--tab-bg: color-mix(in oklab, var(--btn-color, var(--color-base-content)) 8%, var(--color-base-100))"
 					onclick={() => {
 						file.openFile();
 					}}>
