@@ -230,6 +230,7 @@ class MonacoController {
 
         this.editor.setSelection(range);
         this.editor.revealRangeInCenter(range);
+        this.editor.focus();
     }
 
     /**
