@@ -202,12 +202,12 @@
 				bind:this={debugPanelSplitter}
 			>
 				{#snippet a()}
-					<div class="">
-						<Splitpanes theme="wolframe-theme">
+					<div class="max-w-full">
+						<Splitpanes theme="wolframe-theme" class="w-full">
 							<Pane size={50} minSize={20} maxSize={80} class="">
 								<MonacoEditor />
 							</Pane>
-							<Pane class="bg-base-300">
+							<Pane class="bg-base-300 max-w-full">
 								<PreviewPanel />
 							</Pane>
 						</Splitpanes>

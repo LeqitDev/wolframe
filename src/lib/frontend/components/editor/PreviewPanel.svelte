@@ -8,12 +8,25 @@
 
 	const editorManager = getEditorManager();
 	let canvasContainer: HTMLDivElement;
+	
 
 	function renderCompilationResult(output: Output) {
 		let cur_count = canvasContainer.childElementCount;
 		if ('Html' in output) return;
 		for (const [i, page] of output.Svg.entries()) {
-			if (i < cur_count) {
+			const child = canvasContainer.children[i];
+			if (child) {
+				const base = btoa(page);
+				(child as HTMLImageElement).src = `data:image/svg+xml;base64,${base}`;
+			} else {
+				const img = document.createElement('img');
+				img.setAttribute('typst-page', i.toString());
+				const base = btoa(page);
+				img.src = `data:image/svg+xml;base64,${base}`;
+				img.width = 5000;
+				canvasContainer.appendChild(img);
+			}
+			/* if (i < cur_count) {
 				editorManager.renderer.update(i, page);
 			} else {
 				const canvas = document.createElement('canvas');
@@ -23,7 +36,7 @@
 				const offscreen = canvas.transferControlToOffscreen();
 
 				editorManager.renderer.newPage(Comlink.transfer(offscreen, [offscreen]), page);
-			}
+			} */
 		}
 	}
 
@@ -38,7 +51,9 @@
 	});
 </script>
 
-<div
-	bind:this={canvasContainer}
-	class="flex h-full w-full flex-col items-center-safe justify-center-safe gap-3 overflow-auto p-3"
-></div>
+<div class="overflow-auto h-full">
+	<div
+		bind:this={canvasContainer}
+		class="grid items-center-safe justify-center-safe w-max gap-3 p-3"
+	></div>
+</div>

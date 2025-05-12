@@ -181,7 +181,9 @@ class Element {
     }
 }
 
-export class TypstToCanvas {
+
+
+/* export class TypstToCanvas {
     private canvas: SuitableCanvas;
     private maxWidth?: number;
     private domParser: XMLDOMParser;
@@ -365,5 +367,20 @@ export class TypstToCanvas {
                     });
                 }
             });
+    }
+} */
+
+export class TypstToCanvas {
+    private canvas: SuitableCanvas;
+    private maxWidth: number;
+    private domParser: XMLDOMParser;
+    private ctx: SuitableCanvasContext | null = null;
+
+    render(svg: string) {
+        this.rawRender(svg);
+    }
+
+    private rawRender(svg: string) {
+
     }
 }
