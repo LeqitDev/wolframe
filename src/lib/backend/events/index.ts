@@ -24,6 +24,7 @@ type AppEvents = {
     "file:preview": [string | null], // Fired when a file is set to be previewed
 
     "command/file:open": [string | null, ((fileNode: TreeNode) => void)] | [string | null], // Fired when a file is requested to be opened with the file path
+    "command/file:retrieve": [string | null, ((fileNode: TreeNode) => void)], // Fired when a file is requested to be retrieved with the file path
     "command/ui/console:visibility": [boolean], // Fired when the console visibility should be changed
     "command/monaco/editor:selection": [Monaco.IRange | {start: number, end: number}], // Fired when the editor selection should be changed
 }
@@ -41,7 +42,7 @@ class EventController {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     private listeners = new Map<keyof AppEvents, Set<(...args: any[]) => void>>();
 
-    public register<E extends keyof AppEvents>(event: E, callback: (...args: AppEvents[E]) => void): void {
+    public register<E extends keyof AppEvents>(event: E, callback: (...args: AppEvents[E]) => void): {dispose: () => void} {
         if (!this.listeners.has(event)) {
             this.listeners.set(event, new Set());
         }
@@ -55,6 +56,10 @@ class EventController {
                 callback(...executedEvent.args as AppEvents[E]);
             }
         }
+
+        return {
+            dispose: () => this.unregister(event, callback)
+        };
     }
 
     public unregister<E extends keyof AppEvents>(event: E, callback: (...args: AppEvents[E]) => void): void {

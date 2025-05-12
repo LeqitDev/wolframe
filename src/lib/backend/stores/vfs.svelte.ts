@@ -20,6 +20,7 @@ class VirtualFileSystem {
         createdAt: Date.now(),
         updatedAt: Date.now(),
     });
+    disposables: {dispose: () => void}[] = [];
 
     constructor(
         backend: IBackendFileSystem | null = null
@@ -31,7 +32,11 @@ class VirtualFileSystem {
             // this.loadFilesFromBackend();
         }
 
-        eventController.register("command/file:open", this.handleOpenFileRequestedEvent.bind(this));
+        let disp = eventController.register("command/file:open", this.handleOpenFileEvent.bind(this));
+        this.disposables.push(disp);
+        disp = eventController.register("command/file:retrieve", this.handleRetrieveFileEvent.bind(this));
+        this.disposables.push(disp);
+        
     }
 
     /**
@@ -273,26 +278,32 @@ class VirtualFileSystem {
         return Array.from(this.files.values());
     }
 
-    private handleOpenFileRequestedEvent(idOrPath: string | null, callback?: (file: TreeNode) => void) {
-        const fileNode = this.openFileRequested(idOrPath);
+    private handleRetrieveFileEvent(idOrPath: string | null, callback: (file: TreeNode) => void) {
+        const fileNode = this.retrieveFile(idOrPath);
+        if (fileNode) {
+            callback(fileNode);
+        }
+    }
+
+    private handleOpenFileEvent(idOrPath: string | null, callback?: (file: TreeNode) => void) {
+        const fileNode = this.retrieveFile(idOrPath);
+        fileNode?.openFile();
         if (fileNode) {
             callback?.(fileNode);
         }
     }
 
-    private openFileRequested(id: string | null) {
+    private retrieveFile(id: string | null) {
         if (id == null) monacoController.setModel(null);
         else {
             const fileResult = this.getFileById(id);
             if (fileResult.ok) {
                 const fileNode = fileResult.unwrap();
-                fileNode.openFile(); // open the file in the editor
                 return fileNode;
             } else {
                 const byPath = this.getFileByPath(new Path(id));
                 if (byPath.ok) {
                     const fileNode = byPath.unwrap();
-                    fileNode.openFile(); // open the file in the editor
                     return fileNode;
                 } else {
                     debug('error', 'vfs', fileResult.error, byPath.error);
@@ -306,7 +317,7 @@ class VirtualFileSystem {
             file.model?.dispose();
         });
         this.files.clear();
-        eventController.unregister("command/file:open", this.handleOpenFileRequestedEvent.bind(this));
+        this.disposables.forEach((d) => d.dispose());
     }
 }
 

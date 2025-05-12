@@ -171,6 +171,22 @@ class MonacoController {
     }
 
     /**
+     * Gets the model with the specified ID and extension.
+     * @param id The ID of the model.
+     * @param extension The file extension.
+     * @returns The model with the specified ID and extension.
+     * @throws {Error} - Throws an error if Monaco is not loaded yet.
+     */
+    getModel(id: string, extension: string) {
+        if (!this.monaco) {
+            throw new Error("Monaco is not loaded yet.");
+        }
+
+        const uri = this.createURI(id, extension);
+        return this.monaco.editor.getModel(uri);
+    }
+
+    /**
      * Gets the URI of the current model of the editor.
      * @returns {Monaco.Uri} - The current URI of the editor's model.
      * @throws {Error} - Throws an error if the editor is not created or the model is not set yet.
