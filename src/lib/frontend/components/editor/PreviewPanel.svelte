@@ -8,6 +8,7 @@
 	import { debug } from '@/lib/backend/utils';
 	import { createId } from '@paralleldrive/cuid2';
 	import { Minus, Plus } from 'lucide-svelte';
+	import PinchZoom from 'pinch-zoom-js';
 
 	const editorManager = getEditorManager();
 	let canvasContainer: HTMLDivElement;
@@ -35,19 +36,19 @@
 			}
 			if (page) {
 				const base = btoa(svg);
-				
+
 				page.imgSrc = `data:image/svg+xml;base64,${base}`;
 			} else {
 				const base = btoa(svg);
 				const [x, y, width, height] = viewBox[1].split(' ').map(Number);
 				const normalDimensions = {
 					width: width,
-					height: height,
+					height: height
 				};
 				pages.push({
 					id: createId(),
 					normalDimensions,
-					imgSrc: `data:image/svg+xml;base64,${base}`,
+					imgSrc: `data:image/svg+xml;base64,${base}`
 				});
 			}
 		}
@@ -63,41 +64,140 @@
 		const Renderer = Comlink.wrap<RendererType>(new RendererWorker());
 		editorManager.setRenderer(Renderer);
 		eventController.register('renderer:render', renderCompilationResult);
-        
+
 		return () => {
 			eventController.unregister('renderer:render', renderCompilationResult);
-        }
+		};
 	});
+
+	function previewActions(node: HTMLDivElement) {
+		let isDown = false;
+		let startX: number;
+		let startY: number;
+		let scrollLeft: number;
+		let scrollTop: number;
+
+		$effect(() => {
+			const handleMouseDown = (e: MouseEvent) => {
+				e.preventDefault();
+				isDown = true;
+				startX = e.pageX - node.offsetLeft;
+				startY = e.pageY - node.offsetTop;
+				scrollLeft = node.scrollLeft;
+				scrollTop = node.scrollTop;
+			};
+			const handleMouseLeave = () => {
+				isDown = false;
+			};
+			const handleMouseUp = () => {
+				isDown = false;
+			};
+			const handleMouseMove = (e: MouseEvent) => {
+				if (!isDown) return;
+				e.preventDefault();
+				const x = e.pageX - node.offsetLeft;
+				const y = e.pageY - node.offsetTop;
+				const walkX = x - startX; // * 1.5; // Multiplied by 1.5
+				const walkY = y - startY; // * 1.5; // Multiplied by 1.5
+				node.scrollLeft = scrollLeft - walkX;
+				node.scrollTop = scrollTop - walkY;
+			};
+			node.addEventListener('mousedown', handleMouseDown);
+			node.addEventListener('mouseleave', handleMouseLeave);
+			node.addEventListener('mouseup', handleMouseUp);
+			node.addEventListener('mousemove', handleMouseMove);
+
+			// Pinch zoom
+			const handleWheel = (e: WheelEvent) => {
+				if (!e.ctrlKey) return;
+				e.preventDefault();
+
+				// Get mouse position relative to the scrollable container
+				const rect = node.getBoundingClientRect();
+				const mouseX = e.clientX - rect.left;
+				const mouseY = e.clientY - rect.top;
+
+				// Get current scroll position
+				const scrollX = node.scrollLeft;
+				const scrollY = node.scrollTop;
+
+				// Calculate point under mouse in document space
+				const pointX = scrollX + mouseX;
+				const pointY = scrollY + mouseY;
+
+				// Calculate zoom speed based on deltaY magnitude
+				// Taking absolute value since deltaY direction matters separately
+				const zoomSpeed = Math.min(Math.abs(e.deltaY) / 50, 1); // Normalize to 0-1 range with a cap
+				const baseIncrement = 0.005; // Base increment for slow movements
+				const maxIncrement = 0.2; // Maximum increment for fast movements
+
+				// Calculate actual increment based on speed
+				const increment = baseIncrement + zoomSpeed * (maxIncrement - baseIncrement);
+
+				if (e.deltaY < 0) {
+					setZoom(zoom + increment); // Zoom in
+				} else {
+					setZoom(zoom - increment); // Zoom out
+				}
+			};
+			node.addEventListener('wheel', handleWheel);
+
+			return () => {
+				// dispose
+				node.removeEventListener('mousedown', handleMouseDown);
+				node.removeEventListener('mouseleave', handleMouseLeave);
+				node.removeEventListener('mouseup', handleMouseUp);
+				node.removeEventListener('mousemove', handleMouseMove);
+				node.removeEventListener('wheel', handleWheel);
+			};
+		});
+	}
 </script>
 
 {#snippet pageImg(id: number)}
 	{@const page = pages[id]}
-	<typst-preview-page-container typst-page={id} class="w-[var(--tpp-width)]" style="--tpp-width: {page.normalDimensions.width * zoom}px; ">
-		<img src={page.imgSrc} alt="Page {id} of the output" width={page.normalDimensions.width * zoom} />
+	<typst-preview-page-container
+		typst-page={id}
+		class="w-[var(--tpp-width)]"
+		style="--tpp-width: {page.normalDimensions.width * zoom}px; "
+	>
+		<img
+			src={page.imgSrc}
+			alt="Page {id} of the output"
+			width={page.normalDimensions.width * zoom}
+		/>
 	</typst-preview-page-container>
 {/snippet}
-<div class="h-full flex flex-col">
-	<div class="flex items-center justify-between bg-base-200 p-2">
+<div class="flex h-full flex-col">
+	<div class="bg-base-200 flex items-center justify-between p-2">
 		<div class="join">
-			<button class="btn btn-sm btn-soft join-item" onclick={() => setZoom(zoom - .1)}><Minus class="size-4" /></button>
+			<button class="btn btn-sm btn-soft join-item" onclick={() => setZoom(zoom - 0.1)}
+				><Minus class="size-4" /></button
+			>
 			<details class="dropdown">
 				<summary class="btn btn-sm btn-soft join-item">{Math.trunc(zoom * 100)}%</summary>
 				<ul class="menu dropdown-content bg-base-100 rounded-box z-1 w-52 p-2 shadow-sm">
-					<li><button class="" onclick={() => setZoom(.25)}>25%</button></li>
-					<li><button class="" onclick={() => setZoom(.5)}>50%</button></li>
-					<li><button class="" onclick={() => setZoom(.75)}>75%</button></li>
+					<li><button class="" onclick={() => setZoom(0.25)}>25%</button></li>
+					<li><button class="" onclick={() => setZoom(0.5)}>50%</button></li>
+					<li><button class="" onclick={() => setZoom(0.75)}>75%</button></li>
 					<li><button class="" onclick={() => setZoom(1)}>100%</button></li>
 					<li><button class="" onclick={() => setZoom(2)}>200%</button></li>
 					<li><button class="" onclick={() => setZoom(3)}>300%</button></li>
 				</ul>
 			</details>
-			<button class="btn btn-sm btn-soft join-item" onclick={() => setZoom(zoom + .1)}><Plus class="size-4" /></button>
+			<button class="btn btn-sm btn-soft join-item" onclick={() => setZoom(zoom + 0.1)}
+				><Plus class="size-4" /></button
+			>
 		</div>
 	</div>
-	<typst-preview-scroll-container class="overflow-auto h-full flex justify-center-safe p-[var(--outset)]" style="--outset: 1rem; ">
+	<typst-preview-scroll-container
+		class="flex h-full justify-center-safe overflow-auto p-[var(--outset)]"
+		style="--outset: 1rem; "
+		use:previewActions
+	>
 		<typst-preview-layout-container
 			bind:this={canvasContainer}
-			class="grid items-center-safe justify-center-safe w-max h-max gap-[var(--page-gap)]"
+			class="grid h-max w-max items-center-safe justify-center-safe gap-[var(--page-gap)]"
 			style="--page-gap: 1rem;"
 		>
 			{#each pages as page, i (page.id)}
