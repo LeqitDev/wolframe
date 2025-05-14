@@ -66,6 +66,14 @@ export const Compiler = {
         } catch (e) {
             err(e as TypstCoreError);
         }
+    },
+    getFileText(path: string): string {
+        try {
+            return core.get_source(path);
+        } catch (e) {
+            console.error(e);
+            return "";
+        }
     }
 };
 

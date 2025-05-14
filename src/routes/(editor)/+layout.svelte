@@ -60,6 +60,8 @@
 	) {
 		if (node.isFile) {
 			const path = node.path.rooted();
+			let txt = await editorManager.compiler.getFileText(path);
+			debug('info', 'compiler', 'File content before change:', txt);
 
 			for (const change of event.changes) {
 				await editorManager.compiler.edit(
@@ -72,6 +74,8 @@
 			}
 
 			editorManager.compile();
+			txt = await editorManager.compiler.getFileText(path);
+			debug('info', 'compiler', 'File content after change:', txt);
 		}
 	}
 

@@ -122,6 +122,7 @@ class VirtualFileSystem {
 
         // Add file change listener
         model.onDidChangeContent((event) => {
+            debug("info", "vfs", "File changed", file.name, event);
             eventController.fire("file:edited", treeNode, event)
         })
 

@@ -76,7 +76,7 @@
 		<img src={page.imgSrc} alt="Page {id} of the output" width={page.normalDimensions.width * zoom} />
 	</typst-preview-page-container>
 {/snippet}
-<div>
+<div class="h-full flex flex-col">
 	<div class="flex items-center justify-between bg-base-200 p-2">
 		<div class="join">
 			<button class="btn btn-sm btn-soft join-item" onclick={() => setZoom(zoom - .1)}><Minus class="size-4" /></button>
@@ -94,7 +94,7 @@
 			<button class="btn btn-sm btn-soft join-item" onclick={() => setZoom(zoom + .1)}><Plus class="size-4" /></button>
 		</div>
 	</div>
-	<typst-preview-scroll-container class="overflow-auto h-full flex justify-center-safe p-[var(--outset)]" style="--outset: 1rem;">
+	<typst-preview-scroll-container class="overflow-auto h-full flex justify-center-safe p-[var(--outset)]" style="--outset: 1rem; ">
 		<typst-preview-layout-container
 			bind:this={canvasContainer}
 			class="grid items-center-safe justify-center-safe w-max h-max gap-[var(--page-gap)]"
