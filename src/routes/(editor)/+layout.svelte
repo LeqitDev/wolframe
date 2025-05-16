@@ -63,18 +63,35 @@
 			let txt = await editorManager.compiler.getFileText(path);
 			debug('info', 'compiler', 'File content before change:', txt);
 
+			function unicodeLength(str: string): number {
+				let length = 0;
+				// eslint-disable-next-line @typescript-eslint/no-unused-vars
+				for (const c of str) ++length;
+				return length;
+			}
+
+			// const content = node.model!.getValue();
+			// const contentLength = unicodeLength(content);
+			// let offset = 0;
+
+			event.changes.sort((a, b) => b.rangeOffset - a.rangeOffset);
 			for (const change of event.changes) {
+
+				const { text, rangeOffset, rangeLength } = change;
+				/* const initialLength = unicodeLength(content.slice(0, rangeOffset));
+				const deletedLength = unicodeLength(content.slice(rangeOffset, rangeOffset + rangeLength)); */
+
+				// const restLength = contentLength - initialLength - deletedLength;
+
 				await editorManager.compiler.edit(
 					path,
-					change.text,
-					change.rangeOffset,
-					change.rangeOffset + change.rangeLength,
+					change,
 					Comlink.proxy(handleTypstError)
 				);
 			}
 
 			editorManager.compile();
-			txt = await editorManager.compiler.getFileText(path);
+			txt = await editorManager.compiler.getFileText(path);	
 			debug('info', 'compiler', 'File content after change:', txt);
 		}
 	}

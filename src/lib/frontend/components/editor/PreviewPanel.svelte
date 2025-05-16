@@ -8,7 +8,6 @@
 	import { debug } from '@/lib/backend/utils';
 	import { createId } from '@paralleldrive/cuid2';
 	import { Minus, Plus } from 'lucide-svelte';
-	import PinchZoom from 'pinch-zoom-js';
 
 	const editorManager = getEditorManager();
 	let canvasContainer: HTMLDivElement;

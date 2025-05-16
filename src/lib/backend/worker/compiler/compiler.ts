@@ -1,6 +1,7 @@
 import init, { TypstCore, type TypstCoreError, type OutputFormat, type Output } from 'wolframe-typst-core';
 import { Result } from '../../functionals';
 import * as Comlink from 'comlink';
+import type { Monaco } from '../../monaco';
 
 let core: TypstCore;
 
@@ -60,9 +61,25 @@ export const Compiler = {
             err(e as TypstCoreError);
         }
     },
-    edit(path: string, content: string, begin: number, end: number, err: (error: TypstCoreError) => void) {
+    edit(path: string, change: Monaco.editor.IModelContentChange, err: (error: TypstCoreError) => void) {
         try {
-            core.edit_source(path, content, begin, end);
+            const begin = change.rangeOffset;
+            const beginLine = change.range.startLineNumber - 1;
+            const beginColumn = change.range.startColumn - 1;
+            const end = begin + change.rangeLength;
+            const endLine = change.range.endLineNumber - 1;
+            const endColumn = change.range.endColumn - 1;
+            console.log("edit", path, change.text, begin, beginLine, beginColumn, end, endLine, endColumn);
+            core.edit_source(
+                path, 
+                change.text,
+                begin,
+                beginLine,
+                beginColumn,
+                end,
+                endLine,
+                endColumn
+            );
         } catch (e) {
             err(e as TypstCoreError);
         }
