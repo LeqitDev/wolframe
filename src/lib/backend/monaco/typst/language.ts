@@ -77,6 +77,9 @@ export class TypstLanguage implements IMonacoLanguage {
 		}
 
 		if ("CompileError" in tError) {
+			for (const model of this.monaco.editor.getModels()) {
+				this.monaco.editor.setModelMarkers(model, 'compiler', []);
+			}
 			for (const error of tError.CompileError) {
 				eventController.fire("command/file:retrieve", error.range.path, (fileNode) => {
 					const model = monacoController.getModel(fileNode.file.id, fileNode.extension!);
@@ -86,21 +89,16 @@ export class TypstLanguage implements IMonacoLanguage {
 						return;
 					}
 
-					const pos = {
-						start: model.getPositionAt(error.range.start),
-						end: model.getPositionAt(error.range.end)
-					}
-
-					const modelRange = this.monaco!.Range.fromPositions(pos.start, pos.end);
-
-					const marker = {
-						startLineNumber: modelRange.startLineNumber,
-						startColumn: modelRange.startColumn,
-						endLineNumber: modelRange.endLineNumber,
-						endColumn: modelRange.endColumn,
+					const marker: Monaco.editor.IMarkerData = {
+						startLineNumber: error.range.monaco_range.begin_line_number,
+						startColumn: error.range.monaco_range.begin_column,
+						endLineNumber: error.range.monaco_range.end_line_number,
+						endColumn: error.range.monaco_range.end_column,
 						message: error.message,
 						severity: this.monaco!.MarkerSeverity.Error,
 					};
+
+					debug('info', 'typst/language', 'Adding marker', marker, model.uri.toString(), error);
 
 					const prevMarkers = this.monaco!.editor.getModelMarkers({ resource: model.uri, owner: 'compiler' });
 					this.monaco!.editor.setModelMarkers(model, 'compiler', [...prevMarkers, marker]);
