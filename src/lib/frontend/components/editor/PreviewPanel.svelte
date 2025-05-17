@@ -8,6 +8,8 @@
 	import { debug } from '@/lib/backend/utils';
 	import { createId } from '@paralleldrive/cuid2';
 	import { Minus, Plus } from 'lucide-svelte';
+	import { ComponentWindow } from '../../utils/ComponentWindow';
+	import SelfComponent from "./PreviewPanel.svelte"
 
 	const editorManager = getEditorManager();
 	let canvasContainer: HTMLDivElement;
@@ -20,7 +22,18 @@
 		imgSrc: string;
 	}[] = $state([]);
 
+	let {
+		inPopup = false
+	}: {
+		inPopup?: boolean;
+	} = $props();
+
 	let zoom = $state(1);
+	let popupWindow = new ComponentWindow();
+	let scrollContainerDimensions = $state({
+		width: 0,
+		height: 0
+	});
 
 	function renderCompilationResult(output: Output) {
 		let cur_count = canvasContainer.childElementCount;
@@ -35,7 +48,14 @@
 			}
 			if (page) {
 				const base = btoa(svg);
-
+				const [x, y, width, height] = viewBox[1].split(' ').map(Number);
+				const normalDimensions = {
+					width: width,
+					height: height
+				};
+				if (page.normalDimensions !== normalDimensions) {
+					page.normalDimensions = normalDimensions;
+				}
 				page.imgSrc = `data:image/svg+xml;base64,${base}`;
 			} else {
 				const base = btoa(svg);
@@ -51,6 +71,12 @@
 				});
 			}
 		}
+		// remove extra pages from the dom and the array
+		if (cur_count > output.Svg.length) {
+			for (let i = cur_count; i > output.Svg.length; i--) {
+				pages.pop();
+			}
+		}
 	}
 
 	function setZoom(x: number) {
@@ -60,12 +86,15 @@
 	}
 
 	$effect(() => {
-		const Renderer = Comlink.wrap<RendererType>(new RendererWorker());
-		editorManager.setRenderer(Renderer);
+		if (!inPopup) {
+			const Renderer = Comlink.wrap<RendererType>(new RendererWorker());
+			editorManager.setRenderer(Renderer);
+		}
 		eventController.register('renderer:render', renderCompilationResult);
 
 		return () => {
 			eventController.unregister('renderer:render', renderCompilationResult);
+			popupWindow.unmount();
 		};
 	});
 
@@ -141,6 +170,22 @@
 			};
 			node.addEventListener('wheel', handleWheel);
 
+			const resizeObserver = new ResizeObserver((entrys, observer) => {
+				for (const entry of entrys) {
+					if (entry.target === node) {
+						const newWidth = entry.contentRect.width;
+						const newHeight = entry.contentRect.height;
+						if (newWidth !== scrollContainerDimensions.width) {
+							scrollContainerDimensions.width = newWidth;
+						}
+						if (newHeight !== scrollContainerDimensions.height) {
+							scrollContainerDimensions.height = newHeight;
+						}
+					}
+				}
+			});
+			resizeObserver.observe(node);
+
 			return () => {
 				// dispose
 				node.removeEventListener('mousedown', handleMouseDown);
@@ -148,8 +193,25 @@
 				node.removeEventListener('mouseup', handleMouseUp);
 				node.removeEventListener('mousemove', handleMouseMove);
 				node.removeEventListener('wheel', handleWheel);
+				resizeObserver.unobserve(node);
+				resizeObserver.disconnect();
 			};
 		});
+	}
+
+	async function transferToNewWindow() {
+		popupWindow.popout(SelfComponent);
+		editorManager.compile();
+	}
+
+	function zoomToFit(mode: 'width' | 'height') {
+		if (mode === 'width') {
+			const pageWidth = pages[0].normalDimensions.width;
+			zoom = scrollContainerDimensions.width / pageWidth;
+		} else if (mode === 'height') {
+			const pageHeight = pages[0].normalDimensions.height;
+			zoom = scrollContainerDimensions.height / pageHeight;
+		}
 	}
 </script>
 
@@ -167,7 +229,7 @@
 		/>
 	</typst-preview-page-container>
 {/snippet}
-<div class="flex h-full flex-col">
+<div class="flex h-full flex-col" id="preview-anchor">
 	<div class="bg-base-200 flex items-center justify-between p-2">
 		<div class="join">
 			<button class="btn btn-sm btn-soft join-item" onclick={() => setZoom(zoom - 0.1)}
@@ -175,7 +237,10 @@
 			>
 			<details class="dropdown">
 				<summary class="btn btn-sm btn-soft join-item">{Math.trunc(zoom * 100)}%</summary>
-				<ul class="menu dropdown-content bg-base-100 rounded-box z-1 w-52 p-2 shadow-sm">
+				<ul class="menu dropdown-content bg-base-100 rounded-box z-10 w-52 p-2 shadow-sm">
+					<li><button class="" onclick={() => zoomToFit('width')}>Fit width</button></li>
+					<li><button class="" onclick={() => zoomToFit('height')}>Fit height</button></li>
+					<div class="divider m-1"></div>
 					<li><button class="" onclick={() => setZoom(0.25)}>25%</button></li>
 					<li><button class="" onclick={() => setZoom(0.5)}>50%</button></li>
 					<li><button class="" onclick={() => setZoom(0.75)}>75%</button></li>
@@ -188,6 +253,7 @@
 				><Plus class="size-4" /></button
 			>
 		</div>
+		{#if !inPopup}<button class="btn btn-sm btn-soft" onclick={transferToNewWindow}>Popup</button>{/if}
 	</div>
 	<typst-preview-scroll-container
 		class="flex h-full justify-center-safe overflow-auto p-[var(--outset)]"
@@ -198,6 +264,7 @@
 			bind:this={canvasContainer}
 			class="grid h-max w-max items-center-safe justify-center-safe gap-[var(--page-gap)]"
 			style="--page-gap: 1rem;"
+			id="preview-layout"
 		>
 			{#each pages as page, i (page.id)}
 				{@render pageImg(i)}

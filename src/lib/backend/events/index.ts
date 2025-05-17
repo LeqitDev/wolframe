@@ -23,10 +23,14 @@ type AppEvents = {
     "file:edited": [TreeNode, Monaco.editor.IModelContentChangedEvent], // Fired when a file is changed
     "file:preview": [string | null], // Fired when a file is set to be previewed
 
+
     "command/file:open": [string | null, ((fileNode: TreeNode) => void)] | [string | null], // Fired when a file is requested to be opened with the file path
     "command/file:retrieve": [string | null, ((fileNode: TreeNode) => void)], // Fired when a file is requested to be retrieved with the file path
+    
     "command/ui/console:visibility": [boolean], // Fired when the console visibility should be changed
+    
     "command/monaco/editor:selection": [Monaco.IRange | {start: number, end: number}], // Fired when the editor selection should be changed
+    
     "command/compiler:autocomplete": [string, Monaco.IRange, (result: unknown[]) => void]; // Fired when the compiler should retrieve the autocomplete suggestions
 }
 
