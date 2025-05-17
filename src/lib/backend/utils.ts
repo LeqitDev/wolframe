@@ -1,5 +1,6 @@
 import { createId } from "@paralleldrive/cuid2";
 import { writable } from "svelte/store";
+import type { Monaco } from "./monaco";
 
 export const debugLogStore = writable<{
     id: string;
@@ -47,4 +48,12 @@ export function debug(type?: 'error' | 'warning' | 'info', domain?: string,...ar
             message: formattedArgs.join(" ")
         }]);
     //}
+}
+
+export function getIdFromUri(uri: Monaco.Uri) {
+    const id = uri.toString().replace("fileid:", "").replace(/\/file\..*$/, "");
+    if (!id) {
+        throw new Error("Model is not set yet.");
+    }
+    return id;
 }

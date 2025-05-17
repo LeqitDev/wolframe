@@ -86,7 +86,15 @@ export const Compiler = {
             console.error(e);
             return "";
         }
-    }
+    },
+    autocomplete(path: string, range: Monaco.IRange, ok: (result: unknown[]) => void) {
+        try {
+            const result = core.auto_complete(path, range.startLineNumber, range.startColumn);
+            ok(result);
+        } catch (e) {
+            console.error(e);
+        }
+    },
 };
 
 export type Compiler = typeof Compiler;

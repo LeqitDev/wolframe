@@ -4,10 +4,16 @@ import eventController from "../../events";
 import type { TypstCoreError } from "wolframe-typst-core";
 import { debug } from "../../utils";
 import monacoController from "..";
+import { TypstCompletionProvider } from "./provider/completionProvider";
 
 export class TypstLanguage implements IMonacoLanguage {
 	private disposables: Monaco.IDisposable[] = [];
 	private monaco?: typeof Monaco;
+	private completionProvider: TypstCompletionProvider;
+
+	constructor() {
+		this.completionProvider = new TypstCompletionProvider();
+	}
 
 	init(monaco: typeof Monaco) {
 		this.monaco = monaco;
@@ -48,7 +54,10 @@ export class TypstLanguage implements IMonacoLanguage {
 			]
 		});
 
-		this.disposables.push(disposer);
+		this.disposables.push(
+			disposer,
+			monaco.languages.registerCompletionItemProvider('typst', this.completionProvider),
+		);
 	}
 
 	postInit() {

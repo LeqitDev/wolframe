@@ -3,6 +3,7 @@ import eventController from "../events";
 import * as Comlink  from 'comlink';
 import type { Renderer as RendererType } from '../worker/renderer/renderer';
 import type { Compiler as CompilerType } from '../worker/compiler/compiler';
+import type { Monaco } from "../monaco";
 
 /**
  * EditorManager is a class that manages the loading state of an editor in a Svelte application.
@@ -23,6 +24,7 @@ class EditorManager {
     // Access to the renderer and compiler workers
     private Renderer: Comlink.Remote<RendererType> | null = null;
     private Compiler: Comlink.Remote<CompilerType> | null = null;
+    private disposables: {dispose: () => void}[] = [];
 
     /**
      * The loading promise that resolves the editor load function.
@@ -44,8 +46,11 @@ class EditorManager {
     });
 
     constructor() {
-        eventController.register("file:opened", this.openFile.bind(this));
-        eventController.register("file:closed", this.closeFile.bind(this));
+        this.disposables.push(
+            eventController.register("file:opened", this.openFile.bind(this)),
+            eventController.register("file:closed", this.closeFile.bind(this)),
+            eventController.register("command/compiler:autocomplete", this.retrieveAutocomplete.bind(this)),
+        );
     }
 
     
@@ -146,6 +151,15 @@ class EditorManager {
         }));
     }
 
+    private retrieveAutocomplete(path: string, range: Monaco.IRange, callback: (result: unknown[]) => void) {
+        if (!this.Compiler) {
+            throw new Error('Compiler not set');
+        }
+        this.Compiler.autocomplete(path, range, Comlink.proxy((result) => {
+            callback(result);
+        }));
+    }
+
     /**
      * Sets the preview file path.
      * @param path The path to the preview file.
@@ -168,8 +182,9 @@ class EditorManager {
     }
 
     dispose() {
-        eventController.unregister("file:opened", this.openFile);
-        eventController.unregister("file:closed", this.closeFile);
+        for (const disposable of this.disposables) {
+            disposable.dispose();
+        }
     }
 }
 

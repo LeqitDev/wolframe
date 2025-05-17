@@ -3,7 +3,7 @@ import type * as Monaco from "monaco-editor/esm/vs/editor/editor.api";
 export {type Monaco};
 import eventController from "../events";
 import type { IMonacoLanguage, IMonacoTheme } from "@/app.types";
-import { debug } from "../utils";
+import { debug, getIdFromUri } from "../utils";
 
 class MonacoController {
     private monaco?: typeof Monaco;
@@ -212,12 +212,8 @@ class MonacoController {
      */
     getCurrentId() {
         const uri = this.getCurrentURI();
-
-        const id = uri.toString().replace("fileid:", "").replace(/\/file\..*$/, "");
-        if (!id) {
-            throw new Error("Model is not set yet.");
-        }
-        return id;
+        
+        return getIdFromUri(uri);
     }
 
     /**
