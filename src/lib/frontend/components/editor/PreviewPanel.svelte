@@ -12,6 +12,9 @@
 	import SelfComponent from "./PreviewPanel.svelte"
 	import { tick } from 'svelte';
 
+	const MAX_ZOOM = 5;
+	const MIN_ZOOM = 0.25;
+
 	const editorManager = getEditorManager();
 	let canvasContainer: HTMLDivElement;
 	const pages: {
@@ -81,8 +84,8 @@
 	}
 
 	function setZoom(x: number) {
-		if (x < 0.25) x = 0.25; // minimum zoom
-		if (x > 3) x = 3; // maximum zoom
+		if (x < MIN_ZOOM) x = MIN_ZOOM; // minimum zoom
+		if (x > MAX_ZOOM) x = MAX_ZOOM; // maximum zoom
 		zoom = x;
 	}
 
