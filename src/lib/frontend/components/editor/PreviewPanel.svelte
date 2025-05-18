@@ -10,6 +10,7 @@
 	import { Minus, Plus } from 'lucide-svelte';
 	import { ComponentWindow } from '../../utils/ComponentWindow';
 	import SelfComponent from "./PreviewPanel.svelte"
+	import { tick } from 'svelte';
 
 	const editorManager = getEditorManager();
 	let canvasContainer: HTMLDivElement;
@@ -153,6 +154,10 @@
 				const pointX = scrollX + mouseX;
 				const pointY = scrollY + mouseY;
 
+				// Calculate Relative positions
+				const relX = pointX / node.scrollWidth;
+				const relY = pointY / node.scrollHeight;
+
 				// Calculate zoom speed based on deltaY magnitude
 				// Taking absolute value since deltaY direction matters separately
 				const zoomSpeed = Math.min(Math.abs(e.deltaY) / 50, 1); // Normalize to 0-1 range with a cap
@@ -167,6 +172,23 @@
 				} else {
 					setZoom(zoom - increment); // Zoom out
 				}
+
+				tick().then(() => {
+					const newScrollWidth = node.scrollWidth;
+					const newScrollHeight = node.scrollHeight;
+
+					// Keep the same relative point under the mouse
+					const newScrollX = relX * newScrollWidth - mouseX;
+					const newScrollY = relY * newScrollHeight - mouseY;
+
+					node.scrollLeft = newScrollX;
+					node.scrollTop = newScrollY;
+				});
+
+				// Scroll to maintain the mouse position
+				
+				// node.scrollLeft = newScrollX;
+				// node.scrollTop = newScrollY;
 			};
 			node.addEventListener('wheel', handleWheel);
 
