@@ -253,7 +253,7 @@
 				><Plus class="size-4" /></button
 			>
 		</div>
-		{#if !inPopup}<button class="btn btn-sm btn-soft" onclick={transferToNewWindow}>Popup</button>{/if}
+		{#if !inPopup}<button class="btn btn-sm btn-soft" onclick={transferToNewWindow}>Popout</button>{/if}
 	</div>
 	<typst-preview-scroll-container
 		class="flex h-full justify-center-safe overflow-auto p-[var(--outset)]"
