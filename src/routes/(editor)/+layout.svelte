@@ -227,25 +227,19 @@
 						<CustomSplitpanes
 							direction="horizontal"
 							pos="50%"
+							min="20%"
+							max="80%"
 							class="w-full hover:after:bg-primary!"
 						>
 							{#snippet a()}
 									<MonacoEditor />
 							{/snippet}
 							{#snippet b()}
-								<div class="bg-base-300 max-w-full">
+								<div class="bg-base-300 max-w-full w-full min-w-full">
 									<PreviewPanel />
 								</div>
 							{/snippet}
 						</CustomSplitpanes>
-						<!-- <Splitpanes theme="wolframe-theme" class="w-full">
-							<Pane size={50} minSize={20} maxSize={80} class="">
-								<MonacoEditor />
-							</Pane>
-							<Pane class="bg-base-300 max-w-full" size={0}>
-								<PreviewPanel />
-							</Pane>
-						</Splitpanes> -->
 					</div>
 				{/snippet}
 				{#snippet b()}
