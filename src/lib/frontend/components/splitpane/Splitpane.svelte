@@ -114,10 +114,10 @@
     function isMin(perc: number) {
         let minSize = getPxOrPercent(min);
 
-        if (minSize.px) {
+        if (minSize.px !== undefined) {
             const pxPercent = getContainerSize() * (perc / 100);
             return pxPercent < minSize.px;
-        } else if (minSize.percent) {
+        } else if (minSize.percent !== undefined) {
             return perc < minSize.percent;
         } else {
             throw new Error(`Unsupported min length unit: ${min}`);
@@ -286,6 +286,22 @@
 		left: 0;
 		width: 100%;
 		height: 1px;
+	}
+
+	[data-orientation='horizontal'] > svelte-split-pane-devide {
+		padding: 0 calc(0.5 * var(--sp-thickness));
+		width: 0;
+		height: 100%;
+		cursor: ew-resize;
+		left: clamp(var(--min), var(--pos), var(--max));
+		transform: translate(calc(-0.5 * var(--sp-thickness)), 0);
+	}
+
+	[data-orientation='horizontal'] > svelte-split-pane-devide::after {
+		top: 0;
+		left: 50%;
+		width: 1px;
+		height: 100%;
 	}
 
     svelte-split-pane-mousecatcher {

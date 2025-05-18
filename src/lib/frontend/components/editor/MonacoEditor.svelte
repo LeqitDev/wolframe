@@ -14,6 +14,8 @@
 	const vfs = getVirtualFileSystem();
 	const editor = getEditorManager();
 
+	const currentlyOpenedFiles: TreeNode[] = $state([])
+
     // let filteredFiles = $derived();
 
 	function onMonacoLoaded() {
@@ -29,9 +31,41 @@
 		monacoController.changeSelection(range);
 	}
 
+	function onFileOpened(id: string) {
+		const fileResult = vfs.getFileById(id);
+		if (!fileResult.ok) {
+			debug('error', 'monaco/editor', 'File not found');
+			return;
+		}
+		const file = fileResult.unwrap();
+		if (currentlyOpenedFiles.find((f) => f.file.id === file.file.id)) {
+			return;
+		}
+		currentlyOpenedFiles.push(file);
+	}
+
+	function onFileClosed(id: string) {
+		const fileResult = vfs.getFileById(id);
+		if (!fileResult.ok) {
+			debug('error', 'monaco/editor', 'File not found');
+			return;
+		}
+		const file = fileResult.unwrap();
+		const index = currentlyOpenedFiles.findIndex((f) => f.file.id === file.file.id);
+		if (index !== -1) {
+			currentlyOpenedFiles.splice(index, 1);
+		}
+	}
+
 	$effect(() => {
-		eventController.register('monaco:loaded', onMonacoLoaded);
-		eventController.register('command/monaco/editor:selection', onChangeSelection);
+		let disposables = [];
+
+		disposables.push(
+			eventController.register('monaco:loaded', onMonacoLoaded),
+			eventController.register('command/monaco/editor:selection', onChangeSelection),
+			eventController.register('file:opened', onFileOpened),
+			eventController.register('file:closed', onFileClosed),
+		);
 
 		const typstTheme = new TypstTheme();
 		const typstLanguage = new TypstLanguage();
@@ -43,18 +77,19 @@
 		}
 
 		return () => {
-			eventController.unregister('monaco:loaded', onMonacoLoaded);
-			eventController.unregister('command/monaco/editor:selection', onChangeSelection);
+			disposables.forEach((disposable) => {
+				disposable.dispose();
+			});
 			monacoController.dispose();
 		};
 	});
 </script>
 
-<div class="h-full">
-	{#if vfs.getFiles().filter((file) => file.isFile && file.openedFile).length > 0}
+<div class="h-full grid w-full" style="grid-template-rows: auto minmax(0, 1fr);">
+	{#if currentlyOpenedFiles.length > 0}
     <div class="overflow-x-auto max-h-12 max-w-full">
 		<div role="tablist" class="tabs tabs-sm tabs-box border-base-100 rounded-none border-t min-w-max">
-			{#each vfs.getFiles().filter((file) => file.isFile && file.openedFile) as file (file.file.id)}
+			{#each currentlyOpenedFiles as file (file.file.id)}
 				<button
 					role="tab"
                     type="button"
@@ -77,5 +112,5 @@
 		</div>
     </div>
 	{/if}
-	<div bind:this={editorContainer} class="h-full"></div>
+	<div bind:this={editorContainer} class="w-full min-w-full"></div>
 </div>
