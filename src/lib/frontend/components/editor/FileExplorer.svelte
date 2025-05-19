@@ -44,7 +44,6 @@
 <div use:portalAction={{}}>
     <FileExplorerContextMenu />
 </div>
-
 <div class="flex items-center justify-between p-2 pl-4">
     <h2 class="">File Explorer</h2>
     <div class="join">

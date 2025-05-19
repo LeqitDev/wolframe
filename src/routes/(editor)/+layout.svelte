@@ -37,6 +37,7 @@
 	let outputMinimized = $state(false);
 	let debugPanelSplitter: CustomSplitpanes|undefined = $state();
 	let editorPanelSplitter: CustomSplitpanes|undefined = $state();
+	let previewPanel;
 
 	function handleTypstError(err: TypstCoreError) {
 		console.error('Typst error:', err);
@@ -137,10 +138,12 @@
 
 		uiStore.hidePreview = () => {
 			editorPanelSplitter!.hide(1);
+			previewPanel!.style.display = 'none';
 		}
 
 		uiStore.showPreview = () => {
 			editorPanelSplitter!.show(1);
+			previewPanel!.style.display = 'block';
 		}
 
 		eventController.register('command/ui/console:visibility', consoleVisibility);
@@ -215,51 +218,61 @@
 {/await}
 
 <div class="flex h-screen w-screen">
-	<Splitpanes theme="wolframe-theme">
-		<Pane size={18} snapSize={8} maxSize={70} class="bg-base-200">
-			<FileExplorer />
-		</Pane>
-		<Pane class="">
-			<Menu />
-			<CustomSplitpanes
-				direction="vertical"
-				max="-70px"
-				min="10%"
-				maxThreshold={80}
-				maxReleaseThreshold={88}
-				class="hover:after:bg-primary!"
-				bind:maximized={uiStore.isDebugPanelMinimized}
-				bind:this={debugPanelSplitter}
-			>
-				{#snippet a()}
-					<div class="max-w-full">
-						<CustomSplitpanes
-							direction="horizontal"
-							pos="50%"
-							min="20%"
-							max="80%"
-							class="w-full hover:after:bg-primary!"
-							bind:this={editorPanelSplitter}
-						>
-							{#snippet a()}
-									<MonacoEditor />
-							{/snippet}
-							{#snippet b()}
-								<div class="bg-base-300 max-w-full w-full min-w-full">
-									<PreviewPanel />
-								</div>
-							{/snippet}
-						</CustomSplitpanes>
-					</div>
-				{/snippet}
-				{#snippet b()}
-					<div class="bg-base-200 min-h-0 h-full w-full">
-						<DebugPanel />
-					</div>
-				{/snippet}
-			</CustomSplitpanes>
-		</Pane>
-	</Splitpanes>
+	<CustomSplitpanes
+		direction="horizontal"
+		pos="15%"
+		min="12%"
+		max="60%"
+		class="w-full h-screen hover:after:bg-primary!"
+	>
+		{#snippet a()}
+			<div class="bg-base-200 h-screen flex flex-col">
+				<FileExplorer />
+			</div>
+		{/snippet}
+		{#snippet b()}
+			<div class="flex flex-col h-screen w-full pl-[1px]">
+				<Menu />
+				<CustomSplitpanes
+					direction="vertical"
+					max="-20px"
+					min="10%"
+					maxThreshold={80}
+					maxReleaseThreshold={88}
+					class="hover:after:bg-primary!"
+					bind:maximized={uiStore.isDebugPanelMinimized}
+					bind:this={debugPanelSplitter}
+				>
+					{#snippet a()}
+						<div class="max-w-full">
+							<CustomSplitpanes
+								direction="horizontal"
+								pos="50%"
+								min="20%"
+								max="80%"
+								class="w-full hover:after:bg-primary!"
+								bind:this={editorPanelSplitter}
+							>
+								{#snippet a()}
+										<MonacoEditor />
+								{/snippet}
+								{#snippet b()}
+									<div bind:this={previewPanel} class="bg-base-300 max-w-full w-full min-w-full">
+										<PreviewPanel />
+									</div>
+								{/snippet}
+							</CustomSplitpanes>
+						</div>
+					{/snippet}
+					{#snippet b()}
+						<div class="bg-base-200 min-h-0 h-full w-full">
+							<DebugPanel />
+						</div>
+					{/snippet}
+				</CustomSplitpanes>
+			</div>
+		{/snippet}
+	</CustomSplitpanes>
 </div>
 
 {@render children()}

@@ -95,7 +95,7 @@
 		onclick={() => uiStore.setDebugPanelSize?.(100 - 30)}
 	>
 		<p class="text-sm text-gray-400">
-			Compile Errors: <span class="text-error/80 p-0.5 font-bold">{errors.length}</span>
+			Compile Errors: <span class="text-error/80 px-0.5 font-bold">{errors.length}</span>
 		</p>
 	</button>
 {:else}
