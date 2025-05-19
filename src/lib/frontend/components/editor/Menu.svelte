@@ -42,7 +42,9 @@
     </li>
     <li>
         <DropdownMenuItem name="Preview">
-            <li><a href="/">Hide Preview</a></li>
+            <li><button onclick={() => {
+                uiStore.showPreview();
+            }}>Hide Preview</button></li>
             <li><a href="/">Refresh Preview</a></li>
             <li><a href="/">Preview in New Window</a></li>
             <li><a href="/">Zoom In</a></li>

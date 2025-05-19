@@ -35,7 +35,8 @@
 	const awaitLoad = editorManager.loadEditor; // https://github.com/sveltejs/svelte/discussions/14692
 	let showConsole = $state(6);
 	let outputMinimized = $state(false);
-	let debugPanelSplitter = $state();
+	let debugPanelSplitter: CustomSplitpanes|undefined = $state();
+	let editorPanelSplitter: CustomSplitpanes|undefined = $state();
 
 	function handleTypstError(err: TypstCoreError) {
 		console.error('Typst error:', err);
@@ -131,7 +132,15 @@
 
 	$effect(() => {
 		uiStore.setDebugPanelSize = (size: number) => {
-			(debugPanelSplitter as any).setSize(size);
+			debugPanelSplitter!.setSize(size);
+		}
+
+		uiStore.hidePreview = () => {
+			editorPanelSplitter!.hide(1);
+		}
+
+		uiStore.showPreview = () => {
+			editorPanelSplitter!.show(1);
 		}
 
 		eventController.register('command/ui/console:visibility', consoleVisibility);
@@ -230,6 +239,7 @@
 							min="20%"
 							max="80%"
 							class="w-full hover:after:bg-primary!"
+							bind:this={editorPanelSplitter}
 						>
 							{#snippet a()}
 									<MonacoEditor />

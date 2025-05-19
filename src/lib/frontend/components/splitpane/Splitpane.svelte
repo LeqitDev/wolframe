@@ -41,6 +41,19 @@
 	let container: HTMLElement;
 
 	let dragging = $state(false);
+	let splitterVisible = $state(true);
+
+	let originalMin: Length;
+	let originalMax: Length;
+	let previousPos: Length;
+
+	$effect(() => {
+		untrack(() => {
+			originalMin = min;
+			originalMax = max;
+			previousPos = pos;
+		})
+	})
 
     export const setSize = (percentage: number) => {
         container.classList.add('add-transition');
@@ -49,6 +62,31 @@
             container.classList.remove('add-transition');
         }, 200);
     };
+
+	export const hide = (index: number) => {
+		splitterVisible = false;
+		if (index === 0) {
+			previousPos = pos;
+			min = '0px';
+			pos = '0px';
+		} else {
+			previousPos = pos;
+			max = '100%';
+			pos = '100%';
+		}
+	}
+
+	export const show = (index: number) => {
+		splitterVisible = true;
+		console.log('show', index, min, max, pos, originalMin, originalMax, previousPos);
+		if (index === 0) {
+			min = originalMin;
+			pos = previousPos;
+		} else {
+			max = originalMax;
+			pos = previousPos;
+		}
+	}
 
 	function normalize(length: string) {
 		if (length[0] === '-') {
@@ -226,10 +264,12 @@
 	style="--pos: {normalize(pos)}; --min: {normalize(min)}; --max: {normalize(max)}"
 >
 	{@render a?.()}
-	<svelte-split-pane-devide 
-        use:drag={(event) => update(event.clientX, event.clientY)}
-        class={splitterClass}
-	></svelte-split-pane-devide>
+	{#if splitterVisible}
+		<svelte-split-pane-devide 
+			use:drag={(event) => update(event.clientX, event.clientY)}
+			class={splitterClass}
+		></svelte-split-pane-devide>
+	{/if}
 	{@render b?.()}
 </svelte-split-pane>
 

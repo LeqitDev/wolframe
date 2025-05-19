@@ -6,7 +6,7 @@ export class ComponentWindow {
     public popout<
         Props extends Record<string, any>,
         Exports extends Record<string, any>
-        >(component?: Component<Props, Exports, any>) {
+        >(component?: Component<Props, Exports, any>, onUnmount?: () => void) {
         const newWindow = window.open('', '_blank', 'width=800,height=600,popup,resizable,scrollbars');
         const stylesheets = Array.from(document.styleSheets)
         if (newWindow) {
@@ -24,7 +24,15 @@ export class ComponentWindow {
                 });
             }
             newWindow.document.title = 'Wolframe Preview';
-
+            newWindow.onbeforeunload = () => {
+                if (onUnmount) {
+                    onUnmount();
+                }
+                if (this._app) {
+                    unmount(this._app);
+                    this._app = null;
+                }
+            }
             newWindow.document.close();
             return newWindow;
         } else {

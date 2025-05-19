@@ -11,11 +11,13 @@
 	import { ComponentWindow } from '../../utils/ComponentWindow';
 	import SelfComponent from "./PreviewPanel.svelte"
 	import { tick } from 'svelte';
+	import { getUiStore } from '@/lib/backend/stores/ui.svelte';
 
 	const MAX_ZOOM = 5;
 	const MIN_ZOOM = 0.25;
 
 	const editorManager = getEditorManager();
+	const uiStore = getUiStore();
 	let canvasContainer: HTMLDivElement;
 	const pages: {
 		id: string;
@@ -225,7 +227,10 @@
 	}
 
 	async function transferToNewWindow() {
-		popupWindow.popout(SelfComponent);
+		popupWindow.popout(SelfComponent, () => {
+			uiStore.showPreview();
+		});
+		uiStore.hidePreview();
 		editorManager.compile();
 	}
 

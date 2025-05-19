@@ -4,6 +4,8 @@ const DEBUG_PANEL_MINIMIZED_HEIGHT = 67; // px
 
 class UiStore {
     isPreviewVisible: boolean = $state(true);
+    hidePreview: () => void = $state(() => {});
+    showPreview: () => void = $state(() => {});
     isDebugPanelMinimized: boolean = $state(true);
     setDebugPanelSize: (percentage: number) => void = $state(() => {});
 
