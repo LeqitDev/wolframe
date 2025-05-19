@@ -217,21 +217,21 @@
 	<p>{e}</p>
 {/await}
 
-<div class="flex h-screen w-screen">
+<div class="h-screen w-screen">
 	<CustomSplitpanes
 		direction="horizontal"
 		pos="15%"
-		min="12%"
+		min="220px"
 		max="60%"
-		class="w-full h-screen hover:after:bg-primary!"
+		class="hover:after:bg-primary!"
 	>
 		{#snippet a()}
-			<div class="bg-base-200 h-screen flex flex-col">
+			<div class="bg-base-200 flex flex-col">
 				<FileExplorer />
 			</div>
 		{/snippet}
 		{#snippet b()}
-			<div class="flex flex-col h-screen w-full pl-[1px]">
+			<div class="grid pl-[1px]" style="grid-template-rows: auto minmax(0, 1fr);">
 				<Menu />
 				<CustomSplitpanes
 					direction="vertical"
@@ -244,20 +244,20 @@
 					bind:this={debugPanelSplitter}
 				>
 					{#snippet a()}
-						<div class="max-w-full">
+						<div class="">
 							<CustomSplitpanes
 								direction="horizontal"
 								pos="50%"
 								min="20%"
 								max="80%"
-								class="w-full hover:after:bg-primary!"
+								class="hover:after:bg-primary!"
 								bind:this={editorPanelSplitter}
 							>
 								{#snippet a()}
 										<MonacoEditor />
 								{/snippet}
 								{#snippet b()}
-									<div bind:this={previewPanel} class="bg-base-300 max-w-full w-full min-w-full">
+									<div bind:this={previewPanel} class="bg-base-300 flex flex-col">
 										<PreviewPanel />
 									</div>
 								{/snippet}
@@ -265,7 +265,7 @@
 						</div>
 					{/snippet}
 					{#snippet b()}
-						<div class="bg-base-200 min-h-0 h-full w-full">
+						<div class="bg-base-200">
 							<DebugPanel />
 						</div>
 					{/snippet}

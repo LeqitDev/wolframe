@@ -85,10 +85,10 @@
 	});
 </script>
 
-<div class="h-full grid w-full" style="grid-template-rows: auto minmax(0, 1fr);">
+<div class="grid min-h-0 min-w-0" style="grid-template-rows: auto minmax(0, 1fr);">
 	{#if currentlyOpenedFiles.length > 0}
-    <div class="overflow-x-auto max-h-12 max-w-full">
-		<div role="tablist" class="tabs tabs-sm tabs-box border-base-100 rounded-none border-t min-w-max">
+    <div class="overflow-x-auto max-h-12">
+		<div role="tablist" class="tabs tabs-sm tabs-box border-base-100 rounded-none border-t">
 			{#each currentlyOpenedFiles as file (file.file.id)}
 				<button
 					role="tab"
@@ -112,5 +112,5 @@
 		</div>
     </div>
 	{/if}
-	<div bind:this={editorContainer} class="w-full min-w-full"></div>
+	<div bind:this={editorContainer} class="h-full w-full min-w-0"></div>
 </div>

@@ -259,7 +259,7 @@
 		/>
 	</typst-preview-page-container>
 {/snippet}
-<div class="flex h-full flex-col w-full min-w-full" id="preview-anchor">
+<div class="grid min-h-0" style="grid-template-rows: auto minmax(0, 1fr);" id="preview-anchor">
 	<div class="bg-base-200 flex items-center justify-between p-2">
 		<div class="join">
 			<button class="btn btn-sm btn-soft join-item" onclick={() => setZoom(zoom - 0.1)}
@@ -286,7 +286,7 @@
 		{#if !inPopup}<button class="btn btn-sm btn-soft" onclick={transferToNewWindow}>Popout</button>{/if}
 	</div>
 	<typst-preview-scroll-container
-		class="flex h-full justify-center-safe overflow-auto p-[var(--outset)] min-w-full"
+		class="flex justify-center-safe overflow-auto p-[var(--outset)]"
 		style="--outset: 1rem; "
 		use:previewActions
 	>

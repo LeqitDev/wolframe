@@ -288,12 +288,12 @@
 	}
 
 	svelte-split-pane[data-orientation='horizontal'] {
-		grid-template-columns: clamp(var(--min), var(--pos), var(--max)) 1fr;
+		grid-template-columns: clamp(var(--min), var(--pos), var(--max)) minmax(0, 1fr);
 		grid-template-rows: 100%;
 	}
 
 	svelte-split-pane[data-orientation='vertical'] {
-		grid-template-rows: clamp(var(--min), var(--pos), var(--max)) 1fr;
+		grid-template-rows: clamp(var(--min), var(--pos), var(--max)) minmax(0, 1fr);
 		grid-template-columns: 100%;
 	}
 
