@@ -143,7 +143,7 @@
 
 		uiStore.showPreview = () => {
 			editorPanelSplitter!.show(1);
-			previewPanel!.style.display = 'block';
+			previewPanel!.style.display = 'flex';
 		}
 
 		eventController.register('command/ui/console:visibility', consoleVisibility);
