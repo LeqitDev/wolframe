@@ -259,7 +259,7 @@
 		/>
 	</typst-preview-page-container>
 {/snippet}
-<div class="grid min-h-0" style="grid-template-rows: auto minmax(0, 1fr);" id="preview-anchor">
+<div class="grid min-h-0 max-h-screen" style="grid-template-rows: auto minmax(0, 1fr);" id="preview-anchor">
 	<div class="bg-base-200 flex items-center justify-between p-2">
 		<div class="join">
 			<button class="btn btn-sm btn-soft join-item" onclick={() => setZoom(zoom - 0.1)}

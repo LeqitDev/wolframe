@@ -33,7 +33,7 @@ export interface IBackendFileSystem {
 }
 
 interface IMonacoExtension {
-	init?: (monaco: typeof Monaco) => void;
+	init?: (monaco: typeof Monaco) => void | Promise<void>;
 	postInit?: (monaco: typeof Monaco, editor: Monaco.editor.IStandaloneCodeEditor) => void;
 }
 

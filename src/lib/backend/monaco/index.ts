@@ -42,7 +42,7 @@ class MonacoController {
      * @param {HTMLElement} container - The container element for the editor.
      * @throws {Error} - Throws an error if Monaco is not loaded or the editor is already created.
      */
-    createEditor(container: HTMLElement) {
+    async createEditor(container: HTMLElement) {
         if (!this.monaco) {
             throw new Error("Monaco is not loaded yet.");
         } else if (this.editor) {
@@ -52,7 +52,7 @@ class MonacoController {
         debug('info', 'monaco', "Creating Monaco editor...", 'Loaded languages:', this.languages, 'Loaded themes:', this.themes);
 
         for (const language of this.languages) {
-            language.init?.(this.monaco);
+            await language.init?.(this.monaco);
         }
 
         for (const theme of this.themes) {
@@ -70,6 +70,10 @@ class MonacoController {
             readOnly: false,
             fontFamily: 'JetBrains Mono',
             fontLigatures: true,
+            padding: {
+                top: 4,
+            },
+            scrollBeyondLastLine: false,
 			suggest: {
 				showInlineDetails: true,
 				showMethods: true,
