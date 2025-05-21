@@ -88,12 +88,12 @@
 <div class="grid min-h-0 min-w-0" style="grid-template-rows: auto minmax(0, 1fr);">
 	{#if currentlyOpenedFiles.length > 0}
     <div class="overflow-x-auto max-h-12">
-		<div role="tablist" class="tabs tabs-sm tabs-box border-base-100 rounded-none border-t">
+		<div role="tablist" class="tabs tabs-sm tabs-box border-base-100 rounded-none border-t p-0">
 			{#each currentlyOpenedFiles as file (file.file.id)}
 				<button
 					role="tab"
                     type="button"
-					class={['tab', editor.getOpenFileId() === file.file.id ? 'tab-active' : '']}
+					class={['tab rounded-none!', editor.getOpenFileId() === file.file.id ? 'tab-active' : '']}
 					style="--tab-bg: color-mix(in oklab, var(--btn-color, var(--color-base-content)) 8%, var(--color-base-100))"
 					onclick={() => {
 						file.openFile();
@@ -106,7 +106,7 @@
                         e.stopPropagation();
                         
                         file.closeFile();
-                    }} class="ml-1 p-0.5 rounded hover:bg-base-300 z-10"><X class="size-4" /></span>
+                    }} class="ml-1.5 p-0.5 rounded hover:bg-base-300 z-10"><X class="size-4" /></span>
                 </button>
 			{/each}
 		</div>
