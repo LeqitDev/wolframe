@@ -15,7 +15,7 @@ const wasmPromise = fetch(wasmURL)
 
 const scopeUrlMap: Record<string, string> = {
 	'source.typst':
-		'https://raw.githubusercontent.com/nvarner/typst-lsp/refs/heads/master/editors/vscode/typst.tmLanguage.json'
+		'https://raw.githubusercontent.com/michidk/typst-grammar/refs/heads/main/grammars/typst.tmLanguage.json'
 };
 
 const registry = new vsctm.Registry({
