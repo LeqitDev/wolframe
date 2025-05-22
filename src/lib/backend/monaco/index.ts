@@ -106,6 +106,30 @@ class MonacoController {
         this.monaco.editor.remeasureFonts();
     }
 
+    changeTheme(theme: string | Monaco.editor.IStandaloneThemeData, themeName?: string) {
+        if (!this.monaco) {
+            throw new Error("Monaco is not loaded yet.");
+        }
+
+        if (typeof theme === "string") {
+            this.monaco.editor.setTheme(theme);
+        } else {
+            if (!themeName) {
+                throw new Error("Theme name is required when passing a theme object.");
+            }
+            this.monaco.editor.defineTheme(themeName, theme);
+            this.monaco.editor.setTheme(themeName);
+        }
+    }
+
+    getThemes(): Map<string, Monaco.editor.IStandaloneThemeData> {
+        if (!this.editor) {
+            throw new Error("Editor is not loaded yet.");
+        }
+
+        return (this.editor as any)._codeEditorService._knownThemes;
+    }
+
     /**
      * Disposes the Monaco editor instance.
      * This method should be called when the editor is no longer needed.

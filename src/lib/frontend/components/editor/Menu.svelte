@@ -1,10 +1,22 @@
 <script lang="ts">
-	import eventController from "@/lib/backend/events";
 	import DropdownMenuItem from "../DropdownMenuItem.svelte";
 	import { getUiStore } from "@/lib/backend/stores/ui.svelte";
+	import { ComponentWindow } from "../../utils/ComponentWindow";
+	import ThemeEditor from "../dev/monaco/ThemeEditor.svelte";
 
     const uiStore = getUiStore();
     let showConsole = $state(true);
+	let themeEditorWindow = new ComponentWindow();
+
+    $effect(() => {
+        return () => {
+			themeEditorWindow.unmount();
+        }
+    });
+
+    function openThemeEditor() {
+        themeEditorWindow.popout(ThemeEditor);
+    }
 </script>
 
 <ul class="menu menu-horizontal bg-base-200 h-12 w-full gap-2 p-2">
@@ -50,6 +62,11 @@
             <li><a href="/">Zoom In</a></li>
             <li><a href="/">Zoom Out</a></li>
             <li><a href="/">Set Zoom</a></li>
+        </DropdownMenuItem>
+    </li>
+    <li>
+        <DropdownMenuItem name="Development">
+            <li><button onclick={openThemeEditor}>Open Theme Editor</button></li>
         </DropdownMenuItem>
     </li>
 </ul>
