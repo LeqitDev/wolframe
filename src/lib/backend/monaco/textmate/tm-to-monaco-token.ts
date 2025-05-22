@@ -44,6 +44,7 @@ function findMatchingThemeRule2(
 	parentScopes: string[],
 	onlyColorRules: boolean
 ): ThemeRule | null {
+
 	let result: ThemeRule | null = null;
 
 	// Loop backwards, to ensure the last most specific rule wins
@@ -148,7 +149,7 @@ export class ThemeRule {
 		if (!this._matchesOne(selectorScope, scope)) {
 			return false;
 		}
-
+		
 		let selectorParentIndex = selectorParentScopes.length - 1;
 		let parentIndex = parentScopes.length - 1;
 		while (selectorParentIndex >= 0 && parentIndex >= 0) {
@@ -167,5 +168,5 @@ export class ThemeRule {
 
 export const TMToMonacoToken = (theme: IColorTheme, scopes: string[]) => {
 	const themeRule = findMatchingThemeRule(theme, scopes, true);
-	return themeRule ? themeRule.scope : '';
+	return themeRule ? themeRule.rawSelector : ''; // only scope vs rawSelector
 };

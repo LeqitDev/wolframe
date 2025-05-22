@@ -126,13 +126,14 @@ async function createTokensProvider(
 			const lineTokens = grammar.tokenizeLine(line, state);
 			const tokens: Monaco.languages.IToken[] = [];
 			for (const token of lineTokens.tokens) {
+				const scopes = colorTheme ? TMToMonacoToken(colorTheme, token.scopes)
+						: token.scopes[token.scopes.length - 1];
 				tokens.push({
 					startIndex: token.startIndex,
 					// Monaco doesn't support an array of scopes
-					scopes: colorTheme
-						? TMToMonacoToken(colorTheme, token.scopes)
-						: token.scopes[token.scopes.length - 1]
+					scopes
 				});
+				//console.log('token', token, scopes, TMToMonacoToken(colorTheme!, token.scopes));
 			}
 			return { tokens, endState: lineTokens.ruleStack };
 		}

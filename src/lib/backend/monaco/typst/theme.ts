@@ -60,6 +60,8 @@ export class TypstTheme implements IMonacoTheme {
 			rules: tokenColors,
             /* 
                 See playground at https://microsoft.github.io/monaco-editor/playground.html?source=v0.52.2#XQAAAAJVAQAAAAAAAABBqQkHQ5NjdMjwa-jY7SIQ9S7DNlzs5W-mwj0fe1ZCDRFc9ws9XQE0SJE1jc2VKxhaLFIw9vEWSxW3yscwzUw3RgmSa7SUctt0--dGQiknyaYMY3xr3kkxlp8ly-wqeHd4i0HDRY_mBSxDwlBu7VVI9Eu_Z6Cy6jJZ8VqFKdOxNvV_13Xjlk0uJ2xW4GcXd7KyxugZECBrE2HOERUquDGqgvnUh3SNmE4UVO4ZiSfMmMayJm42pXl6mk719B9_Y8N3CA5ObeYljauoEnMzjkQIxkGd392BwjpXxj-zVw4hivC9A4t66Df-6sUrfoOVdqe6KgkAWMOgyyWRhkdhdylBBCJQN5bqZdOWO8ZKu4hVJ6f_0Ri2AA
+				for all possible color settings.
+
 
                 wich code:
                 ```

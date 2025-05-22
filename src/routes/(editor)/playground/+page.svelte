@@ -123,7 +123,7 @@
 }
 
 #let strong-enums(offset: 0, ..body) = enum(numbering: (it) => strong(numbering("a)", it + offset)),..body)`);
-        vfs.addFile("main.typ", "Hello *Typst*!");
+        vfs.addFile("main.typ", "Hello *_Typst_*!");
 
         eventController.fire("files:loaded");
     }
