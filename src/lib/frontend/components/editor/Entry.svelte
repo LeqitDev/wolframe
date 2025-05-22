@@ -77,6 +77,7 @@
 			onclick={() => {
 				entry.openFile();
 			}}
+			class="rounded-none"
 		>
 			<File class="h-4 w-4" strokeWidth="2" />
 			<span class={[editor.getOpenFileId() === entry.file.id ? "underline underline-offset-4 decoration-primary decoration-2" : ""]}>{entry.file.name}</span>
@@ -106,6 +107,7 @@
 
 					moveFile(dropzone!, item!);
 				}}
+				class="rounded-none"
 			>
 				{#if entry.open}
 					<FolderOpen class="h-4 w-4" strokeWidth="2" />

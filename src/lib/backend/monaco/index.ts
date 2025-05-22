@@ -70,6 +70,10 @@ class MonacoController {
             readOnly: false,
             fontFamily: 'JetBrains Mono',
             fontLigatures: true,
+            padding: {
+                top: 4,
+            },
+            scrollBeyondLastLine: false,
 			suggest: {
 				showInlineDetails: true,
 				showMethods: true,
