@@ -15,7 +15,7 @@ const wasmPromise = fetch(wasmURL)
 
 const scopeUrlMap: Record<string, string> = {
 	'source.typst':
-		'https://raw.githubusercontent.com/michidk/typst-grammar/refs/heads/main/grammars/typst.tmLanguage.json'
+		'https://raw.githubusercontent.com/wolframe-project/tinymist-textmate/refs/heads/main/typst.tmLanguage.json'
 };
 
 const registry = new vsctm.Registry({
@@ -34,7 +34,7 @@ const registry = new vsctm.Registry({
 		if (url) {
 			return fetchGrammar(url).then((grammar) => {
 				const parsed_grammar = JSON.parse(grammar);
-				parsed_grammar.repository.markup.patterns = [
+				/* parsed_grammar.repository.markup.patterns = [
 					...parsed_grammar.repository.markup.patterns.slice(0, 28),
 					{
 						comment: 'Module name',
@@ -66,14 +66,15 @@ const registry = new vsctm.Registry({
 						]
 					},
 					...parsed_grammar.repository.markup.patterns.slice(28)
-				];
+				]; */
 				console.log(parsed_grammar);
 
 				return parsed_grammar;
 			});
 		}
 
-		return Promise.reject(new Error(`No grammar found for scope: ${scopeName}`));
+		console.error(`No grammar found for scope: ${scopeName}`);
+		return Promise.resolve(null);
 	}
 });
 
@@ -124,6 +125,7 @@ async function createTokensProvider(
 		},
 		tokenize(line, state: vsctm.StateStack) {
 			const lineTokens = grammar.tokenizeLine(line, state);
+			console.log('lineTokens', line, lineTokens);
 			const tokens: Monaco.languages.IToken[] = [];
 			for (const token of lineTokens.tokens) {
 				const scopes = colorTheme ? TMToMonacoToken(colorTheme, token.scopes)

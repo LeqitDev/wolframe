@@ -34,7 +34,7 @@
 		},
 		{
 			"name": "Comment Doc",
-			"scope": "keyword.operator.assignment.jsdoc,comment.block.documentation variable,comment.block.documentation storage,comment.block.documentation keyword,comment.block.documentation support,comment.block.documentation markup,comment.block.documentation markup.inline.raw.string.markdown,meta.other.type.phpdoc.php keyword.other.type.php,meta.other.type.phpdoc.php support.other.namespace.php,meta.other.type.phpdoc.php punctuation.separator.inheritance.php,meta.other.type.phpdoc.php support.class,keyword.other.phpdoc.php,log.date",
+			"scope": "keyword.operator.assignment.jsdoc,comment.block.documentation variable,comment.block.documentation storage,comment.block.documentation keyword,comment.block.documentation support,comment.block.documentation markup,comment.block.documentation markup.inline.raw.string.markdown,meta.other.type.phpdoc.php keyword.other.type.php,meta.other.type.phpdoc.php support.other.namespace.php,meta.other.type.phpdoc.php punctuation.separator.inheritance.php,meta.other.type.phpdoc.php support.class,keyword.other.phpdoc.php,log.date,comment.line.tidy.typst",
 			"settings": {
 				"foreground": "#5a638c"
 			}
