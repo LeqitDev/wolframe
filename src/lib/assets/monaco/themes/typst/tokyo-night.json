@@ -731,6 +731,14 @@
 			}
 		},
 		{
+			"name": "Tidy Keywords",
+			"scope": "comment.line.tidy.type-annotation.typst entity.name.type.primitive.typst,comment.line.tidy.type-annotation.typst entity.name.type.custom.tidy.typst",
+			"settings": {
+				"fontStyle": "bold",
+				"foreground": "#bb9af7"
+			}
+		},
+		{
 			"name": "Markup - Underline",
 			"scope": "markup.underline,markup.underline punctuation",
 			"settings": {

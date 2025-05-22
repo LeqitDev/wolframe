@@ -35,13 +35,16 @@ const registry = new vsctm.Registry({
 			return fetchGrammar(url).then((grammar) => {
 				const parsed_grammar = JSON.parse(grammar);
 				/* parsed_grammar.repository.markup.patterns = [
-					...parsed_grammar.repository.markup.patterns.slice(0, 28),
+					...parsed_grammar.repository.markup.patterns,
 					{
 						comment: 'Module name',
 						name: 'entity.name.module.typst',
 						match:
 							'((#)(?:[[:alpha:]_][[:alnum:]_-]*\\.)*([[:alpha:]_][[:alnum:]_-]*)!?)(?=\\[|\\()',
 						captures: {
+							'1': {
+								name: 'entity.name.module.typst'
+							},
 							'2': {
 								name: 'punctuation.definition.function.typst'
 							},
@@ -65,7 +68,6 @@ const registry = new vsctm.Registry({
 							}
 						]
 					},
-					...parsed_grammar.repository.markup.patterns.slice(28)
 				]; */
 				console.log(parsed_grammar);
 
