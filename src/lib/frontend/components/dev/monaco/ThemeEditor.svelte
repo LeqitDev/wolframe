@@ -29,7 +29,7 @@
 		name: '',
 		include: ''
 	});
-	let curView: 'none' | 'details' | 'tokens' | 'token' = $state('none');
+	let curView: 'none' | 'details' | 'tokens' | 'token' = $state('tokens');
 	let addNewRule = $state(false);
 	let newRule: ITokenColor = $state({
 		id: createId(),
@@ -59,6 +59,12 @@
 		'editor.selectionBackground',
 		'editorCursor.foreground'
 	];
+
+    const autocomplete = [
+        'markup.bold.typst',
+        'markup.italic.typst',
+        'markup.underline.typst',
+    ]
 
 	const DB_NAME = 'themeEditorDB';
 	const STORE_NAME = 'themes';
@@ -198,6 +204,8 @@
 		curTheme.tokenColors = curTheme.tokenColors!.filter((r) => r.id != rule.id);
 		if (curView == 'token') curView = 'tokens';
 	}
+
+    let openAutocompletes: boolean[] = $state([])
 </script>
 
 {#snippet theme_actions()}
@@ -337,7 +345,14 @@
 			<p class="mb-4 text-2xl">Scopes</p>
             <div class="grid grid-cols-1 gap-2">
                 {#each curRule!.scope as scope, i}
-                    <input type="text" class="input border" bind:value={curRule!.scope[i]} />
+                    <details class="dropdown" bind:open={openAutocompletes[i]}>
+                        <summary class="marker:hidden"><input type="text" class="input border" bind:value={curRule!.scope[i]} onblur={() => openAutocompletes[i]=false} onfocus={() => openAutocompletes[i]=true}  /></summary>
+                        <ul class="">
+                            {#each autocomplete as item}
+                                <li><button>{item}</button></li>
+                            {/each}
+                        </ul>
+                    </details>
                 {/each}
                 <input type="text" class="input border" onblur={(e) => {
                     if ((e.target! as HTMLInputElement).value) {
@@ -349,12 +364,6 @@
 		</div>
 	</div>
 {/snippet}
-
-<svelte:window
-	onmousedown={(e) => {
-		console.log(e);
-	}}
-/>
 
 <div class="flex h-screen w-screen flex-col gap-2"
 		style="--cp-bg-color: #333; --cp-input-color: #555;--cp-button-hover-color: #777;">
