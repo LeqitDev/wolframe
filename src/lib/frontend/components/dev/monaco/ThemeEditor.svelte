@@ -1,7 +1,8 @@
 <script lang="ts">
 	import type { Grammar } from "@/app.types";
     import monacoController from "@/lib/backend/monaco";
-	import { convertTheme, type IVScodeTheme } from "@/lib/backend/monaco/textmate/theme-converter";
+	import { convertTheme, type IVScodeTheme, type TokenColor } from "@/lib/backend/monaco/textmate/theme-converter";
+	import { Plus } from "lucide-svelte";
     import ColorPicker from 'svelte-awesome-color-picker';
 
     const grammars: {[key: string]: string} = {
@@ -17,7 +18,13 @@
         name: '',
         include: ''
     });
-    let curView: "none" | "details" | "tokens" | "token" = $state('details');
+    let curView: "none" | "details" | "tokens" | "token" = $state('tokens');
+    let addNewRule = $state(false);
+    let newRule: TokenColor = $state({
+        name: '',
+        scope: [],
+        settings: {}
+    })
 
     let {
         window: newWindow
@@ -136,6 +143,18 @@
         const grammarText = await grammar.json();
         return grammarText as Grammar;
     }
+
+    function putNewRule() {
+        if (addNewRule) {
+            curTheme.tokenColors!.push(newRule);
+            addNewRule = false;
+            newRule = {
+                name: '',
+                scope: [],
+                settings: {}
+            };
+        }
+    }
 </script>
 
 {#snippet theme_actions()}
@@ -179,7 +198,23 @@
 {/snippet}
 
 {#snippet theme_tokens()}
-    <div></div>
+    <div class="grid grid-cols-2 gap-2">
+        {#if addNewRule}
+            <div>
+                <div class="flex flex-col gap-2">
+                    <label for="tokenName">Name</label>
+                    <input type="text" id="tokenName" class="input" bind:value={newRule.name} />
+                </div>
+                <button class="btn btn-primary" onclick={putNewRule}>Add Rule</button>
+            </div>
+        {/if}
+        {#each curTheme.tokenColors as token}
+            <div class="flex flex-col gap-2">
+                <p class="text-2xl">{token.name}</p>
+                <button class="btn btn-primary" onclick={() => { curView = 'token'; }}>Edit</button>
+            </div>
+        {/each}
+    </div>
 {/snippet}
 
 {#snippet theme_token()}
@@ -195,7 +230,8 @@
         <div class="flex justify-between">
             <div class="flex gap-2">
                 {#if curView != "none"}<button class="btn btn-primary" onclick={lastView}>Back</button>{/if}
-                <p>Grammar {g.name}</p>
+                {#if curView == "tokens"}<button class="btn btn-primary" onclick={() => {addNewRule = true}}><Plus /></button>{/if}
+                <p>Grammar {g.name} {curView}</p>
             </div>
             <div>
                 {@render theme_actions()}
