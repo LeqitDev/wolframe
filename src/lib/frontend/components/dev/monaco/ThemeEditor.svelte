@@ -1,5 +1,5 @@
 <script lang="ts">
-	import type { Grammar } from '@/app.types';
+	import type { Grammar, Pattern } from '@/app.types';
 	import monacoController from '@/lib/backend/monaco';
 	import {
 		convertTheme,
@@ -9,6 +9,7 @@
 	import { createId } from '@paralleldrive/cuid2';
 	import { ChevronLeft, Plus } from 'lucide-svelte';
 	import ColorPicker from 'svelte-awesome-color-picker';
+	import TagInput from '../../TagInput.svelte';
 
 	const grammars: { [key: string]: string } = {
 		typst:
@@ -29,7 +30,7 @@
 		name: '',
 		include: ''
 	});
-	let curView: 'none' | 'details' | 'tokens' | 'token' = $state('tokens');
+	let curView: 'none' | 'details' | 'tokens' | 'token' = $state('none');
 	let addNewRule = $state(false);
 	let newRule: ITokenColor = $state({
 		id: createId(),
@@ -65,6 +66,8 @@
         'markup.italic.typst',
         'markup.underline.typst',
     ]
+
+    let indexedGrammarScopes: string[] = [];
 
 	const DB_NAME = 'themeEditorDB';
 	const STORE_NAME = 'themes';
@@ -168,9 +171,32 @@
 		}
 	}
 
+    function getScopesFromPattern(pattern: Pattern): string[] {
+        const scopes: string[] = [];
+        if (pattern.name) {
+            scopes.push(pattern.name);
+        }
+        if ('patterns' in pattern && pattern.patterns) {
+            for (const subPattern of pattern.patterns) {
+                scopes.push(...getScopesFromPattern(subPattern));
+            }
+        }
+        return scopes;
+    }
+
+    function indexGrammar(grammar: Grammar) {
+        indexedGrammarScopes = [];
+        if (!grammar.repository) return;
+        for (const key of Object.keys(grammar.repository)) {
+            const rule = grammar.repository[key];
+            indexedGrammarScopes.push(...getScopesFromPattern(rule));
+        }
+    }
+
 	async function loadGrammar() {
 		const grammar = await fetch(grammars[curGrammar]);
 		const grammarText = await grammar.json();
+        indexGrammar(grammarText);
 		return grammarText as Grammar;
 	}
 
@@ -204,8 +230,6 @@
 		curTheme.tokenColors = curTheme.tokenColors!.filter((r) => r.id != rule.id);
 		if (curView == 'token') curView = 'tokens';
 	}
-
-    let openAutocompletes: boolean[] = $state([])
 </script>
 
 {#snippet theme_actions()}
@@ -260,7 +284,7 @@
 {/snippet}
 
 {#snippet theme_tokens()}
-	<div class="grid h-full min-w-0 grid-cols-1 gap-6">
+	<div class="grid min-w-0 grid-cols-1 gap-6">
 		{#if addNewRule}
 			<div class="flex flex-col gap-4">
 				<p class="text-2xl">New Rule</p>
@@ -345,21 +369,11 @@
 			<p class="mb-4 text-2xl">Scopes</p>
             <div class="grid grid-cols-1 gap-2">
                 {#each curRule!.scope as scope, i}
-                    <details class="dropdown" bind:open={openAutocompletes[i]}>
-                        <summary class="marker:hidden"><input type="text" class="input border" bind:value={curRule!.scope[i]} onblur={() => openAutocompletes[i]=false} onfocus={() => openAutocompletes[i]=true}  /></summary>
-                        <ul class="">
-                            {#each autocomplete as item}
-                                <li><button>{item}</button></li>
-                            {/each}
-                        </ul>
-                    </details>
+                    <TagInput bind:value={curRule!.scope[i]} useCompletions={true} completions={indexedGrammarScopes} />
                 {/each}
-                <input type="text" class="input border" onblur={(e) => {
-                    if ((e.target! as HTMLInputElement).value) {
-                        curRule!.scope.push((e.target! as HTMLInputElement).value);
-                        (e.target! as HTMLInputElement).value = '';
-                    }
-                }} placeholder="Add new scope" />
+                <button class="btn btn-primary max-w-xs" onclick={(e) => {
+                    curRule!.scope.push("");
+                }}>Add new scope</button>
             </div>
 		</div>
 	</div>
