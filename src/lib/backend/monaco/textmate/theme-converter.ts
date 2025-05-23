@@ -56,7 +56,7 @@ function convertTheme(theme: IVScodeTheme): editor.IStandaloneThemeData {
 					: theme.type === 'hcDark'
 						? 'hc-black'
 						: 'vs-dark',
-		inherit: false,
+		inherit: true,
 		rules,
 		colors: theme.colors || {}
 	};
