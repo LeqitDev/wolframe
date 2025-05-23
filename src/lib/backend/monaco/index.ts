@@ -117,6 +117,7 @@ class MonacoController {
             if (!themeName) {
                 throw new Error("Theme name is required when passing a theme object.");
             }
+            console.log("Setting theme", themeName, theme);
             this.monaco.editor.defineTheme(themeName, theme);
             this.monaco.editor.setTheme(themeName);
         }
